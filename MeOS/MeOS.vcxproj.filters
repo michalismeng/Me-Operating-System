@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Boot">
+      <UniqueIdentifier>{59f5a754-2fcd-412f-8e51-f81994be24de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Batch Scripts">
+      <UniqueIdentifier>{239d5659-6e7a-4f4a-b262-a3ca60735aab}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="descriptor_tables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utility.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="screen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cstring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="system.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="isr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="timer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mmngr_phys.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vmmngr_pte.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vmmngr_pde.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="kasm.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
+    <MASM Include="..\Boot\boot.asm">
+      <Filter>Boot</Filter>
+    </MASM>
+    <MASM Include="..\Boot\stage2.asm">
+      <Filter>Boot</Filter>
+    </MASM>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="descriptor_tables.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="types.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utility.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="screen.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cstring.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="system.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="isr.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pit.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="timer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="boot_info.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vmmngr_pte.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mmngr_phys.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vmmngr_pde.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Boot\BootCommon.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\BootInfo.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\common16.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\common32.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\GDT.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\memory.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Boot\stage2.sys">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="..\Batch Scripts\format.bat">
+      <Filter>Batch Scripts</Filter>
+    </None>
+    <None Include="..\Batch Scripts\Run.bat">
+      <Filter>Batch Scripts</Filter>
+    </None>
+  </ItemGroup>
+</Project>
