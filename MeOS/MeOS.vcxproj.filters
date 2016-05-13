@@ -115,6 +115,9 @@
     <ClInclude Include="vmmngr_pde.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="mmngr_virtual.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Boot\BootCommon.inc">

@@ -52,6 +52,7 @@
     <ClInclude Include="descriptor_tables.h" />
     <ClInclude Include="isr.h" />
     <ClInclude Include="mmngr_phys.h" />
+    <ClInclude Include="mmngr_virtual.h" />
     <ClInclude Include="pic.h" />
     <ClInclude Include="pit.h" />
     <ClInclude Include="screen.h" />
