@@ -20,21 +20,23 @@ _canOutput DB	01H
 	DD	FLAT:$SG3021
 _DATA	ENDS
 CONST	SEGMENT
-$SG3174	DB	'Max blocks: %u', 00H
-$SG3177	DB	00H
-$SG3175	DB	'Available blocks: %u', 00H
+$SG3172	DB	'Max blocks: %u', 00H
+$SG3175	DB	00H
+$SG3173	DB	'Available blocks: %u', 00H
 	ORG $+3
-$SG3176	DB	'Used blocks: %u', 00H
-$SG3191	DB	'Welcome to ME Operating System', 0aH, 00H
-$SG3192	DB	'Memory detected: %h KB %h MB', 0aH, 00H
+$SG3174	DB	'Used blocks: %u', 00H
+$SG3189	DB	'Welcome to ME Operating System', 0aH, 00H
+$SG3190	DB	'Memory detected: %h KB %h MB', 0aH, 00H
 	ORG $+2
-$SG3193	DB	'Kernel size: %u bytes', 0aH, 00H
+$SG3191	DB	'Kernel size: %u bytes', 0aH, 00H
 	ORG $+1
-$SG3194	DB	'Boot device: %h', 0aH, 00H
+$SG3192	DB	'Boot device: %h', 0aH, 00H
+	ORG $+7
+$SG3195	DB	'region %i: start: 0x%x %x length (bytes): 0x%x %x type: '
+	DB	'%i (%s)', 0aH, 00H
 	ORG $+3
-$SG3197	DB	'region %i: start: 0x%x%x length (bytes): 0x%x%x type: %i'
-	DB	' (%s)', 0aH, 00H
-	ORG $+1
+$SG3197	DB	'allocation at %h', 00H
+	ORG $+3
 $SG3018	DB	'Available', 00H
 	ORG $+2
 $SG3019	DB	'Reserved', 00H
@@ -55,12 +57,14 @@ EXTRN	_timer_callback:PROC
 EXTRN	_pmmngr_init:PROC
 EXTRN	_pmmngr_init_region:PROC
 EXTRN	_pmmngr_deinit_region:PROC
+EXTRN	_pmmngr_alloc_blocks:PROC
 EXTRN	_pmmngr_get_block_use_count:PROC
 EXTRN	_pmmngr_get_free_block_count:PROC
 EXTRN	_pmmngr_get_block_count:PROC
+EXTRN	_pmmngr_get_block_size:PROC
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-_kernel_size_sectors$ = -16				; size = 4
+_kernel_size_bytes$ = -16				; size = 4
 _memoryKB$ = -12					; size = 4
 _region$ = -8						; size = 4
 _i$1 = -4						; size = 4
@@ -72,7 +76,7 @@ _boot_info$ = 8						; size = 4
 	mov	ebp, esp
 	sub	esp, 16					; 00000010H
 ; Line 372
-	mov	DWORD PTR _kernel_size_sectors$[ebp], edx
+	mov	DWORD PTR _kernel_size_bytes$[ebp], edx
 ; Line 374
 	cli
 ; Line 375
@@ -92,7 +96,7 @@ _boot_info$ = 8						; size = 4
 ; Line 381
 	call	_ClearScreen
 ; Line 385
-	push	OFFSET $SG3191
+	push	OFFSET $SG3189
 	call	_printf
 	add	esp, 4
 ; Line 387
@@ -109,27 +113,26 @@ _boot_info$ = 8						; size = 4
 	push	edx
 	mov	eax, DWORD PTR _memoryKB$[ebp]
 	push	eax
-	push	OFFSET $SG3192
+	push	OFFSET $SG3190
 	call	_printf
 	add	esp, 12					; 0000000cH
 ; Line 390
-	mov	ecx, DWORD PTR _kernel_size_sectors$[ebp]
+	mov	ecx, DWORD PTR _kernel_size_bytes$[ebp]
 	push	ecx
-	push	OFFSET $SG3193
+	push	OFFSET $SG3191
 	call	_printf
 	add	esp, 8
 ; Line 392
 	mov	edx, DWORD PTR _boot_info$[ebp]
 	mov	eax, DWORD PTR [edx+12]
 	push	eax
-	push	OFFSET $SG3194
+	push	OFFSET $SG3192
 	call	_printf
 	add	esp, 8
 ; Line 394
 	mov	DWORD PTR _region$[ebp], 1280		; 00000500H
 ; Line 396
-	mov	ecx, DWORD PTR _kernel_size_sectors$[ebp]
-	shl	ecx, 9
+	mov	ecx, DWORD PTR _kernel_size_bytes$[ebp]
 	add	ecx, 1048576				; 00100000H
 	push	ecx
 	mov	edx, DWORD PTR _memoryKB$[ebp]
@@ -192,13 +195,13 @@ $LN8@kmain:
 	push	edx
 	mov	eax, DWORD PTR _i$1[ebp]
 	push	eax
-	push	OFFSET $SG3197
+	push	OFFSET $SG3195
 	call	_printf
 	add	esp, 32					; 00000020H
 ; Line 411
 	imul	ecx, DWORD PTR _i$1[ebp], 24
 	mov	edx, DWORD PTR _region$[ebp]
-	cmp	DWORD PTR [edx+ecx+16], 0
+	cmp	DWORD PTR [edx+ecx+16], 1
 	jne	SHORT $LN9@kmain
 ; Line 412
 	imul	eax, DWORD PTR _i$1[ebp], 24
@@ -216,26 +219,38 @@ $LN9@kmain:
 	jmp	$LN2@kmain
 $LN3@kmain:
 ; Line 415
-	mov	eax, DWORD PTR _kernel_size_sectors$[ebp]
-	shl	eax, 9
+	mov	eax, DWORD PTR _kernel_size_bytes$[ebp]
 	push	eax
 	push	1048576					; 00100000H
 	call	_pmmngr_deinit_region
 	add	esp, 8
 ; Line 417
-	mov	BYTE PTR _canOutput, 1
+	call	?GetMemoryStats@@YAXXZ			; GetMemoryStats
 ; Line 419
+	call	_pmmngr_get_block_size
+	mov	ecx, eax
+	mov	eax, 654336				; 0009fc00H
+	xor	edx, edx
+	div	ecx
+	push	eax
+	call	_pmmngr_alloc_blocks
+	add	esp, 4
+	push	eax
+	push	OFFSET $SG3197
+	call	_printfln
+	add	esp, 8
+; Line 421
 	call	?GetMemoryStats@@YAXXZ			; GetMemoryStats
 $LN5@kmain:
-; Line 421
-	mov	ecx, 1
-	test	ecx, ecx
+; Line 423
+	mov	edx, 1
+	test	edx, edx
 	je	SHORT $LN6@kmain
 	jmp	SHORT $LN5@kmain
 $LN6@kmain:
-; Line 423
+; Line 425
 	mov	eax, -559039814				; deadbabaH
-; Line 424
+; Line 426
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -251,23 +266,23 @@ _TEXT	SEGMENT
 ; Line 362
 	call	_pmmngr_get_block_count
 	push	eax
-	push	OFFSET $SG3174
+	push	OFFSET $SG3172
 	call	_printfln
 	add	esp, 8
 ; Line 363
 	call	_pmmngr_get_free_block_count
 	push	eax
-	push	OFFSET $SG3175
+	push	OFFSET $SG3173
 	call	_printfln
 	add	esp, 8
 ; Line 364
 	call	_pmmngr_get_block_use_count
 	push	eax
-	push	OFFSET $SG3176
+	push	OFFSET $SG3174
 	call	_printfln
 	add	esp, 8
 ; Line 366
-	push	OFFSET $SG3177
+	push	OFFSET $SG3175
 	call	_printfln
 	add	esp, 4
 ; Line 367

@@ -15,6 +15,11 @@ _mmngr_used_blocks DD 01H DUP (?)
 _mmngr_max_blocks DD 01H DUP (?)
 _mmngr_bitmap DD 01H DUP (?)
 _BSS	ENDS
+CONST	SEGMENT
+$SG2854	DB	'init aligned size: %h', 00H
+	ORG $+2
+$SG2867	DB	'deinit aligned size: %h', 00H
+CONST	ENDS
 PUBLIC	_pmmngr_init
 PUBLIC	_pmmngr_init_region
 PUBLIC	_pmmngr_deinit_region
@@ -36,6 +41,7 @@ PUBLIC	?mmap_unset@@YAXH@Z				; mmap_unset
 PUBLIC	?mmap_test@@YA_NH@Z				; mmap_test
 PUBLIC	?mmap_first_free@@YAHXZ				; mmap_first_free
 PUBLIC	?mmap_first_free_s@@YAHI@Z			; mmap_first_free_s
+EXTRN	_printfln:PROC
 EXTRN	_memset:PROC
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
@@ -339,15 +345,15 @@ _TEXT	SEGMENT
 _addr$ = -4						; size = 4
 _pmmngr_get_PDBR PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 276
+; Line 280
 	push	ebp
 	mov	ebp, esp
 	push	ecx
-; Line 281
+; Line 285
 	mov	eax, cr3
-; Line 282
+; Line 286
 	mov	DWORD PTR _addr$[ebp], eax
-; Line 284
+; Line 288
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -358,14 +364,14 @@ _TEXT	SEGMENT
 _addr$ = 8						; size = 4
 _pmmngr_load_PDBR PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 267
+; Line 271
 	push	ebp
 	mov	ebp, esp
-; Line 270
+; Line 274
 	mov	eax, DWORD PTR _addr$[ebp]
-; Line 271
+; Line 275
 	mov	cr3, eax
-; Line 273
+; Line 277
 	pop	ebp
 	ret	0
 _pmmngr_load_PDBR ENDP
@@ -375,26 +381,26 @@ _TEXT	SEGMENT
 _res$ = -4						; size = 4
 _pmmngr_get_paging_enabled PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 251
+; Line 255
 	push	ebp
 	mov	ebp, esp
 	push	ecx
-; Line 256
-	mov	eax, cr0
-; Line 257
-	mov	DWORD PTR _res$[ebp], eax
 ; Line 260
+	mov	eax, cr0
+; Line 261
+	mov	DWORD PTR _res$[ebp], eax
+; Line 264
 	mov	eax, DWORD PTR _res$[ebp]
 	and	eax, -2147483648			; 80000000H
 	je	SHORT $LN2@pmmngr_get
-; Line 261
+; Line 265
 	mov	al, 1
 	jmp	SHORT $LN1@pmmngr_get
 $LN2@pmmngr_get:
-; Line 263
+; Line 267
 	xor	al, al
 $LN1@pmmngr_get:
-; Line 264
+; Line 268
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -405,27 +411,27 @@ _TEXT	SEGMENT
 _flag$ = 8						; size = 1
 _pmmngr_paging_enable PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 231
+; Line 235
 	push	ebp
 	mov	ebp, esp
-; Line 234
+; Line 238
 	mov	eax, cr0
-; Line 235
+; Line 239
 	cmp	BYTE PTR _flag$[ebp], 1
-; Line 236
+; Line 240
 	jne	SHORT $disable$3
 $enable$4:
-; Line 239
+; Line 243
 	or	eax, -2147483648			; 80000000H
-; Line 240
+; Line 244
 	jmp	SHORT $done$5
 $disable$3:
-; Line 243
+; Line 247
 	and	eax, 2147483647				; 7fffffffH
 $done$5:
-; Line 246
+; Line 250
 	mov	cr0, eax
-; Line 248
+; Line 252
 	pop	ebp
 	ret	0
 _pmmngr_paging_enable ENDP
@@ -434,12 +440,12 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 _pmmngr_get_block_size PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 226
+; Line 230
 	push	ebp
 	mov	ebp, esp
-; Line 227
+; Line 231
 	mov	eax, 4096				; 00001000H
-; Line 228
+; Line 232
 	pop	ebp
 	ret	0
 _pmmngr_get_block_size ENDP
@@ -448,12 +454,12 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 _pmmngr_get_block_count PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 221
+; Line 225
 	push	ebp
 	mov	ebp, esp
-; Line 222
+; Line 226
 	mov	eax, DWORD PTR _mmngr_max_blocks
-; Line 223
+; Line 227
 	pop	ebp
 	ret	0
 _pmmngr_get_block_count ENDP
@@ -462,13 +468,13 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 _pmmngr_get_free_block_count PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 216
+; Line 220
 	push	ebp
 	mov	ebp, esp
-; Line 217
+; Line 221
 	mov	eax, DWORD PTR _mmngr_max_blocks
 	sub	eax, DWORD PTR _mmngr_used_blocks
-; Line 218
+; Line 222
 	pop	ebp
 	ret	0
 _pmmngr_get_free_block_count ENDP
@@ -477,12 +483,12 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 _pmmngr_get_block_use_count PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 211
+; Line 215
 	push	ebp
 	mov	ebp, esp
-; Line 212
+; Line 216
 	mov	eax, DWORD PTR _mmngr_used_blocks
-; Line 213
+; Line 217
 	pop	ebp
 	ret	0
 _pmmngr_get_block_use_count ENDP
@@ -491,12 +497,12 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 _pmmngr_get_memory_size PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 206
+; Line 210
 	push	ebp
 	mov	ebp, esp
-; Line 207
+; Line 211
 	mov	eax, DWORD PTR _mmngr_memory_size
-; Line 208
+; Line 212
 	pop	ebp
 	ret	0
 _pmmngr_get_memory_size ENDP
@@ -510,18 +516,18 @@ _block$ = 8						; size = 4
 _count$ = 12						; size = 4
 _pmmngr_free_blocks PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 191
+; Line 195
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 12					; 0000000cH
-; Line 192
+; Line 196
 	mov	eax, DWORD PTR _block$[ebp]
 	mov	DWORD PTR _addr$[ebp], eax
-; Line 193
+; Line 197
 	mov	ecx, DWORD PTR _addr$[ebp]
 	shr	ecx, 12					; 0000000cH
 	mov	DWORD PTR _frame$[ebp], ecx
-; Line 195
+; Line 199
 	mov	DWORD PTR _i$1[ebp], 0
 	jmp	SHORT $LN4@pmmngr_fre
 $LN2@pmmngr_fre:
@@ -532,7 +538,7 @@ $LN4@pmmngr_fre:
 	mov	eax, DWORD PTR _i$1[ebp]
 	cmp	eax, DWORD PTR _count$[ebp]
 	jae	SHORT $LN1@pmmngr_fre
-; Line 197
+; Line 201
 	mov	ecx, DWORD PTR _frame$[ebp]
 	add	ecx, DWORD PTR _i$1[ebp]
 	push	ecx
@@ -541,20 +547,20 @@ $LN4@pmmngr_fre:
 	movzx	edx, al
 	cmp	edx, 1
 	jne	SHORT $LN5@pmmngr_fre
-; Line 199
+; Line 203
 	mov	eax, DWORD PTR _frame$[ebp]
 	push	eax
 	call	?mmap_unset@@YAXH@Z			; mmap_unset
 	add	esp, 4
-; Line 200
+; Line 204
 	mov	ecx, DWORD PTR _mmngr_used_blocks
 	sub	ecx, 1
 	mov	DWORD PTR _mmngr_used_blocks, ecx
 $LN5@pmmngr_fre:
-; Line 202
+; Line 206
 	jmp	SHORT $LN2@pmmngr_fre
 $LN1@pmmngr_fre:
-; Line 203
+; Line 207
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -568,32 +574,32 @@ _i$1 = -4						; size = 4
 _count$ = 8						; size = 4
 _pmmngr_alloc_blocks PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 172
+; Line 176
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 12					; 0000000cH
-; Line 173
+; Line 177
 	call	_pmmngr_get_free_block_count
 	cmp	eax, DWORD PTR _count$[ebp]
 	jae	SHORT $LN5@pmmngr_all
-; Line 174
+; Line 178
 	xor	eax, eax
 	jmp	SHORT $LN1@pmmngr_all
 $LN5@pmmngr_all:
-; Line 176
+; Line 180
 	mov	eax, DWORD PTR _count$[ebp]
 	push	eax
 	call	?mmap_first_free_s@@YAHI@Z		; mmap_first_free_s
 	add	esp, 4
 	mov	DWORD PTR _frame$[ebp], eax
-; Line 178
+; Line 182
 	cmp	DWORD PTR _frame$[ebp], -1
 	jne	SHORT $LN6@pmmngr_all
-; Line 179
+; Line 183
 	xor	eax, eax
 	jmp	SHORT $LN1@pmmngr_all
 $LN6@pmmngr_all:
-; Line 181
+; Line 185
 	mov	DWORD PTR _i$1[ebp], 0
 	jmp	SHORT $LN4@pmmngr_all
 $LN2@pmmngr_all:
@@ -604,7 +610,7 @@ $LN4@pmmngr_all:
 	mov	edx, DWORD PTR _i$1[ebp]
 	cmp	edx, DWORD PTR _count$[ebp]
 	jae	SHORT $LN3@pmmngr_all
-; Line 182
+; Line 186
 	mov	eax, DWORD PTR _frame$[ebp]
 	add	eax, DWORD PTR _i$1[ebp]
 	push	eax
@@ -612,18 +618,18 @@ $LN4@pmmngr_all:
 	add	esp, 4
 	jmp	SHORT $LN2@pmmngr_all
 $LN3@pmmngr_all:
-; Line 184
+; Line 188
 	mov	ecx, DWORD PTR _frame$[ebp]
 	shl	ecx, 12					; 0000000cH
 	mov	DWORD PTR _addr$[ebp], ecx
-; Line 185
+; Line 189
 	mov	edx, DWORD PTR _mmngr_used_blocks
 	add	edx, DWORD PTR _count$[ebp]
 	mov	DWORD PTR _mmngr_used_blocks, edx
-; Line 187
+; Line 191
 	mov	eax, DWORD PTR _addr$[ebp]
 $LN1@pmmngr_all:
-; Line 188
+; Line 192
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -636,18 +642,18 @@ _frame$ = -4						; size = 4
 _block$ = 8						; size = 4
 _pmmngr_free_block PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 160
+; Line 164
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 8
-; Line 161
+; Line 165
 	mov	eax, DWORD PTR _block$[ebp]
 	mov	DWORD PTR _addr$[ebp], eax
-; Line 162
+; Line 166
 	mov	ecx, DWORD PTR _addr$[ebp]
 	shr	ecx, 12					; 0000000cH
 	mov	DWORD PTR _frame$[ebp], ecx
-; Line 164
+; Line 168
 	mov	edx, DWORD PTR _frame$[ebp]
 	push	edx
 	call	?mmap_test@@YA_NH@Z			; mmap_test
@@ -655,17 +661,17 @@ _pmmngr_free_block PROC
 	movzx	eax, al
 	cmp	eax, 1
 	jne	SHORT $LN1@pmmngr_fre
-; Line 166
+; Line 170
 	mov	ecx, DWORD PTR _frame$[ebp]
 	push	ecx
 	call	?mmap_unset@@YAXH@Z			; mmap_unset
 	add	esp, 4
-; Line 167
+; Line 171
 	mov	edx, DWORD PTR _mmngr_used_blocks
 	sub	edx, 1
 	mov	DWORD PTR _mmngr_used_blocks, edx
 $LN1@pmmngr_fre:
-; Line 169
+; Line 173
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -677,45 +683,45 @@ _addr$ = -8						; size = 4
 _frame$ = -4						; size = 4
 _pmmngr_alloc_block PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 142
+; Line 146
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 8
-; Line 143
+; Line 147
 	call	_pmmngr_get_free_block_count
 	test	eax, eax
 	ja	SHORT $LN2@pmmngr_all
-; Line 144
+; Line 148
 	xor	eax, eax
 	jmp	SHORT $LN1@pmmngr_all
 $LN2@pmmngr_all:
-; Line 146
+; Line 150
 	call	?mmap_first_free@@YAHXZ			; mmap_first_free
 	mov	DWORD PTR _frame$[ebp], eax
-; Line 148
+; Line 152
 	cmp	DWORD PTR _frame$[ebp], -1
 	jne	SHORT $LN3@pmmngr_all
-; Line 149
+; Line 153
 	xor	eax, eax
 	jmp	SHORT $LN1@pmmngr_all
 $LN3@pmmngr_all:
-; Line 151
+; Line 155
 	mov	eax, DWORD PTR _frame$[ebp]
 	push	eax
 	call	?mmap_set@@YAXH@Z			; mmap_set
 	add	esp, 4
-; Line 153
+; Line 157
 	mov	ecx, DWORD PTR _frame$[ebp]
 	shl	ecx, 12					; 0000000cH
 	mov	DWORD PTR _addr$[ebp], ecx
-; Line 154
+; Line 158
 	mov	edx, DWORD PTR _mmngr_used_blocks
 	add	edx, 1
 	mov	DWORD PTR _mmngr_used_blocks, edx
-; Line 156
+; Line 160
 	mov	eax, DWORD PTR _addr$[ebp]
 $LN1@pmmngr_all:
-; Line 157
+; Line 161
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -723,7 +729,7 @@ _pmmngr_alloc_block ENDP
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-tv75 = -16						; size = 4
+tv77 = -16						; size = 4
 _aligned_size$ = -12					; size = 4
 _i$1 = -8						; size = 4
 _aligned_addr$ = -4					; size = 4
@@ -731,63 +737,69 @@ _base$ = 8						; size = 4
 _size$ = 12						; size = 4
 _pmmngr_deinit_region PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_phys.cpp
-; Line 124
+; Line 126
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 16					; 00000010H
-; Line 125
+; Line 127
 	cmp	DWORD PTR _size$[ebp], 0
 	jne	SHORT $LN5@pmmngr_dei
-; Line 126
+; Line 128
 	jmp	SHORT $LN1@pmmngr_dei
 $LN5@pmmngr_dei:
-; Line 128
+; Line 130
 	mov	eax, DWORD PTR _base$[ebp]
 	shr	eax, 12					; 0000000cH
 	mov	DWORD PTR _aligned_addr$[ebp], eax
-; Line 129
+; Line 131
 	mov	ecx, DWORD PTR _size$[ebp]
 	sub	ecx, 1
 	shr	ecx, 12					; 0000000cH
 	mov	DWORD PTR _aligned_size$[ebp], ecx
-; Line 131
+; Line 133
+	mov	edx, DWORD PTR _aligned_size$[ebp]
+	push	edx
+	push	OFFSET $SG2867
+	call	_printfln
+	add	esp, 8
+; Line 135
 	mov	DWORD PTR _i$1[ebp], 0
 	jmp	SHORT $LN4@pmmngr_dei
 $LN2@pmmngr_dei:
-	mov	edx, DWORD PTR _i$1[ebp]
-	add	edx, 1
-	mov	DWORD PTR _i$1[ebp], edx
-$LN4@pmmngr_dei:
 	mov	eax, DWORD PTR _i$1[ebp]
-	cmp	eax, DWORD PTR _aligned_size$[ebp]
+	add	eax, 1
+	mov	DWORD PTR _i$1[ebp], eax
+$LN4@pmmngr_dei:
+	mov	ecx, DWORD PTR _i$1[ebp]
+	cmp	ecx, DWORD PTR _aligned_size$[ebp]
 	ja	SHORT $LN1@pmmngr_dei
-; Line 133
-	mov	ecx, DWORD PTR _aligned_addr$[ebp]
-	push	ecx
+; Line 137
+	mov	edx, DWORD PTR _aligned_addr$[ebp]
+	push	edx
 	call	?mmap_test@@YA_NH@Z			; mmap_test
 	add	esp, 4
-	movzx	edx, al
-	test	edx, edx
+	movzx	eax, al
+	test	eax, eax
 	jne	SHORT $LN6@pmmngr_dei
-; Line 135
-	mov	eax, DWORD PTR _aligned_addr$[ebp]
-	mov	DWORD PTR tv75[ebp], eax
-	mov	ecx, DWORD PTR tv75[ebp]
-	push	ecx
+; Line 139
+	mov	ecx, DWORD PTR _aligned_addr$[ebp]
+	mov	DWORD PTR tv77[ebp], ecx
+	mov	edx, DWORD PTR tv77[ebp]
+	push	edx
 	call	?mmap_set@@YAXH@Z			; mmap_set
 	add	esp, 4
-	mov	edx, DWORD PTR _aligned_addr$[ebp]
-	add	edx, 1
-	mov	DWORD PTR _aligned_addr$[ebp], edx
-; Line 136
-	mov	eax, DWORD PTR _mmngr_used_blocks
+	mov	eax, DWORD PTR _aligned_addr$[ebp]
 	add	eax, 1
-	mov	DWORD PTR _mmngr_used_blocks, eax
+	mov	DWORD PTR _aligned_addr$[ebp], eax
+; Line 140
+	mov	ecx, DWORD PTR _mmngr_used_blocks
+	add	ecx, 1
+	mov	DWORD PTR _mmngr_used_blocks, ecx
 $LN6@pmmngr_dei:
-; Line 138
+; Line 142
 	jmp	SHORT $LN2@pmmngr_dei
 $LN1@pmmngr_dei:
-; Line 139
+; Line 143
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -795,7 +807,7 @@ _pmmngr_deinit_region ENDP
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-tv75 = -16						; size = 4
+tv77 = -16						; size = 4
 _aligned_size$ = -12					; size = 4
 _i$1 = -8						; size = 4
 _aligned_addr$ = -4					; size = 4
@@ -811,7 +823,7 @@ _pmmngr_init_region PROC
 	cmp	DWORD PTR _size$[ebp], 0
 	jne	SHORT $LN5@pmmngr_ini
 ; Line 105
-	jmp	SHORT $LN1@pmmngr_ini
+	jmp	$LN1@pmmngr_ini
 $LN5@pmmngr_ini:
 ; Line 107
 	mov	eax, DWORD PTR _base$[ebp]
@@ -823,48 +835,54 @@ $LN5@pmmngr_ini:
 	shr	ecx, 12					; 0000000cH
 	mov	DWORD PTR _aligned_size$[ebp], ecx
 ; Line 110
+	mov	edx, DWORD PTR _aligned_size$[ebp]
+	push	edx
+	push	OFFSET $SG2854
+	call	_printfln
+	add	esp, 8
+; Line 112
 	mov	DWORD PTR _i$1[ebp], 0
 	jmp	SHORT $LN4@pmmngr_ini
 $LN2@pmmngr_ini:
-	mov	edx, DWORD PTR _i$1[ebp]
-	add	edx, 1
-	mov	DWORD PTR _i$1[ebp], edx
-$LN4@pmmngr_ini:
 	mov	eax, DWORD PTR _i$1[ebp]
-	cmp	eax, DWORD PTR _aligned_size$[ebp]
+	add	eax, 1
+	mov	DWORD PTR _i$1[ebp], eax
+$LN4@pmmngr_ini:
+	mov	ecx, DWORD PTR _i$1[ebp]
+	cmp	ecx, DWORD PTR _aligned_size$[ebp]
 	ja	SHORT $LN3@pmmngr_ini
-; Line 112
-	mov	ecx, DWORD PTR _aligned_addr$[ebp]
-	push	ecx
+; Line 114
+	mov	edx, DWORD PTR _aligned_addr$[ebp]
+	push	edx
 	call	?mmap_test@@YA_NH@Z			; mmap_test
 	add	esp, 4
-	movzx	edx, al
-	cmp	edx, 1
+	movzx	eax, al
+	cmp	eax, 1
 	jne	SHORT $LN6@pmmngr_ini
-; Line 114
-	mov	eax, DWORD PTR _aligned_addr$[ebp]
-	mov	DWORD PTR tv75[ebp], eax
-	mov	ecx, DWORD PTR tv75[ebp]
-	push	ecx
+; Line 116
+	mov	ecx, DWORD PTR _aligned_addr$[ebp]
+	mov	DWORD PTR tv77[ebp], ecx
+	mov	edx, DWORD PTR tv77[ebp]
+	push	edx
 	call	?mmap_unset@@YAXH@Z			; mmap_unset
 	add	esp, 4
-	mov	edx, DWORD PTR _aligned_addr$[ebp]
-	add	edx, 1
-	mov	DWORD PTR _aligned_addr$[ebp], edx
-; Line 115
-	mov	eax, DWORD PTR _mmngr_used_blocks
-	sub	eax, 1
-	mov	DWORD PTR _mmngr_used_blocks, eax
-$LN6@pmmngr_ini:
+	mov	eax, DWORD PTR _aligned_addr$[ebp]
+	add	eax, 1
+	mov	DWORD PTR _aligned_addr$[ebp], eax
 ; Line 117
+	mov	ecx, DWORD PTR _mmngr_used_blocks
+	sub	ecx, 1
+	mov	DWORD PTR _mmngr_used_blocks, ecx
+$LN6@pmmngr_ini:
+; Line 119
 	jmp	SHORT $LN2@pmmngr_ini
 $LN3@pmmngr_ini:
-; Line 119
+; Line 121
 	push	0
 	call	?mmap_set@@YAXH@Z			; mmap_set
 	add	esp, 4
 $LN1@pmmngr_ini:
-; Line 121
+; Line 123
 	mov	esp, ebp
 	pop	ebp
 	ret	0

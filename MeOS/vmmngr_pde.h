@@ -1,10 +1,6 @@
 #ifndef VMMNGR_PDE_H_160516
 #define VMMNGR_PDE_H_160516
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "types.h"
 #include "mmngr_phys.h"
 
@@ -30,34 +26,30 @@ typedef uint32 pd_entry;
 // INTERFACE
 
 // sets a flag in the page table entry
-inline void pd_entry_add_attrib(pd_entry* entry, uint32 attrib);
+extern void pd_entry_add_attrib(pd_entry* entry, uint32 attrib);
 
 // clears a flag in the page table entry
-inline void pd_entry_del_attrib(pd_entry* entry, uint32 attrib);
+extern void pd_entry_del_attrib(pd_entry* entry, uint32 attrib);
 
 // checks if the given attribute is set
-inline bool pd_entry_test_attrib(pd_entry* entry, uint32 attrib);
+extern bool pd_entry_test_attrib(pd_entry* entry, uint32 attrib);
 
 // sets a frame to page table
-inline void pd_entry_set_frame(pd_entry* entry, physical_addr addr);
+extern void pd_entry_set_frame(pd_entry* entry, physical_addr addr);
 
 // test if page is present
-inline bool pd_entry_is_present(pd_entry entry);
+extern bool pd_entry_is_present(pd_entry entry);
 
 // test if directory is user mode
-inline bool pd_entry_is_user(pd_entry entry);
+extern bool pd_entry_is_user(pd_entry entry);
 
 // test if directory contains 4mb pages
-inline bool pd_entry_is_4mb(pd_entry entry);
+extern bool pd_entry_is_4mb(pd_entry entry);
 
 // test if page is writable
-inline bool pd_entry_is_writable(pd_entry entry);
+extern bool pd_entry_is_writable(pd_entry entry);
 
 // get page table entry frame address
-inline physical_addr pd_entry_get_frame(pd_entry entry);
-
-#ifdef __cplusplus
-}
-#endif
+extern physical_addr pd_entry_get_frame(pd_entry entry);
 
 #endif

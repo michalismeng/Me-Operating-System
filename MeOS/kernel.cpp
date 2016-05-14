@@ -342,7 +342,7 @@ void ProccessCommand()
 		endOfCommand = false;		// start new command
 	}
 
-	mem.manager.KillPaging();		// just put these to prevent variables from being destroyed as optimisation (arghhh c++)
+	mem.manager.KillPaging();		// just put these to prevent variables from being destroyed as optimization
 	mem.kheap.Print();
 	return 0xDEADBABA;
 }*/
@@ -368,8 +368,8 @@ void GetMemoryStats()
 
 int kmain(multiboot_info* boot_info)
 {
-	uint32 kernel_size_sectors;
-	_asm mov dword ptr [kernel_size_sectors], edx
+	uint32 kernel_size_bytes;
+	_asm mov dword ptr [kernel_size_bytes], edx
 
 	__asm cli
 	init_descriptor_tables();
@@ -380,20 +380,18 @@ int kmain(multiboot_info* boot_info)
 	SetColor(DARK_BLUE, WHITE);
 	ClearScreen();
 
-	//canOutput = 0;
-
 	printf("Welcome to ME Operating System\n");
 
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
 	printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
 
-	printf("Kernel size: %u bytes\n", kernel_size_sectors);
+	printf("Kernel size: %u bytes\n", kernel_size_bytes);
 
 	printf("Boot device: %h\n", boot_info->m_bootDevice);
 
 	memory_region* region = (memory_region*)0x500;
 
-	pmmngr_init(memoryKB, 0x100000 + kernel_size_sectors * 512);
+	pmmngr_init(memoryKB, 0x100000 + kernel_size_bytes);
 
 	for (int i = 0; i < 15; i++)
 	{
@@ -403,20 +401,16 @@ int kmain(multiboot_info* boot_info)
 		if (i > 0 && region[i].startLo == 0)
 			break;
 
-		printf("region %i: start: 0x%x%x length (bytes): 0x%x%x type: %i (%s)\n", i,
+		printf("region %i: start: 0x%x %x length (bytes): 0x%x %x type: %i (%s)\n", i,
 			region[i].startHi, region[i].startLo,
 			region[i].sizeHi, region[i].sizeLo,
 			region[i].type, strMemoryTypes[region[i].type - 1]);
 
-		if (region[i].type == 0)	// make available
+		if (region[i].type  == 1)	// make available
 			pmmngr_init_region(region[i].startLo, region[i].sizeLo);
 	}
 
-	pmmngr_deinit_region(0x100000, kernel_size_sectors * 512);
-
-	canOutput = 1;
-
-	GetMemoryStats();
+	pmmngr_deinit_region(0x100000, kernel_size_bytes);
 
 	while (true);
 

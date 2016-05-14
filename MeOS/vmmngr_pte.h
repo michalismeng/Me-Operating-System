@@ -1,10 +1,6 @@
 #ifndef VMMNGR_PTE_H_130516
 #define VMMNGR_PTE_H_130516
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "types.h"
 #include "mmngr_phys.h"
 
@@ -30,25 +26,21 @@ typedef uint32 pt_entry;		// every page table entry is 32 bit wide
 // INTERFACE
 
 // set a flag (see enum above) in a pt_entry
-inline void pt_entry_add_attrib(pt_entry* entry, uint32 attrib);
+extern void pt_entry_add_attrib(pt_entry* entry, uint32 attrib);
 
 // unset a flag from a pt_entry
-inline void pt_entry_del_attrib(pt_entry* entry, uint32 attrib);
+extern void pt_entry_del_attrib(pt_entry* entry, uint32 attrib);
 
 // set the frame address (physical address space) of a pt_entry
-inline void pt_entry_set_frame(pt_entry* entry, physical_addr address);
+extern void pt_entry_set_frame(pt_entry* entry, physical_addr address);
 
 // check if entry is present in memory
-inline bool pt_entry_is_present(pt_entry entry);
+extern bool pt_entry_is_present(pt_entry entry);
 
 // check if entry is writable
-inline bool pt_entry_is_writable(pt_entry entry);
+extern bool pt_entry_is_writable(pt_entry entry);
 
 // get the frame address of the pt_entry
-physical_addr pt_entry_get_frame(pt_entry entry);
-
-#ifdef __cplusplus
-}
-#endif
+extern physical_addr pt_entry_get_frame(pt_entry entry);
 
 #endif

@@ -1,10 +1,6 @@
 #ifndef MMNGR_VIRTUAL_H_130516
 #define MMNGR_VIRTUAL_H_130516
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "types.h"
 
 #include "vmmngr_pte.h"
@@ -22,16 +18,16 @@ typedef uint32 virtual_addr;
 #define PAGE_GET_PHYSICAL_ADDR(x)	( *x & ~0xfff )				// Physical address is 4KB aligned, so return all bits except the 12 first
 
 // page table definition
-typedef struct ptable_t
+typedef struct ptable
 {
 	pt_entry entries[PAGES_PER_TABLE];
-}ptable;
+};
 
 // page directory definition
-typedef struct pdirectory_t
+typedef struct pdirectory
 {
 	pd_entry entries[TABLES_PER_DIR];
-}pdirectory;
+};
 
 // USEFUL DATA CHAIN cr3 -> pdirectory -> (PAGE_DIR_INDEX(v_addr)) -> pd_entry -> (PAGE_GET_PHYSICAL_ADDR(pd_entry)) -> ptable
 //					 ptable -> (PAGE_TABLE_INDEX(v_addr)) -> pt_entry -> (PAGE_GET_PHYSICAL_ADDR(pt_entry)) -> physical address
@@ -72,10 +68,5 @@ void vmmngr_pdirectory_clear(pdirectory* pdir);
 
 // returns entry of pdirectory p based on addr
 pd_entry* vmmngr_pdirectory_lookup_entry(pdirectory* p, virtual_addr addr);
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

@@ -9,48 +9,48 @@
 INCLUDELIB MSVCRTD
 INCLUDELIB OLDNAMES
 
-PUBLIC	?current_directory@@3PAUpdirectory_t@@A		; current_directory
+PUBLIC	?current_directory@@3PAUpdirectory@@A		; current_directory
 PUBLIC	?current_pdbr@@3IA				; current_pdbr
 _BSS	SEGMENT
-?current_directory@@3PAUpdirectory_t@@A DD 01H DUP (?)	; current_directory
+?current_directory@@3PAUpdirectory@@A DD 01H DUP (?)	; current_directory
 ?current_pdbr@@3IA DD 01H DUP (?)			; current_pdbr
 _BSS	ENDS
-PUBLIC	_vmmngr_map_page
-PUBLIC	_vmmngr_initialize
-PUBLIC	_vmmngr_alloc_page
-PUBLIC	_vmmngr_free_page
-PUBLIC	_vmmngr_switch_directory
-PUBLIC	_vmmngr_get_directory
-PUBLIC	_vmmngr_flush_TLB_entry
-PUBLIC	_vmmngr_ptable_clear
-PUBLIC	_vmmngr_ptable_lookup_entry
-PUBLIC	_vmmngr_pdirectory_clear
-PUBLIC	_vmmngr_pdirectory_lookup_entry
+PUBLIC	?vmmngr_map_page@@YAXII@Z			; vmmngr_map_page
+PUBLIC	?vmmngr_initialize@@YAXXZ			; vmmngr_initialize
+PUBLIC	?vmmngr_alloc_page@@YA_NPAI@Z			; vmmngr_alloc_page
+PUBLIC	?vmmngr_free_page@@YAXPAI@Z			; vmmngr_free_page
+PUBLIC	?vmmngr_switch_directory@@YA_NPAUpdirectory@@@Z	; vmmngr_switch_directory
+PUBLIC	?vmmngr_get_directory@@YAPAUpdirectory@@XZ	; vmmngr_get_directory
+PUBLIC	?vmmngr_flush_TLB_entry@@YAXI@Z			; vmmngr_flush_TLB_entry
+PUBLIC	?vmmngr_ptable_clear@@YAXPAUptable@@@Z		; vmmngr_ptable_clear
+PUBLIC	?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z ; vmmngr_ptable_lookup_entry
+PUBLIC	?vmmngr_pdirectory_clear@@YAXPAUpdirectory@@@Z	; vmmngr_pdirectory_clear
+PUBLIC	?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z ; vmmngr_pdirectory_lookup_entry
 EXTRN	_memset:PROC
 EXTRN	_pmmngr_alloc_block:PROC
 EXTRN	_pmmngr_free_block:PROC
 EXTRN	_pmmngr_load_PDBR:PROC
-EXTRN	_pt_entry_add_attrib:PROC
-EXTRN	_pt_entry_del_attrib:PROC
-EXTRN	_pt_entry_set_frame:PROC
-EXTRN	_pt_entry_get_frame:PROC
-EXTRN	_pd_entry_add_attrib:PROC
-EXTRN	_pd_entry_test_attrib:PROC
-EXTRN	_pd_entry_set_frame:PROC
-EXTRN	_pd_entry_get_frame:PROC
+EXTRN	?pt_entry_add_attrib@@YAXPAII@Z:PROC		; pt_entry_add_attrib
+EXTRN	?pt_entry_del_attrib@@YAXPAII@Z:PROC		; pt_entry_del_attrib
+EXTRN	?pt_entry_set_frame@@YAXPAII@Z:PROC		; pt_entry_set_frame
+EXTRN	?pt_entry_get_frame@@YAII@Z:PROC		; pt_entry_get_frame
+EXTRN	?pd_entry_add_attrib@@YAXPAII@Z:PROC		; pd_entry_add_attrib
+EXTRN	?pd_entry_test_attrib@@YA_NPAII@Z:PROC		; pd_entry_test_attrib
+EXTRN	?pd_entry_set_frame@@YAXPAII@Z:PROC		; pd_entry_set_frame
+EXTRN	?pd_entry_get_frame@@YAII@Z:PROC		; pd_entry_get_frame
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _p$ = 8							; size = 4
 _addr$ = 12						; size = 4
-_vmmngr_pdirectory_lookup_entry PROC
+?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z PROC ; vmmngr_pdirectory_lookup_entry
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 116
+; Line 113
 	push	ebp
 	mov	ebp, esp
-; Line 117
+; Line 114
 	cmp	DWORD PTR _p$[ebp], 0
 	je	SHORT $LN2@vmmngr_pdi
-; Line 118
+; Line 115
 	mov	eax, DWORD PTR _addr$[ebp]
 	shr	eax, 22					; 00000016H
 	and	eax, 1023				; 000003ffH
@@ -58,40 +58,40 @@ _vmmngr_pdirectory_lookup_entry PROC
 	lea	eax, DWORD PTR [ecx+eax*4]
 	jmp	SHORT $LN1@vmmngr_pdi
 $LN2@vmmngr_pdi:
-; Line 120
+; Line 117
 	xor	eax, eax
 $LN1@vmmngr_pdi:
-; Line 121
+; Line 118
 	pop	ebp
 	ret	0
-_vmmngr_pdirectory_lookup_entry ENDP
+?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z ENDP ; vmmngr_pdirectory_lookup_entry
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _pdir$ = 8						; size = 4
-_vmmngr_pdirectory_clear PROC
+?vmmngr_pdirectory_clear@@YAXPAUpdirectory@@@Z PROC	; vmmngr_pdirectory_clear
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 112
+; Line 109
 	push	ebp
 	mov	ebp, esp
-; Line 113
+; Line 110
 	pop	ebp
 	ret	0
-_vmmngr_pdirectory_clear ENDP
+?vmmngr_pdirectory_clear@@YAXPAUpdirectory@@@Z ENDP	; vmmngr_pdirectory_clear
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _p$ = 8							; size = 4
 _addr$ = 12						; size = 4
-_vmmngr_ptable_lookup_entry PROC
+?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z PROC	; vmmngr_ptable_lookup_entry
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 104
+; Line 101
 	push	ebp
 	mov	ebp, esp
-; Line 105
+; Line 102
 	cmp	DWORD PTR _p$[ebp], 0
 	je	SHORT $LN2@vmmngr_pta
-; Line 106
+; Line 103
 	mov	eax, DWORD PTR _addr$[ebp]
 	shr	eax, 12					; 0000000cH
 	and	eax, 1023				; 000003ffH
@@ -99,201 +99,201 @@ _vmmngr_ptable_lookup_entry PROC
 	lea	eax, DWORD PTR [ecx+eax*4]
 	jmp	SHORT $LN1@vmmngr_pta
 $LN2@vmmngr_pta:
-; Line 108
+; Line 105
 	xor	eax, eax
 $LN1@vmmngr_pta:
-; Line 109
+; Line 106
 	pop	ebp
 	ret	0
-_vmmngr_ptable_lookup_entry ENDP
+?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z ENDP	; vmmngr_ptable_lookup_entry
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _table$ = 8						; size = 4
-_vmmngr_ptable_clear PROC
+?vmmngr_ptable_clear@@YAXPAUptable@@@Z PROC		; vmmngr_ptable_clear
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 100
+; Line 97
 	push	ebp
 	mov	ebp, esp
-; Line 101
+; Line 98
 	pop	ebp
 	ret	0
-_vmmngr_ptable_clear ENDP
+?vmmngr_ptable_clear@@YAXPAUptable@@@Z ENDP		; vmmngr_ptable_clear
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _addr$ = 8						; size = 4
-_vmmngr_flush_TLB_entry PROC
+?vmmngr_flush_TLB_entry@@YAXI@Z PROC			; vmmngr_flush_TLB_entry
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 90
+; Line 87
 	push	ebp
 	mov	ebp, esp
-; Line 93
+; Line 90
 	cli
-; Line 94
+; Line 91
 	invlpg	DWORD PTR _addr$[ebp]
-; Line 95
+; Line 92
 	sti
-; Line 97
+; Line 94
 	pop	ebp
 	ret	0
-_vmmngr_flush_TLB_entry ENDP
+?vmmngr_flush_TLB_entry@@YAXI@Z ENDP			; vmmngr_flush_TLB_entry
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-_vmmngr_get_directory PROC
+?vmmngr_get_directory@@YAPAUpdirectory@@XZ PROC		; vmmngr_get_directory
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 85
+; Line 82
 	push	ebp
 	mov	ebp, esp
-; Line 86
-	mov	eax, DWORD PTR ?current_directory@@3PAUpdirectory_t@@A ; current_directory
-; Line 87
+; Line 83
+	mov	eax, DWORD PTR ?current_directory@@3PAUpdirectory@@A ; current_directory
+; Line 84
 	pop	ebp
 	ret	0
-_vmmngr_get_directory ENDP
+?vmmngr_get_directory@@YAPAUpdirectory@@XZ ENDP		; vmmngr_get_directory
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _dir$ = 8						; size = 4
-_vmmngr_switch_directory PROC
+?vmmngr_switch_directory@@YA_NPAUpdirectory@@@Z PROC	; vmmngr_switch_directory
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 75
+; Line 72
 	push	ebp
 	mov	ebp, esp
-; Line 76
+; Line 73
 	cmp	DWORD PTR _dir$[ebp], 0
 	jne	SHORT $LN2@vmmngr_swi
-; Line 77
+; Line 74
 	xor	al, al
 	jmp	SHORT $LN1@vmmngr_swi
 $LN2@vmmngr_swi:
-; Line 79
+; Line 76
 	mov	eax, DWORD PTR _dir$[ebp]
-	mov	DWORD PTR ?current_directory@@3PAUpdirectory_t@@A, eax ; current_directory
-; Line 80
+	mov	DWORD PTR ?current_directory@@3PAUpdirectory@@A, eax ; current_directory
+; Line 77
 	mov	ecx, DWORD PTR ?current_pdbr@@3IA	; current_pdbr
 	push	ecx
 	call	_pmmngr_load_PDBR
 	add	esp, 4
-; Line 81
+; Line 78
 	mov	al, 1
 $LN1@vmmngr_swi:
-; Line 82
+; Line 79
 	pop	ebp
 	ret	0
-_vmmngr_switch_directory ENDP
+?vmmngr_switch_directory@@YA_NPAUpdirectory@@@Z ENDP	; vmmngr_switch_directory
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _addr$ = -4						; size = 4
 _entry$ = 8						; size = 4
-_vmmngr_free_page PROC
+?vmmngr_free_page@@YAXPAI@Z PROC			; vmmngr_free_page
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 61
+; Line 58
 	push	ebp
 	mov	ebp, esp
 	push	ecx
-; Line 62
+; Line 59
 	cmp	DWORD PTR _entry$[ebp], 0
 	jne	SHORT $LN2@vmmngr_fre
-; Line 63
+; Line 60
 	jmp	SHORT $LN1@vmmngr_fre
 $LN2@vmmngr_fre:
-; Line 65
+; Line 62
 	mov	eax, DWORD PTR _entry$[ebp]
 	mov	ecx, DWORD PTR [eax]
 	push	ecx
-	call	_pt_entry_get_frame
+	call	?pt_entry_get_frame@@YAII@Z		; pt_entry_get_frame
 	add	esp, 4
 	mov	DWORD PTR _addr$[ebp], eax
-; Line 67
+; Line 64
 	cmp	DWORD PTR _addr$[ebp], 0
 	je	SHORT $LN3@vmmngr_fre
-; Line 68
+; Line 65
 	mov	edx, DWORD PTR _addr$[ebp]
 	push	edx
 	call	_pmmngr_free_block
 	add	esp, 4
 $LN3@vmmngr_fre:
-; Line 70
+; Line 67
 	push	1
 	mov	eax, DWORD PTR _entry$[ebp]
 	push	eax
-	call	_pt_entry_del_attrib
+	call	?pt_entry_del_attrib@@YAXPAII@Z		; pt_entry_del_attrib
 	add	esp, 8
-; Line 71
+; Line 68
 	push	2
 	mov	ecx, DWORD PTR _entry$[ebp]
 	push	ecx
-	call	_pt_entry_del_attrib
+	call	?pt_entry_del_attrib@@YAXPAII@Z		; pt_entry_del_attrib
 	add	esp, 8
 $LN1@vmmngr_fre:
-; Line 72
+; Line 69
 	mov	esp, ebp
 	pop	ebp
 	ret	0
-_vmmngr_free_page ENDP
+?vmmngr_free_page@@YAXPAI@Z ENDP			; vmmngr_free_page
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
 _addr$ = -4						; size = 4
 _entry$ = 8						; size = 4
-_vmmngr_alloc_page PROC
+?vmmngr_alloc_page@@YA_NPAI@Z PROC			; vmmngr_alloc_page
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 47
+; Line 44
 	push	ebp
 	mov	ebp, esp
 	push	ecx
-; Line 48
+; Line 45
 	call	_pmmngr_alloc_block
 	mov	DWORD PTR _addr$[ebp], eax
-; Line 50
+; Line 47
 	cmp	DWORD PTR _addr$[ebp], 0
 	jne	SHORT $LN2@vmmngr_all
-; Line 51
+; Line 48
 	xor	al, al
 	jmp	SHORT $LN1@vmmngr_all
 $LN2@vmmngr_all:
-; Line 53
+; Line 50
 	push	1
 	mov	eax, DWORD PTR _entry$[ebp]
 	push	eax
-	call	_pt_entry_add_attrib
+	call	?pt_entry_add_attrib@@YAXPAII@Z		; pt_entry_add_attrib
 	add	esp, 8
-; Line 54
+; Line 51
 	push	2
 	mov	ecx, DWORD PTR _entry$[ebp]
 	push	ecx
-	call	_pt_entry_add_attrib
+	call	?pt_entry_add_attrib@@YAXPAII@Z		; pt_entry_add_attrib
 	add	esp, 8
-; Line 55
+; Line 52
 	mov	edx, DWORD PTR _addr$[ebp]
 	push	edx
 	mov	eax, DWORD PTR _entry$[ebp]
 	push	eax
-	call	_pt_entry_set_frame
+	call	?pt_entry_set_frame@@YAXPAII@Z		; pt_entry_set_frame
 	add	esp, 8
-; Line 57
+; Line 54
 	mov	al, 1
 $LN1@vmmngr_all:
-; Line 58
+; Line 55
 	mov	esp, ebp
 	pop	ebp
 	ret	0
-_vmmngr_alloc_page ENDP
+?vmmngr_alloc_page@@YA_NPAI@Z ENDP			; vmmngr_alloc_page
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-_vmmngr_initialize PROC
+?vmmngr_initialize@@YAXXZ PROC				; vmmngr_initialize
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 43
+; Line 40
 	push	ebp
 	mov	ebp, esp
-; Line 44
+; Line 41
 	pop	ebp
 	ret	0
-_vmmngr_initialize ENDP
+?vmmngr_initialize@@YAXXZ ENDP				; vmmngr_initialize
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
@@ -304,110 +304,110 @@ _page$ = -8						; size = 4
 _e$ = -4						; size = 4
 _phys$ = 8						; size = 4
 _virt$ = 12						; size = 4
-_vmmngr_map_page PROC
+?vmmngr_map_page@@YAXII@Z PROC				; vmmngr_map_page
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\mmngr_virtual.cpp
-; Line 10
+; Line 7
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 20					; 00000014H
-; Line 13
-	call	_vmmngr_get_directory
+; Line 10
+	call	?vmmngr_get_directory@@YAPAUpdirectory@@XZ ; vmmngr_get_directory
 	mov	DWORD PTR _dir$[ebp], eax
-; Line 15
+; Line 12
 	mov	eax, DWORD PTR _virt$[ebp]
 	push	eax
 	mov	ecx, DWORD PTR _dir$[ebp]
 	push	ecx
-	call	_vmmngr_pdirectory_lookup_entry
+	call	?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z ; vmmngr_pdirectory_lookup_entry
 	add	esp, 8
 	mov	DWORD PTR _e$[ebp], eax
-; Line 17
+; Line 14
 	push	1
 	mov	edx, DWORD PTR _e$[ebp]
 	push	edx
-	call	_pd_entry_test_attrib
+	call	?pd_entry_test_attrib@@YA_NPAII@Z	; pd_entry_test_attrib
 	add	esp, 8
 	movzx	eax, al
 	test	eax, eax
 	jne	SHORT $LN2@vmmngr_map
-; Line 19
+; Line 16
 	call	_pmmngr_alloc_block
 	mov	DWORD PTR _table$1[ebp], eax
-; Line 21
+; Line 18
 	cmp	DWORD PTR _table$1[ebp], 0
 	jne	SHORT $LN3@vmmngr_map
-; Line 22
+; Line 19
 	jmp	$LN1@vmmngr_map
 $LN3@vmmngr_map:
-; Line 24
+; Line 21
 	push	4
 	push	0
 	mov	ecx, DWORD PTR _table$1[ebp]
 	push	ecx
 	call	_memset
 	add	esp, 12					; 0000000cH
-; Line 26
+; Line 23
 	push	1
 	mov	edx, DWORD PTR _e$[ebp]
 	push	edx
-	call	_pd_entry_add_attrib
+	call	?pd_entry_add_attrib@@YAXPAII@Z		; pd_entry_add_attrib
 	add	esp, 8
-; Line 27
+; Line 24
 	push	2
 	mov	eax, DWORD PTR _e$[ebp]
 	push	eax
-	call	_pd_entry_add_attrib
+	call	?pd_entry_add_attrib@@YAXPAII@Z		; pd_entry_add_attrib
 	add	esp, 8
-; Line 28
+; Line 25
 	mov	ecx, DWORD PTR _table$1[ebp]
 	push	ecx
 	mov	edx, DWORD PTR _e$[ebp]
 	push	edx
-	call	_pd_entry_set_frame
+	call	?pd_entry_set_frame@@YAXPAII@Z		; pd_entry_set_frame
 	add	esp, 8
 $LN2@vmmngr_map:
-; Line 33
+; Line 30
 	mov	eax, DWORD PTR _e$[ebp]
 	mov	ecx, DWORD PTR [eax]
 	push	ecx
-	call	_pd_entry_get_frame
+	call	?pd_entry_get_frame@@YAII@Z		; pd_entry_get_frame
 	add	esp, 4
 	mov	DWORD PTR _table$[ebp], eax
-; Line 34
+; Line 31
 	mov	edx, DWORD PTR _virt$[ebp]
 	push	edx
 	mov	eax, DWORD PTR _table$[ebp]
 	push	eax
-	call	_vmmngr_ptable_lookup_entry
+	call	?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z ; vmmngr_ptable_lookup_entry
 	add	esp, 8
 	mov	DWORD PTR _page$[ebp], eax
-; Line 36
+; Line 33
 	mov	ecx, DWORD PTR _page$[ebp]
 	mov	DWORD PTR [ecx], 0
-; Line 37
+; Line 34
 	push	1
 	mov	edx, DWORD PTR _page$[ebp]
 	push	edx
-	call	_pt_entry_add_attrib
+	call	?pt_entry_add_attrib@@YAXPAII@Z		; pt_entry_add_attrib
 	add	esp, 8
-; Line 38
+; Line 35
 	push	2
 	mov	eax, DWORD PTR _page$[ebp]
 	push	eax
-	call	_pt_entry_add_attrib
+	call	?pt_entry_add_attrib@@YAXPAII@Z		; pt_entry_add_attrib
 	add	esp, 8
-; Line 39
+; Line 36
 	mov	ecx, DWORD PTR _phys$[ebp]
 	push	ecx
 	mov	edx, DWORD PTR _page$[ebp]
 	push	edx
-	call	_pt_entry_set_frame
+	call	?pt_entry_set_frame@@YAXPAII@Z		; pt_entry_set_frame
 	add	esp, 8
 $LN1@vmmngr_map:
-; Line 40
+; Line 37
 	mov	esp, ebp
 	pop	ebp
 	ret	0
-_vmmngr_map_page ENDP
+?vmmngr_map_page@@YAXII@Z ENDP				; vmmngr_map_page
 _TEXT	ENDS
 END
