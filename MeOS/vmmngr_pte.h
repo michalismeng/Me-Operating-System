@@ -1,6 +1,10 @@
 #ifndef VMMNGR_PTE_H_130516
 #define VMMNGR_PTE_H_130516
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "types.h"
 #include "mmngr_phys.h"
 
@@ -8,17 +12,17 @@
 
 enum PAGE_PTE_FLAGS
 {
-	I86_PTE_PRESENT				= 1,
-	I86_PTE_WRITABLE			= 2,
-	I86_PTE_USER				= 4,
-	I86_PTE_WRITETHROUGH		= 8,
-	I86_PTE_NOT_CACHABLE		= 0x10,
-	I86_PTE_ACCESSED			= 0x20,
-	I86_PTE_DIRTY				= 0x40,
-	I86_PTE_PAT					= 0x80,
-	I86_PTE_CPU_GLOBAL			= 0x100,
-	I86_PTE_LV4_GLOBAL			= 0x200,
-	I86_PTE_FRAME				= 0x7FFFF000
+	I86_PTE_PRESENT = 1,
+	I86_PTE_WRITABLE = 2,
+	I86_PTE_USER = 4,
+	I86_PTE_WRITETHROUGH = 8,
+	I86_PTE_NOT_CACHABLE = 0x10,
+	I86_PTE_ACCESSED = 0x20,
+	I86_PTE_DIRTY = 0x40,
+	I86_PTE_PAT = 0x80,
+	I86_PTE_CPU_GLOBAL = 0x100,
+	I86_PTE_LV4_GLOBAL = 0x200,
+	I86_PTE_FRAME = 0x7FFFF000
 };
 
 typedef uint32 pt_entry;		// every page table entry is 32 bit wide
@@ -42,5 +46,9 @@ inline bool pt_entry_is_writable(pt_entry entry);
 
 // get the frame address of the pt_entry
 physical_addr pt_entry_get_frame(pt_entry entry);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

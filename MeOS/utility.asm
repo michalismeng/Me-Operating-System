@@ -380,14 +380,15 @@ _pow	ENDP
 _TEXT	ENDS
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-_expr$ = 8						; size = 4
+_expr$ = 8						; size = 1
 _ASSERT	PROC
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\utility.c
 ; Line 251
 	push	ebp
 	mov	ebp, esp
 ; Line 252
-	cmp	DWORD PTR _expr$[ebp], 0
+	movzx	eax, BYTE PTR _expr$[ebp]
+	test	eax, eax
 	jne	SHORT $LN1@ASSERT
 ; Line 253
 	push	OFFSET $SG1699

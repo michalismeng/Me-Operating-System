@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #else
-#define bool int
+#define bool uint8
 #define true 1
 #define false 0
 #endif

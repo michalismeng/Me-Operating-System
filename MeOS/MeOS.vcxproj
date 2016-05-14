@@ -24,6 +24,7 @@
     <ClCompile Include="isr.c" />
     <ClCompile Include="kernel.cpp" />
     <ClCompile Include="mmngr_phys.cpp" />
+    <ClCompile Include="mmngr_virtual.cpp" />
     <ClCompile Include="pic.c" />
     <ClCompile Include="pit.c" />
     <ClCompile Include="screen.c" />

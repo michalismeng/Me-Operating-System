@@ -20,15 +20,19 @@ _canOutput DB	01H
 	DD	FLAT:$SG3021
 _DATA	ENDS
 CONST	SEGMENT
-$SG3075	DB	'Welcome to ME Operating System', 0aH, 00H
-$SG3076	DB	'Memory detected: %h KB %h MB', 0aH, 00H
-$SG3061	DB	00H
-	ORG $+1
-$SG3077	DB	'Kernel size: %u bytes', 0aH, 00H
-	ORG $+1
-$SG3078	DB	'Boot device: %h', 0aH, 00H
+$SG3174	DB	'Max blocks: %u', 00H
+$SG3177	DB	00H
+$SG3175	DB	'Available blocks: %u', 00H
 	ORG $+3
-$SG3081	DB	'region %i: start: 0x%x%x length (bytes): 0x%x%x type: %i'
+$SG3176	DB	'Used blocks: %u', 00H
+$SG3191	DB	'Welcome to ME Operating System', 0aH, 00H
+$SG3192	DB	'Memory detected: %h KB %h MB', 0aH, 00H
+	ORG $+2
+$SG3193	DB	'Kernel size: %u bytes', 0aH, 00H
+	ORG $+1
+$SG3194	DB	'Boot device: %h', 0aH, 00H
+	ORG $+3
+$SG3197	DB	'region %i: start: 0x%x%x length (bytes): 0x%x%x type: %i'
 	DB	' (%s)', 0aH, 00H
 	ORG $+1
 $SG3018	DB	'Available', 00H
@@ -38,12 +42,6 @@ $SG3019	DB	'Reserved', 00H
 $SG3020	DB	'ACPI Reclaim', 00H
 	ORG $+3
 $SG3021	DB	'ACPI NVS', 00H
-	ORG $+3
-$SG3058	DB	'Max blocks: %u', 00H
-	ORG $+1
-$SG3059	DB	'Available blocks: %u', 00H
-	ORG $+3
-$SG3060	DB	'Used blocks: %u', 00H
 CONST	ENDS
 PUBLIC	?GetMemoryStats@@YAXXZ				; GetMemoryStats
 PUBLIC	?kmain@@YAHPAUmultiboot_info@@@Z		; kmain
@@ -55,47 +53,49 @@ EXTRN	_init_descriptor_tables:PROC
 EXTRN	_init_pit_timer:PROC
 EXTRN	_timer_callback:PROC
 EXTRN	_pmmngr_init:PROC
+EXTRN	_pmmngr_init_region:PROC
+EXTRN	_pmmngr_deinit_region:PROC
 EXTRN	_pmmngr_get_block_use_count:PROC
 EXTRN	_pmmngr_get_free_block_count:PROC
 EXTRN	_pmmngr_get_block_count:PROC
 ; Function compile flags: /Odtpy
 _TEXT	SEGMENT
-_kernel_size$ = -16					; size = 4
+_kernel_size_sectors$ = -16				; size = 4
 _memoryKB$ = -12					; size = 4
 _region$ = -8						; size = 4
 _i$1 = -4						; size = 4
 _boot_info$ = 8						; size = 4
 ?kmain@@YAHPAUmultiboot_info@@@Z PROC			; kmain
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\kernel.cpp
-; Line 369
+; Line 370
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 16					; 00000010H
-; Line 371
-	mov	DWORD PTR _kernel_size$[ebp], edx
-; Line 373
-	cli
+; Line 372
+	mov	DWORD PTR _kernel_size_sectors$[ebp], edx
 ; Line 374
-	call	_init_descriptor_tables
+	cli
 ; Line 375
+	call	_init_descriptor_tables
+; Line 376
 	sti
-; Line 377
+; Line 378
 	push	OFFSET _timer_callback
 	push	1000					; 000003e8H
 	call	_init_pit_timer
 	add	esp, 8
-; Line 379
+; Line 380
 	push	15					; 0000000fH
 	push	1
 	call	_SetColor
 	add	esp, 8
-; Line 380
+; Line 381
 	call	_ClearScreen
-; Line 384
-	push	OFFSET $SG3075
+; Line 385
+	push	OFFSET $SG3191
 	call	_printf
 	add	esp, 4
-; Line 386
+; Line 387
 	mov	eax, DWORD PTR _boot_info$[ebp]
 	mov	ecx, DWORD PTR [eax+4]
 	mov	edx, DWORD PTR _boot_info$[ebp]
@@ -103,61 +103,68 @@ _boot_info$ = 8						; size = 4
 	shl	eax, 6
 	lea	ecx, DWORD PTR [ecx+eax+1024]
 	mov	DWORD PTR _memoryKB$[ebp], ecx
-; Line 387
+; Line 388
 	mov	edx, DWORD PTR _memoryKB$[ebp]
 	shr	edx, 10					; 0000000aH
 	push	edx
 	mov	eax, DWORD PTR _memoryKB$[ebp]
 	push	eax
-	push	OFFSET $SG3076
+	push	OFFSET $SG3192
 	call	_printf
 	add	esp, 12					; 0000000cH
-; Line 389
-	mov	ecx, DWORD PTR _kernel_size$[ebp]
+; Line 390
+	mov	ecx, DWORD PTR _kernel_size_sectors$[ebp]
 	push	ecx
-	push	OFFSET $SG3077
+	push	OFFSET $SG3193
 	call	_printf
 	add	esp, 8
-; Line 391
+; Line 392
 	mov	edx, DWORD PTR _boot_info$[ebp]
 	mov	eax, DWORD PTR [edx+12]
 	push	eax
-	push	OFFSET $SG3078
+	push	OFFSET $SG3194
 	call	_printf
 	add	esp, 8
-; Line 393
+; Line 394
 	mov	DWORD PTR _region$[ebp], 1280		; 00000500H
-; Line 395
+; Line 396
+	mov	ecx, DWORD PTR _kernel_size_sectors$[ebp]
+	shl	ecx, 9
+	add	ecx, 1048576				; 00100000H
+	push	ecx
+	mov	edx, DWORD PTR _memoryKB$[ebp]
+	push	edx
+	call	_pmmngr_init
+	add	esp, 8
+; Line 398
 	mov	DWORD PTR _i$1[ebp], 0
 	jmp	SHORT $LN4@kmain
 $LN2@kmain:
-	mov	ecx, DWORD PTR _i$1[ebp]
-	add	ecx, 1
-	mov	DWORD PTR _i$1[ebp], ecx
+	mov	eax, DWORD PTR _i$1[ebp]
+	add	eax, 1
+	mov	DWORD PTR _i$1[ebp], eax
 $LN4@kmain:
 	cmp	DWORD PTR _i$1[ebp], 15			; 0000000fH
 	jge	$LN3@kmain
-; Line 397
-	imul	edx, DWORD PTR _i$1[ebp], 24
-	mov	eax, DWORD PTR _region$[ebp]
-	cmp	DWORD PTR [eax+edx+16], 4
-	jbe	SHORT $LN7@kmain
-; Line 398
+; Line 400
 	imul	ecx, DWORD PTR _i$1[ebp], 24
 	mov	edx, DWORD PTR _region$[ebp]
-	mov	DWORD PTR [edx+ecx+16], 1
+	cmp	DWORD PTR [edx+ecx+16], 4
+	jbe	SHORT $LN7@kmain
+; Line 401
+	jmp	$LN3@kmain
 $LN7@kmain:
-; Line 400
+; Line 403
 	cmp	DWORD PTR _i$1[ebp], 0
 	jle	SHORT $LN8@kmain
 	imul	eax, DWORD PTR _i$1[ebp], 24
 	mov	ecx, DWORD PTR _region$[ebp]
 	cmp	DWORD PTR [ecx+eax], 0
 	jne	SHORT $LN8@kmain
-; Line 401
-	jmp	SHORT $LN3@kmain
+; Line 404
+	jmp	$LN3@kmain
 $LN8@kmain:
-; Line 403
+; Line 406
 	imul	edx, DWORD PTR _i$1[ebp], 24
 	mov	eax, DWORD PTR _region$[ebp]
 	mov	ecx, DWORD PTR [eax+edx+16]
@@ -185,33 +192,50 @@ $LN8@kmain:
 	push	edx
 	mov	eax, DWORD PTR _i$1[ebp]
 	push	eax
-	push	OFFSET $SG3081
+	push	OFFSET $SG3197
 	call	_printf
 	add	esp, 32					; 00000020H
-; Line 407
+; Line 411
+	imul	ecx, DWORD PTR _i$1[ebp], 24
+	mov	edx, DWORD PTR _region$[ebp]
+	cmp	DWORD PTR [edx+ecx+16], 0
+	jne	SHORT $LN9@kmain
+; Line 412
+	imul	eax, DWORD PTR _i$1[ebp], 24
+	mov	ecx, DWORD PTR _region$[ebp]
+	mov	edx, DWORD PTR [ecx+eax+8]
+	push	edx
+	imul	eax, DWORD PTR _i$1[ebp], 24
+	mov	ecx, DWORD PTR _region$[ebp]
+	mov	edx, DWORD PTR [ecx+eax]
+	push	edx
+	call	_pmmngr_init_region
+	add	esp, 8
+$LN9@kmain:
+; Line 413
 	jmp	$LN2@kmain
 $LN3@kmain:
-; Line 409
-	mov	BYTE PTR _canOutput, 1
-; Line 411
-	mov	ecx, DWORD PTR _kernel_size$[ebp]
-	shl	ecx, 9
-	add	ecx, 1048576				; 00100000H
-	push	ecx
-	mov	edx, DWORD PTR _memoryKB$[ebp]
-	push	edx
-	call	_pmmngr_init
+; Line 415
+	mov	eax, DWORD PTR _kernel_size_sectors$[ebp]
+	shl	eax, 9
+	push	eax
+	push	1048576					; 00100000H
+	call	_pmmngr_deinit_region
 	add	esp, 8
+; Line 417
+	mov	BYTE PTR _canOutput, 1
+; Line 419
+	call	?GetMemoryStats@@YAXXZ			; GetMemoryStats
 $LN5@kmain:
-; Line 413
-	mov	eax, 1
-	test	eax, eax
+; Line 421
+	mov	ecx, 1
+	test	ecx, ecx
 	je	SHORT $LN6@kmain
 	jmp	SHORT $LN5@kmain
 $LN6@kmain:
-; Line 415
+; Line 423
 	mov	eax, -559039814				; deadbabaH
-; Line 416
+; Line 424
 	mov	esp, ebp
 	pop	ebp
 	ret	0
@@ -221,32 +245,32 @@ _TEXT	ENDS
 _TEXT	SEGMENT
 ?GetMemoryStats@@YAXXZ PROC				; GetMemoryStats
 ; File c:\users\michalis\documents\visual studio 2015\projects\meos\meos\kernel.cpp
-; Line 360
+; Line 361
 	push	ebp
 	mov	ebp, esp
-; Line 361
+; Line 362
 	call	_pmmngr_get_block_count
 	push	eax
-	push	OFFSET $SG3058
-	call	_printfln
-	add	esp, 8
-; Line 362
-	call	_pmmngr_get_free_block_count
-	push	eax
-	push	OFFSET $SG3059
+	push	OFFSET $SG3174
 	call	_printfln
 	add	esp, 8
 ; Line 363
-	call	_pmmngr_get_block_use_count
+	call	_pmmngr_get_free_block_count
 	push	eax
-	push	OFFSET $SG3060
+	push	OFFSET $SG3175
 	call	_printfln
 	add	esp, 8
-; Line 365
-	push	OFFSET $SG3061
+; Line 364
+	call	_pmmngr_get_block_use_count
+	push	eax
+	push	OFFSET $SG3176
+	call	_printfln
+	add	esp, 8
+; Line 366
+	push	OFFSET $SG3177
 	call	_printfln
 	add	esp, 4
-; Line 366
+; Line 367
 	pop	ebp
 	ret	0
 ?GetMemoryStats@@YAXXZ ENDP				; GetMemoryStats

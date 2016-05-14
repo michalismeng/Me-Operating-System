@@ -51,13 +51,16 @@
     <ClCompile Include="kernel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mmngr_phys.cpp">
+    <ClCompile Include="vmmngr_pde.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="vmmngr_pte.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vmmngr_pde.cpp">
+    <ClCompile Include="mmngr_virtual.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mmngr_phys.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

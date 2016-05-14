@@ -12,6 +12,11 @@ inline void pd_entry_del_attrib(pd_entry* e, uint32 attrib)
 	*e &= ~attrib;
 }
 
+inline bool pd_entry_test_attrib(pd_entry* e, uint32 attrib)
+{
+	return ((*e & attrib) == attrib);
+}
+
 inline void pd_entry_set_frame(pd_entry* e, physical_addr addr)
 {
 	*e = (*e & ~I86_PDE_FRAME) | addr;
