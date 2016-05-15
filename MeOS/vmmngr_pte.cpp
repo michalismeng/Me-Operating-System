@@ -12,6 +12,11 @@ inline void pt_entry_del_attrib(pt_entry* entry, uint32 attrib)
 	*entry &= ~attrib;
 }
 
+bool pt_entry_test_attrib(pt_entry* entry, uint32 attrib)
+{
+	return ((*entry & attrib) == attrib);
+}
+
 inline void pt_entry_set_frame(pt_entry* entry, physical_addr addr)
 {
 	*entry = (*entry & ~I86_PTE_FRAME) | addr;		// addr is 4KB aligned => erase frame bits, set them with addr

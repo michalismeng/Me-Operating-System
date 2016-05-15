@@ -107,7 +107,7 @@ void pmmngr_init_region(physical_addr base, uint32 size)
 	uint32 aligned_addr = base / PMMNGR_BLOCK_SIZE;				// floor the base address as it is absolute
 	uint32 aligned_size = (size - 1) / PMMNGR_BLOCK_SIZE;		// same but make it zero based as it is length
 
-	printfln("init aligned size: %h", aligned_size);
+	printfln("init aligned addr: %h aligned size: %h", aligned_addr, aligned_size);
 
 	for (int i = 0; i <= aligned_size; i++)
 	{
@@ -130,7 +130,7 @@ void pmmngr_deinit_region(physical_addr base, uint32 size)
 	uint32 aligned_addr = base / PMMNGR_BLOCK_SIZE;
 	uint32 aligned_size = (size - 1) / PMMNGR_BLOCK_SIZE;
 
-	printfln("deinit aligned size: %h", aligned_size);
+	printfln("deinit aligned addr: %h aligned size: %h", aligned_addr, aligned_size);
 
 	for (int i = 0; i <= aligned_size; i++)
 	{

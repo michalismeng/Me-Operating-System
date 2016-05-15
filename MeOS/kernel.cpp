@@ -393,6 +393,8 @@ int kmain(multiboot_info* boot_info)
 
 	pmmngr_init(memoryKB, 0x100000 + kernel_size_bytes);
 
+	canOutput = 0;
+
 	for (int i = 0; i < 15; i++)
 	{
 		if (region[i].type > 4)
@@ -411,6 +413,13 @@ int kmain(multiboot_info* boot_info)
 	}
 
 	pmmngr_deinit_region(0x100000, kernel_size_bytes);
+
+	canOutput = 1;
+
+	vmmngr_initialize();
+	pmmngr_paging_enable(true);
+
+	printfln("Virtual manager initialized");
 
 	while (true);
 

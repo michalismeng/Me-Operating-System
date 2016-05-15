@@ -2,6 +2,7 @@
 #define MMNGR_VIRTUAL_H_130516
 
 #include "types.h"
+#include "isr.h"
 
 #include "vmmngr_pte.h"
 #include "vmmngr_pde.h"
@@ -15,7 +16,7 @@ typedef uint32 virtual_addr;
 
 #define PAGE_DIR_INDEX(x)			( ((x) >> 22) & 0x3ff )		// Get the 10 upper bits of x 
 #define PAGE_TABLE_INDEX(x)			( ((x) >> 12) & 0x3ff )		// Get the 10 "middle" bits of x
-#define PAGE_GET_PHYSICAL_ADDR(x)	( *x & ~0xfff )				// Physical address is 4KB aligned, so return all bits except the 12 first
+#define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )				// Physical address is 4KB aligned, so return all bits except the 12 first
 
 // page table definition
 typedef struct ptable
@@ -49,7 +50,7 @@ bool vmmngr_alloc_page(pt_entry* entry);
 void vmmngr_free_page(pt_entry* entry);
 
 // switch page directory
-bool vmmngr_switch_directory(pdirectory* dir);
+bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr);
 
 // get the current page directory
 pdirectory* vmmngr_get_directory();
@@ -68,5 +69,8 @@ void vmmngr_pdirectory_clear(pdirectory* pdir);
 
 // returns entry of pdirectory p based on addr
 pd_entry* vmmngr_pdirectory_lookup_entry(pdirectory* p, virtual_addr addr);
+
+// print a directory structure (for debug purposes)
+void vmmngr_print(pdirectory* dir);
 
 #endif

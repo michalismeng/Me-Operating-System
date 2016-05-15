@@ -1,26 +1,26 @@
  MeOS
 
- Timestamp is 5737545a (Sat May 14 19:37:46 2016)
+ Timestamp is 5738595f (Sun May 15 14:11:27 2016)
 
  Preferred load address is 00100000
 
  Start         Length     Name                   Class
- 0001:00000000 0000279cH .text$mn                CODE
- 0002:00000000 000001c4H .rdata                  DATA
- 0002:000001c4 000000d8H .rdata$zzzdbg           DATA
+ 0001:00000000 0000298cH .text$mn                CODE
+ 0002:00000000 00000234H .rdata                  DATA
+ 0002:00000234 000000d8H .rdata$zzzdbg           DATA
  0003:00000000 000000a0H .data                   DATA
  0003:000000a0 00000ca0H .bss                    DATA
 
   Address         Publics by Value              Rva+Base       Lib:Object
 
- 0000:00000000       ___safe_se_handler_count   00000000     <absolute>
- 0000:00000000       ___guard_longjmp_table     00000000     <absolute>
  0000:00000000       ___guard_longjmp_count     00000000     <absolute>
- 0000:00000000       ___guard_fids_count        00000000     <absolute>
- 0000:00000000       ___guard_iat_table         00000000     <absolute>
- 0000:00000000       ___guard_fids_table        00000000     <absolute>
  0000:00000000       ___safe_se_handler_table   00000000     <absolute>
+ 0000:00000000       ___guard_longjmp_table     00000000     <absolute>
  0000:00000000       ___dynamic_value_reloc_table 00000000     <absolute>
+ 0000:00000000       ___guard_fids_table        00000000     <absolute>
+ 0000:00000000       ___guard_iat_table         00000000     <absolute>
+ 0000:00000000       ___safe_se_handler_count   00000000     <absolute>
+ 0000:00000000       ___guard_fids_count        00000000     <absolute>
  0000:00000000       ___guard_iat_count         00000000     <absolute>
  0000:00000000       ___guard_flags             00000000     <absolute>
  0001:00000000       _strlength                 00100400 f   cstring.obj
@@ -37,8 +37,8 @@
  0001:000007d0       _irq_handler               00100bd0 f   isr.obj
  0001:00000830       ?GetMemoryStats@@YAXXZ     00100c30 f   kernel.obj
  0001:00000880       ?kmain@@YAHPAUmultiboot_info@@@Z 00100c80 f   kernel.obj
- 0001:00000a70       _pmmngr_init               00100e70 f   mmngr_phys.obj
- 0001:00000ac0       _pmmngr_init_region        00100ec0 f   mmngr_phys.obj
+ 0001:00000a60       _pmmngr_init               00100e60 f   mmngr_phys.obj
+ 0001:00000ab0       _pmmngr_init_region        00100eb0 f   mmngr_phys.obj
  0001:00000b60       _pmmngr_deinit_region      00100f60 f   mmngr_phys.obj
  0001:00000c00       _pmmngr_alloc_block        00101000 f   mmngr_phys.obj
  0001:00000c50       _pmmngr_free_block         00101050 f   mmngr_phys.obj
@@ -59,171 +59,177 @@
  0001:00000ff0       ?mmap_test@@YA_NH@Z        001013f0 f i mmngr_phys.obj
  0001:00001040       ?mmap_unset@@YAXH@Z        00101440 f i mmngr_phys.obj
  0001:00001090       ?vmmngr_map_page@@YAXII@Z  00101490 f   mmngr_virtual.obj
- 0001:00001180       ?vmmngr_initialize@@YAXXZ  00101580 f   mmngr_virtual.obj
- 0001:00001190       ?vmmngr_alloc_page@@YA_NPAI@Z 00101590 f   mmngr_virtual.obj
- 0001:000011e0       ?vmmngr_free_page@@YAXPAI@Z 001015e0 f   mmngr_virtual.obj
- 0001:00001230       ?vmmngr_switch_directory@@YA_NPAUpdirectory@@@Z 00101630 f   mmngr_virtual.obj
- 0001:00001260       ?vmmngr_get_directory@@YAPAUpdirectory@@XZ 00101660 f   mmngr_virtual.obj
- 0001:00001270       ?vmmngr_flush_TLB_entry@@YAXI@Z 00101670 f   mmngr_virtual.obj
- 0001:00001280       ?vmmngr_ptable_clear@@YAXPAUptable@@@Z 00101680 f   mmngr_virtual.obj
- 0001:00001290       ?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z 00101690 f   mmngr_virtual.obj
- 0001:000012b0       ?vmmngr_pdirectory_clear@@YAXPAUpdirectory@@@Z 001016b0 f   mmngr_virtual.obj
- 0001:000012c0       ?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z 001016c0 f   mmngr_virtual.obj
- 0001:000012e0       _init_pic                  001016e0 f   pic.obj
- 0001:00001390       _init_pit_timer            00101790 f   pit.obj
- 0001:00001410       _play_sound                00101810 f   pit.obj
- 0001:00001490       _stop_sound                00101890 f   pit.obj
- 0001:000014c0       _ClearLine                 001018c0 f   screen.obj
- 0001:00001550       _UpdateCursor              00101950 f   screen.obj
- 0001:000015c0       _SetCursor                 001019c0 f   screen.obj
- 0001:000015e0       _ClearScreen               001019e0 f   screen.obj
- 0001:00001620       _ScrollUp                  00101a20 f   screen.obj
- 0001:00001700       _NewLineCheck              00101b00 f   screen.obj
- 0001:00001720       _Printch                   00101b20 f   screen.obj
- 0001:000018d0       _Print                     00101cd0 f   screen.obj
- 0001:00001920       _PrintCentered             00101d20 f   screen.obj
- 0001:00001970       _SetColor                  00101d70 f   screen.obj
- 0001:00001990       _SetForegroundColor        00101d90 f   screen.obj
- 0001:000019c0       _SetBackgroundColor        00101dc0 f   screen.obj
- 0001:000019f0       _MakeColor                 00101df0 f   screen.obj
- 0001:00001a10       _PrintLine                 00101e10 f   screen.obj
- 0001:00001a20       _SetMinWritable            00101e20 f   screen.obj
- 0001:00001a30       _inportb                   00101e30 f   system.obj
- 0001:00001a50       _inportw                   00101e50 f   system.obj
- 0001:00001a70       _inportl                   00101e70 f   system.obj
- 0001:00001a90       _outportb                  00101e90 f   system.obj
- 0001:00001aa0       _outportw                  00101ea0 f   system.obj
- 0001:00001ab0       _outportl                  00101eb0 f   system.obj
- 0001:00001ac0       _timer_callback            00101ec0 f   timer.obj
- 0001:00001b30       _sleep                     00101f30 f   timer.obj
- 0001:00001b50       _millis                    00101f50 f   timer.obj
- 0001:00001b70       ??0Timer@@QAE@XZ           00101f70 f   timer.obj
- 0001:00001b90       ?Restart@Timer@@QAEIXZ     00101f90 f   timer.obj
- 0001:00001bc0       ?GetElapsedMillis@Timer@@QAEIXZ 00101fc0 f   timer.obj
- 0001:00001be0       _uitoa                     00101fe0 f   utility.obj
- 0001:00001cc0       _itoa                      001020c0 f   utility.obj
- 0001:00001e30       _printf                    00102230 f   utility.obj
- 0001:00001e60       _printfln                  00102260 f   utility.obj
- 0001:00001e90       _memset                    00102290 f   utility.obj
- 0001:00001f70       _atoui                     00102370 f   utility.obj
- 0001:00002050       _atoui_dec                 00102450 f   utility.obj
- 0001:000020b0       _atoui_hex                 001024b0 f   utility.obj
- 0001:000021c0       _PANIC                     001025c0 f   utility.obj
- 0001:000021e0       _ASSERT                    001025e0 f   utility.obj
- 0001:00002200       _pow                       00102600 f   utility.obj
- 0001:00002240       _printf_base               00102640 f   utility.obj
- 0001:000024c0       ?pt_entry_add_attrib@@YAXPAII@Z 001028c0 f i vmmngr_pte.obj
- 0001:000024c0       ?pd_entry_add_attrib@@YAXPAII@Z 001028c0 f i vmmngr_pde.obj
- 0001:000024e0       ?pd_entry_test_attrib@@YA_NPAII@Z 001028e0 f i vmmngr_pde.obj
- 0001:00002510       ?pt_entry_del_attrib@@YAXPAII@Z 00102910 f i vmmngr_pte.obj
- 0001:00002530       ?pd_entry_get_frame@@YAII@Z 00102930 f i vmmngr_pde.obj
- 0001:00002530       ?pt_entry_get_frame@@YAII@Z 00102930 f i vmmngr_pte.obj
- 0001:00002540       ?pd_entry_set_frame@@YAXPAII@Z 00102940 f i vmmngr_pde.obj
- 0001:00002540       ?pt_entry_set_frame@@YAXPAII@Z 00102940 f i vmmngr_pte.obj
- 0001:00002560       _flush_gdt                 00102960 f   kasm.obj
- 0001:00002586       _flush_idt                 00102986 f   kasm.obj
- 0001:00002591       _isr8                      00102991 f   kasm.obj
- 0001:00002599       _isr10                     00102999 f   kasm.obj
- 0001:000025a1       _isr11                     001029a1 f   kasm.obj
- 0001:000025a9       _isr12                     001029a9 f   kasm.obj
- 0001:000025b1       _isr13                     001029b1 f   kasm.obj
- 0001:000025b9       _isr14                     001029b9 f   kasm.obj
- 0001:000025c1       _isr0                      001029c1 f   kasm.obj
- 0001:000025cb       _isr1                      001029cb f   kasm.obj
- 0001:000025d5       _isr2                      001029d5 f   kasm.obj
- 0001:000025df       _isr3                      001029df f   kasm.obj
- 0001:000025e9       _isr4                      001029e9 f   kasm.obj
- 0001:000025f3       _isr5                      001029f3 f   kasm.obj
- 0001:000025fd       _isr6                      001029fd f   kasm.obj
- 0001:00002607       _isr7                      00102a07 f   kasm.obj
- 0001:00002611       _isr9                      00102a11 f   kasm.obj
- 0001:0000261b       _isr15                     00102a1b f   kasm.obj
- 0001:00002625       _isr16                     00102a25 f   kasm.obj
- 0001:0000262f       _isr17                     00102a2f f   kasm.obj
- 0001:00002639       _isr18                     00102a39 f   kasm.obj
- 0001:00002643       _isr19                     00102a43 f   kasm.obj
- 0001:0000264d       _isr20                     00102a4d f   kasm.obj
- 0001:00002657       _isr21                     00102a57 f   kasm.obj
- 0001:00002661       _isr22                     00102a61 f   kasm.obj
- 0001:0000266b       _isr23                     00102a6b f   kasm.obj
- 0001:00002675       _isr24                     00102a75 f   kasm.obj
- 0001:0000267f       _isr25                     00102a7f f   kasm.obj
- 0001:00002689       _isr26                     00102a89 f   kasm.obj
- 0001:00002693       _isr27                     00102a93 f   kasm.obj
- 0001:0000269d       _isr28                     00102a9d f   kasm.obj
- 0001:000026a7       _isr29                     00102aa7 f   kasm.obj
- 0001:000026b1       _isr30                     00102ab1 f   kasm.obj
- 0001:000026bb       _isr31                     00102abb f   kasm.obj
- 0001:000026c2       _irq0                      00102ac2 f   kasm.obj
- 0001:000026cc       _irq1                      00102acc f   kasm.obj
- 0001:000026d6       _irq2                      00102ad6 f   kasm.obj
- 0001:000026e0       _irq3                      00102ae0 f   kasm.obj
- 0001:000026ea       _irq4                      00102aea f   kasm.obj
- 0001:000026f1       _irq5                      00102af1 f   kasm.obj
- 0001:000026f8       _irq6                      00102af8 f   kasm.obj
- 0001:000026ff       _irq7                      00102aff f   kasm.obj
- 0001:00002706       _irq8                      00102b06 f   kasm.obj
- 0001:0000270d       _irq9                      00102b0d f   kasm.obj
- 0001:00002714       _irq10                     00102b14 f   kasm.obj
- 0001:0000271b       _irq11                     00102b1b f   kasm.obj
- 0001:00002722       _irq12                     00102b22 f   kasm.obj
- 0001:00002729       _irq13                     00102b29 f   kasm.obj
- 0001:00002730       _irq14                     00102b30 f   kasm.obj
- 0001:00002737       _irq15                     00102b37 f   kasm.obj
- 0002:00000164       _SCREEN_WIDTH              00102d64     screen.obj
- 0002:00000165       _SCREEN_HEIGHT             00102d65     screen.obj
- 0002:00000166       _SCREEN_DEPTH              00102d66     screen.obj
- 0002:00000167       _TAB_SIZE                  00102d67     screen.obj
- 0003:0000005c       _canOutput                 0010305c     kernel.obj
- 0003:00000060       ?strMemoryTypes@@3PAPADA   00103060     kernel.obj
- 0003:00000070       _color                     00103070     screen.obj
- 0003:00000074       _hexes                     00103074     utility.obj
- 0003:000000b0       ?current_directory@@3PAUpdirectory@@A 001030b0     mmngr_virtual.obj
- 0003:000000b4       ?current_pdbr@@3IA         001030b4     mmngr_virtual.obj
- 0003:000000b8       _cursorX                   001030b8     screen.obj
- 0003:000000ba       _minWritable               001030ba     screen.obj
- 0003:000000bc       _cursorY                   001030bc     screen.obj
- 0003:000000c0       _ticks                     001030c0     timer.obj
- 0003:000000c4       _frequency                 001030c4     <common>
- 0003:000000c8       _idt_ptr                   001030c8     <common>
- 0003:000000e0       _idt_entries               001030e0     <common>
- 0003:000008e0       _gdt_ptr                   001038e0     <common>
- 0003:00000900       _gdt_entries               00103900     <common>
- 0003:00000940       _interrupt_handlers        00103940     <common>
+ 0001:00001190       ?vmmngr_initialize@@YAXXZ  00101590 f   mmngr_virtual.obj
+ 0001:00001200       ?vmmngr_alloc_page@@YA_NPAI@Z 00101600 f   mmngr_virtual.obj
+ 0001:00001250       ?vmmngr_free_page@@YAXPAI@Z 00101650 f   mmngr_virtual.obj
+ 0001:000012a0       ?vmmngr_switch_directory@@YA_NPAUpdirectory@@I@Z 001016a0 f   mmngr_virtual.obj
+ 0001:000012e0       ?vmmngr_get_directory@@YAPAUpdirectory@@XZ 001016e0 f   mmngr_virtual.obj
+ 0001:000012f0       ?vmmngr_flush_TLB_entry@@YAXI@Z 001016f0 f   mmngr_virtual.obj
+ 0001:00001300       ?vmmngr_ptable_clear@@YAXPAUptable@@@Z 00101700 f   mmngr_virtual.obj
+ 0001:00001330       ?vmmngr_ptable_lookup_entry@@YAPAIPAUptable@@I@Z 00101730 f   mmngr_virtual.obj
+ 0001:00001350       ?vmmngr_pdirectory_clear@@YAXPAUpdirectory@@@Z 00101750 f   mmngr_virtual.obj
+ 0001:000013b0       ?vmmngr_pdirectory_lookup_entry@@YAPAIPAUpdirectory@@I@Z 001017b0 f   mmngr_virtual.obj
+ 0001:000013d0       ?vmmngr_print@@YAXPAUpdirectory@@@Z 001017d0 f   mmngr_virtual.obj
+ 0001:00001480       ?page_fault@@YAXUregisters_struct@@@Z 00101880 f   mmngr_virtual.obj
+ 0001:000014a0       _init_pic                  001018a0 f   pic.obj
+ 0001:00001550       _init_pit_timer            00101950 f   pit.obj
+ 0001:000015d0       _play_sound                001019d0 f   pit.obj
+ 0001:00001650       _stop_sound                00101a50 f   pit.obj
+ 0001:00001680       _ClearLine                 00101a80 f   screen.obj
+ 0001:00001710       _UpdateCursor              00101b10 f   screen.obj
+ 0001:00001780       _SetCursor                 00101b80 f   screen.obj
+ 0001:000017a0       _ClearScreen               00101ba0 f   screen.obj
+ 0001:000017e0       _ScrollUp                  00101be0 f   screen.obj
+ 0001:000018c0       _NewLineCheck              00101cc0 f   screen.obj
+ 0001:000018e0       _Printch                   00101ce0 f   screen.obj
+ 0001:00001a90       _Print                     00101e90 f   screen.obj
+ 0001:00001ae0       _PrintCentered             00101ee0 f   screen.obj
+ 0001:00001b30       _SetColor                  00101f30 f   screen.obj
+ 0001:00001b50       _SetForegroundColor        00101f50 f   screen.obj
+ 0001:00001b80       _SetBackgroundColor        00101f80 f   screen.obj
+ 0001:00001bb0       _MakeColor                 00101fb0 f   screen.obj
+ 0001:00001bd0       _PrintLine                 00101fd0 f   screen.obj
+ 0001:00001be0       _SetMinWritable            00101fe0 f   screen.obj
+ 0001:00001bf0       _inportb                   00101ff0 f   system.obj
+ 0001:00001c10       _inportw                   00102010 f   system.obj
+ 0001:00001c30       _inportl                   00102030 f   system.obj
+ 0001:00001c50       _outportb                  00102050 f   system.obj
+ 0001:00001c60       _outportw                  00102060 f   system.obj
+ 0001:00001c70       _outportl                  00102070 f   system.obj
+ 0001:00001c80       _timer_callback            00102080 f   timer.obj
+ 0001:00001cf0       _sleep                     001020f0 f   timer.obj
+ 0001:00001d10       _millis                    00102110 f   timer.obj
+ 0001:00001d30       ??0Timer@@QAE@XZ           00102130 f   timer.obj
+ 0001:00001d50       ?Restart@Timer@@QAEIXZ     00102150 f   timer.obj
+ 0001:00001d80       ?GetElapsedMillis@Timer@@QAEIXZ 00102180 f   timer.obj
+ 0001:00001da0       _uitoa                     001021a0 f   utility.obj
+ 0001:00001e80       _itoa                      00102280 f   utility.obj
+ 0001:00001ff0       _printf                    001023f0 f   utility.obj
+ 0001:00002020       _printfln                  00102420 f   utility.obj
+ 0001:00002050       _memset                    00102450 f   utility.obj
+ 0001:00002130       _atoui                     00102530 f   utility.obj
+ 0001:00002210       _atoui_dec                 00102610 f   utility.obj
+ 0001:00002270       _atoui_hex                 00102670 f   utility.obj
+ 0001:00002380       _PANIC                     00102780 f   utility.obj
+ 0001:000023a0       _ASSERT                    001027a0 f   utility.obj
+ 0001:000023c0       _pow                       001027c0 f   utility.obj
+ 0001:00002400       _printf_base               00102800 f   utility.obj
+ 0001:00002680       ?pd_entry_add_attrib@@YAXPAII@Z 00102a80 f i vmmngr_pde.obj
+ 0001:00002680       ?pt_entry_add_attrib@@YAXPAII@Z 00102a80 f i vmmngr_pte.obj
+ 0001:000026a0       ?pd_entry_test_attrib@@YA_NPAII@Z 00102aa0 f i vmmngr_pde.obj
+ 0001:000026d0       ?pt_entry_test_attrib@@YA_NPAII@Z 00102ad0 f   vmmngr_pte.obj
+ 0001:00002700       ?pt_entry_del_attrib@@YAXPAII@Z 00102b00 f i vmmngr_pte.obj
+ 0001:00002720       ?pt_entry_get_frame@@YAII@Z 00102b20 f i vmmngr_pte.obj
+ 0001:00002720       ?pd_entry_get_frame@@YAII@Z 00102b20 f i vmmngr_pde.obj
+ 0001:00002730       ?pt_entry_set_frame@@YAXPAII@Z 00102b30 f i vmmngr_pte.obj
+ 0001:00002730       ?pd_entry_set_frame@@YAXPAII@Z 00102b30 f i vmmngr_pde.obj
+ 0001:00002750       _flush_gdt                 00102b50 f   kasm.obj
+ 0001:00002776       _flush_idt                 00102b76 f   kasm.obj
+ 0001:00002781       _isr8                      00102b81 f   kasm.obj
+ 0001:00002789       _isr10                     00102b89 f   kasm.obj
+ 0001:00002791       _isr11                     00102b91 f   kasm.obj
+ 0001:00002799       _isr12                     00102b99 f   kasm.obj
+ 0001:000027a1       _isr13                     00102ba1 f   kasm.obj
+ 0001:000027a9       _isr14                     00102ba9 f   kasm.obj
+ 0001:000027b1       _isr0                      00102bb1 f   kasm.obj
+ 0001:000027bb       _isr1                      00102bbb f   kasm.obj
+ 0001:000027c5       _isr2                      00102bc5 f   kasm.obj
+ 0001:000027cf       _isr3                      00102bcf f   kasm.obj
+ 0001:000027d9       _isr4                      00102bd9 f   kasm.obj
+ 0001:000027e3       _isr5                      00102be3 f   kasm.obj
+ 0001:000027ed       _isr6                      00102bed f   kasm.obj
+ 0001:000027f7       _isr7                      00102bf7 f   kasm.obj
+ 0001:00002801       _isr9                      00102c01 f   kasm.obj
+ 0001:0000280b       _isr15                     00102c0b f   kasm.obj
+ 0001:00002815       _isr16                     00102c15 f   kasm.obj
+ 0001:0000281f       _isr17                     00102c1f f   kasm.obj
+ 0001:00002829       _isr18                     00102c29 f   kasm.obj
+ 0001:00002833       _isr19                     00102c33 f   kasm.obj
+ 0001:0000283d       _isr20                     00102c3d f   kasm.obj
+ 0001:00002847       _isr21                     00102c47 f   kasm.obj
+ 0001:00002851       _isr22                     00102c51 f   kasm.obj
+ 0001:0000285b       _isr23                     00102c5b f   kasm.obj
+ 0001:00002865       _isr24                     00102c65 f   kasm.obj
+ 0001:0000286f       _isr25                     00102c6f f   kasm.obj
+ 0001:00002879       _isr26                     00102c79 f   kasm.obj
+ 0001:00002883       _isr27                     00102c83 f   kasm.obj
+ 0001:0000288d       _isr28                     00102c8d f   kasm.obj
+ 0001:00002897       _isr29                     00102c97 f   kasm.obj
+ 0001:000028a1       _isr30                     00102ca1 f   kasm.obj
+ 0001:000028ab       _isr31                     00102cab f   kasm.obj
+ 0001:000028b2       _irq0                      00102cb2 f   kasm.obj
+ 0001:000028bc       _irq1                      00102cbc f   kasm.obj
+ 0001:000028c6       _irq2                      00102cc6 f   kasm.obj
+ 0001:000028d0       _irq3                      00102cd0 f   kasm.obj
+ 0001:000028da       _irq4                      00102cda f   kasm.obj
+ 0001:000028e1       _irq5                      00102ce1 f   kasm.obj
+ 0001:000028e8       _irq6                      00102ce8 f   kasm.obj
+ 0001:000028ef       _irq7                      00102cef f   kasm.obj
+ 0001:000028f6       _irq8                      00102cf6 f   kasm.obj
+ 0001:000028fd       _irq9                      00102cfd f   kasm.obj
+ 0001:00002904       _irq10                     00102d04 f   kasm.obj
+ 0001:0000290b       _irq11                     00102d0b f   kasm.obj
+ 0001:00002912       _irq12                     00102d12 f   kasm.obj
+ 0001:00002919       _irq13                     00102d19 f   kasm.obj
+ 0001:00002920       _irq14                     00102d20 f   kasm.obj
+ 0001:00002927       _irq15                     00102d27 f   kasm.obj
+ 0002:000001ce       _SCREEN_WIDTH              00102fce     screen.obj
+ 0002:000001cf       _SCREEN_HEIGHT             00102fcf     screen.obj
+ 0002:000001d0       _SCREEN_DEPTH              00102fd0     screen.obj
+ 0002:000001d1       _TAB_SIZE                  00102fd1     screen.obj
+ 0003:0000005c       _canOutput                 0010325c     kernel.obj
+ 0003:00000060       ?strMemoryTypes@@3PAPADA   00103260     kernel.obj
+ 0003:00000070       _color                     00103270     screen.obj
+ 0003:00000074       _hexes                     00103274     utility.obj
+ 0003:000000b0       ?current_directory@@3PAUpdirectory@@A 001032b0     mmngr_virtual.obj
+ 0003:000000b4       ?current_pdbr@@3IA         001032b4     mmngr_virtual.obj
+ 0003:000000b8       _cursorX                   001032b8     screen.obj
+ 0003:000000ba       _minWritable               001032ba     screen.obj
+ 0003:000000bc       _cursorY                   001032bc     screen.obj
+ 0003:000000c0       _ticks                     001032c0     timer.obj
+ 0003:000000c4       _frequency                 001032c4     <common>
+ 0003:000000c8       _idt_ptr                   001032c8     <common>
+ 0003:000000e0       _idt_entries               001032e0     <common>
+ 0003:000008e0       _gdt_ptr                   00103ae0     <common>
+ 0003:00000900       _gdt_entries               00103b00     <common>
+ 0003:00000940       _interrupt_handlers        00103b40     <common>
 
  entry point at        0000:00000000
 
  Static symbols
 
- 0001:000018b8       $LN13                      00101cb8     screen.obj
- 0001:0000247c       $LN22                      0010287c     utility.obj
- 0001:000024a0       $LN21                      001028a0     utility.obj
- 0001:00002560       $$000000                   00102960     kasm.obj
- 0002:00000000       $SG3172                    00102c00     kernel.obj
- 0002:0000000f       $SG3175                    00102c0f     kernel.obj
- 0002:00000010       $SG3173                    00102c10     kernel.obj
- 0002:00000028       $SG3174                    00102c28     kernel.obj
- 0002:00000038       $SG3189                    00102c38     kernel.obj
- 0002:00000058       $SG3190                    00102c58     kernel.obj
- 0002:00000078       $SG3191                    00102c78     kernel.obj
- 0002:00000090       $SG3192                    00102c90     kernel.obj
- 0002:000000a8       $SG3195                    00102ca8     kernel.obj
- 0002:000000ec       $SG3197                    00102cec     kernel.obj
- 0002:00000100       $SG3018                    00102d00     kernel.obj
- 0002:0000010c       $SG3019                    00102d0c     kernel.obj
- 0002:00000118       $SG3020                    00102d18     kernel.obj
- 0002:00000128       $SG3021                    00102d28     kernel.obj
- 0002:00000134       $SG2854                    00102d34     mmngr_phys.obj
- 0002:0000014c       $SG2867                    00102d4c     mmngr_phys.obj
- 0002:00000168       $SG2837                    00102d68     timer.obj
- 0003:00000000       $SG1662                    00103000     descriptor_tables.obj
- 0003:00000010       $SG1667                    00103010     descriptor_tables.obj
- 0003:0000002c       $SG1558                    0010302c     isr.obj
- 0003:00000044       $SG1561                    00103044     isr.obj
- 0003:00000084       $SG1648                    00103084     utility.obj
- 0003:00000088       $SG1694                    00103088     utility.obj
- 0003:0000008c       $SG1699                    0010308c     utility.obj
- 0003:000000a0       _mmngr_memory_size         001030a0     mmngr_phys.obj
- 0003:000000a4       _mmngr_used_blocks         001030a4     mmngr_phys.obj
- 0003:000000a8       _mmngr_max_blocks          001030a8     mmngr_phys.obj
- 0003:000000ac       _mmngr_bitmap              001030ac     mmngr_phys.obj
+ 0001:00001a78       $LN13                      00101e78     screen.obj
+ 0001:0000263c       $LN22                      00102a3c     utility.obj
+ 0001:00002660       $LN21                      00102a60     utility.obj
+ 0001:00002750       $$000000                   00102b50     kasm.obj
+ 0002:00000000       $SG3178                    00102e00     kernel.obj
+ 0002:0000000f       $SG3181                    00102e0f     kernel.obj
+ 0002:00000010       $SG3179                    00102e10     kernel.obj
+ 0002:00000028       $SG3180                    00102e28     kernel.obj
+ 0002:00000038       $SG3195                    00102e38     kernel.obj
+ 0002:00000058       $SG3196                    00102e58     kernel.obj
+ 0002:00000078       $SG3197                    00102e78     kernel.obj
+ 0002:00000090       $SG3198                    00102e90     kernel.obj
+ 0002:000000a8       $SG3201                    00102ea8     kernel.obj
+ 0002:000000ec       $SG3203                    00102eec     kernel.obj
+ 0002:00000108       $SG3018                    00102f08     kernel.obj
+ 0002:00000114       $SG3019                    00102f14     kernel.obj
+ 0002:00000120       $SG3020                    00102f20     kernel.obj
+ 0002:00000130       $SG3021                    00102f30     kernel.obj
+ 0002:0000013c       $SG2854                    00102f3c     mmngr_phys.obj
+ 0002:00000164       $SG2867                    00102f64     mmngr_phys.obj
+ 0002:00000190       $SG2962                    00102f90     mmngr_virtual.obj
+ 0002:0000019c       $SG2976                    00102f9c     mmngr_virtual.obj
+ 0002:000001b4       $SG3049                    00102fb4     mmngr_virtual.obj
+ 0002:000001d4       $SG2837                    00102fd4     timer.obj
+ 0003:00000000       $SG1662                    00103200     descriptor_tables.obj
+ 0003:00000010       $SG1667                    00103210     descriptor_tables.obj
+ 0003:0000002c       $SG1558                    0010322c     isr.obj
+ 0003:00000044       $SG1561                    00103244     isr.obj
+ 0003:00000084       $SG1648                    00103284     utility.obj
+ 0003:00000088       $SG1694                    00103288     utility.obj
+ 0003:0000008c       $SG1699                    0010328c     utility.obj
+ 0003:000000a0       _mmngr_memory_size         001032a0     mmngr_phys.obj
+ 0003:000000a4       _mmngr_used_blocks         001032a4     mmngr_phys.obj
+ 0003:000000a8       _mmngr_max_blocks          001032a8     mmngr_phys.obj
+ 0003:000000ac       _mmngr_bitmap              001032ac     mmngr_phys.obj

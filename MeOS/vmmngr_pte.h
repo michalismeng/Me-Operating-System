@@ -31,6 +31,9 @@ extern void pt_entry_add_attrib(pt_entry* entry, uint32 attrib);
 // unset a flag from a pt_entry
 extern void pt_entry_del_attrib(pt_entry* entry, uint32 attrib);
 
+// test if attrib is set
+extern bool pt_entry_test_attrib(pt_entry* entry, uint32 attrib);
+
 // set the frame address (physical address space) of a pt_entry
 extern void pt_entry_set_frame(pt_entry* entry, physical_addr address);
 
