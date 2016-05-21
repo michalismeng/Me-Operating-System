@@ -125,9 +125,13 @@ Stage3:							; PMode here
 	add ebx, 12
 	mov eax, dword [ebx]
 	add ebp, eax	
+
+	mov eax, 0x2BADB002
+	mov ebx, 0
 	
+	push dword [memory_map_len]
 	push dword boot_info
-	
+
 	call ebp		; execute kernel
 	
 	cli

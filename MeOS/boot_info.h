@@ -29,7 +29,7 @@ struct multiboot_info {
 	uint16	m_vbe_interface_len;
 };
 
-struct memory_region
+struct bios_memory_region
 {
 	uint32	startLo;
 	uint32	startHi;

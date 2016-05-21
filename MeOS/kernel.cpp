@@ -355,6 +355,10 @@ void ProccessCommand()
 #include "mmngr_phys.h"
 #include "mmngr_virtual.h"
 
+#include "keyboard.h"
+
+#include "OrderedArray.h"
+
 extern "C" uint8 canOutput = 1;
 
 void GetMemoryStats()
@@ -366,9 +370,11 @@ void GetMemoryStats()
 	printfln("");
 }
 
-int kmain(multiboot_info* boot_info)
+int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
 	uint32 kernel_size_bytes;
+	uint32 memory_map_length = memory_map_len;
+
 	_asm mov dword ptr [kernel_size_bytes], edx
 
 	__asm cli
@@ -389,13 +395,11 @@ int kmain(multiboot_info* boot_info)
 
 	printf("Boot device: %h\n", boot_info->m_bootDevice);
 
-	memory_region* region = (memory_region*)0x500;
+	bios_memory_region* region = (bios_memory_region*)0x500;
 
 	pmmngr_init(memoryKB, 0x100000 + kernel_size_bytes);
 
-	canOutput = 0;
-
-	for (int i = 0; i < 15; i++)
+	for (uint32 i = 0; i < memory_map_length; i++)
 	{
 		if (region[i].type > 4)
 			break;
@@ -408,18 +412,29 @@ int kmain(multiboot_info* boot_info)
 			region[i].sizeHi, region[i].sizeLo,
 			region[i].type, strMemoryTypes[region[i].type - 1]);
 
-		if (region[i].type  == 1)	// make available
-			pmmngr_init_region(region[i].startLo, region[i].sizeLo);
+		if (region[i].type == 1)	// make available
+			pmmngr_free_region(&physical_memory_region(region[i].startLo, region[i].sizeLo));
 	}
 
-	pmmngr_deinit_region(0x100000, kernel_size_bytes);
+	pmmngr_reserve_region(&physical_memory_region(0x100000, kernel_size_bytes + 4096));
+	//GetMemoryStats();
 
-	canOutput = 1;
+	//return 0;
 
 	vmmngr_initialize();
 	pmmngr_paging_enable(true);
 
 	printfln("Virtual manager initialized");
+
+	canOutput = 1;
+	
+	OrderedArray oa(0xc0000000, 0x10000, Standard_LessThan_Predicate);
+
+	oa.Insert(0);
+	oa.Insert((ordered_type)10);
+	oa.Insert((ordered_type)2);
+
+	oa.Print();
 
 	while (true);
 

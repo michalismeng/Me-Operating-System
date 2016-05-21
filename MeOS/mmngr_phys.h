@@ -10,6 +10,15 @@ extern "C" {
 
 typedef uint32 physical_addr;
 
+struct physical_memory_region
+{
+	physical_memory_region() {}
+	physical_memory_region(uint32 base, uint32 length) { this->base = base; this->length = length; }
+
+	uint32 base;
+	uint32 length;
+};
+
 // INTERFACE
 
 // size of physical memory
@@ -28,10 +37,10 @@ extern uint32* mmngr_bitmap;
 void pmmngr_init(uint32 size, physical_addr base);
 
 // initialize a region for use
-void pmmngr_init_region(physical_addr base, uint32 size);
+void pmmngr_free_region(physical_memory_region* region);
 
 // uninitialize a region (make it unusable)
-void pmmngr_deinit_region(physical_addr base, uint32 size);
+void pmmngr_reserve_region(physical_memory_region* region);
 
 // allocates a block of memory
 void* pmmngr_alloc_block();
@@ -39,11 +48,11 @@ void* pmmngr_alloc_block();
 // frees an allocated block
 void pmmngr_free_block(void* block);
 
-// allocates count blocks
-void* pmmngr_alloc_blocks(uint32 count);
+// allocates blocks to hold size
+void* pmmngr_alloc_blocks(uint32 size);
 
 // frees allocated blocks
-void pmmngr_free_blocks(void* block, uint32 count);
+void pmmngr_free_blocks(void* block, uint32 size);
 
 // get the memory amount the manager is initialized to use
 uint32 pmmngr_get_memory_size();

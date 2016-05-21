@@ -21,10 +21,13 @@
   <ItemGroup>
     <ClCompile Include="cstring.c" />
     <ClCompile Include="descriptor_tables.c" />
+    <ClCompile Include="HeapManager.cpp" />
     <ClCompile Include="isr.c" />
     <ClCompile Include="kernel.cpp" />
+    <ClCompile Include="keyboard.cpp" />
     <ClCompile Include="mmngr_phys.cpp" />
     <ClCompile Include="mmngr_virtual.cpp" />
+    <ClCompile Include="OrderedArray.cpp" />
     <ClCompile Include="pic.c" />
     <ClCompile Include="pit.c" />
     <ClCompile Include="screen.c" />
@@ -51,9 +54,12 @@
     <ClInclude Include="boot_info.h" />
     <ClInclude Include="cstring.h" />
     <ClInclude Include="descriptor_tables.h" />
+    <ClInclude Include="HeapManager.h" />
     <ClInclude Include="isr.h" />
+    <ClInclude Include="keyboard.h" />
     <ClInclude Include="mmngr_phys.h" />
     <ClInclude Include="mmngr_virtual.h" />
+    <ClInclude Include="OrderedArray.h" />
     <ClInclude Include="pic.h" />
     <ClInclude Include="pit.h" />
     <ClInclude Include="screen.h" />

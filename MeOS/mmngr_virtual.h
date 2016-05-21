@@ -19,13 +19,13 @@ typedef uint32 virtual_addr;
 #define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )				// Physical address is 4KB aligned, so return all bits except the 12 first
 
 // page table definition
-typedef struct ptable
+struct ptable
 {
 	pt_entry entries[PAGES_PER_TABLE];
 };
 
 // page directory definition
-typedef struct pdirectory
+struct pdirectory
 {
 	pd_entry entries[TABLES_PER_DIR];
 };
@@ -44,7 +44,7 @@ void vmmngr_map_page(physical_addr phys, virtual_addr virt);
 void vmmngr_initialize();
 
 // allocates a virtual page filling the entry with the necessary data
-bool vmmngr_alloc_page(pt_entry* entry);
+bool vmmngr_alloc_page(virtual_addr base);
 
 // frees a virtual page
 void vmmngr_free_page(pt_entry* entry);

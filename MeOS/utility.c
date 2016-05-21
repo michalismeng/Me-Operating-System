@@ -88,6 +88,17 @@ uint32 pow(uint32 base, uint32 exp)	// IMPROVEEEEE
 	return res;
 }
 
+uint32 ceil_division(uint32 value, uint32 divisor)
+{
+	uint32 div = value / divisor;
+	uint32 rem = value % divisor;
+
+	if (rem != 0)
+		div++;
+
+	return div;
+}
+
 uint32 atoui(char* input)
 {
 	if (input[0] == '0' && tolower(input[1]) == 'x')	// hex
@@ -237,14 +248,18 @@ void memset(void* base, uint8 val, uint32 length)
 	val32 |= (val << 16) & 0xFF0000;
 	val32 |= (val << 24) & 0xFF000000;
 
-	for (uint32 i = 0; i < length; i++)
+	for (uint32 i = 0; i < length; i++)		
 		new_ptr[i] = val32;
 }
 
 void PANIC(char* str)
 {
 	printf("\n%s", str);
-	__asm hlt;
+	__asm 
+	{
+		cli 
+		hlt
+	}
 }
 
 void ASSERT(bool expr)

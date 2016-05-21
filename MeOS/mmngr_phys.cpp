@@ -86,7 +86,50 @@ int mmap_first_free_s(uint32 count)
 	return -1;
 }
 
+// modifies reg: base and length to be block aligned and to be within the former borders (new_base >= base and new_length <= length) 
+void pmmngr_block_align_region(physical_memory_region* reg)
+{
+	uint32 new_base = reg->base;
+	uint32 new_length = reg->length;
+
+	if (new_base % PMMNGR_BLOCK_SIZE != 0)
+	{
+		new_base = reg->base + PMMNGR_BLOCK_SIZE - reg->base % PMMNGR_BLOCK_SIZE;
+		if (new_length < reg->base % PMMNGR_BLOCK_SIZE)
+			PANIC("allocation failed.");
+
+		new_length -= PMMNGR_BLOCK_SIZE - reg->base % PMMNGR_BLOCK_SIZE;
+	}
+	if (new_length % PMMNGR_BLOCK_SIZE != 0)
+		new_length = new_length - new_length % PMMNGR_BLOCK_SIZE;
+
+	reg->base = new_base;
+	reg->length = new_length;
+}
+
+
+
 // INTERFACE FUNCTIONS
+
+/*void pmmngr_init(physical_addr bitmap_base, physical_memory_region* available_regions, uint32 region_num)
+{
+	mmngr_bitmap = (uint32*)bitmap_base;
+	
+	for (uint32 i = 0; i < region_num; i++)
+	{
+		pmmngr_block_align_region(available_regions + i);
+		mmngr_memory_size += available_regions[i].length;		// length has changed
+		printfln("base: %h length: %h", available_regions[i].base, available_regions[i].length);
+	}
+
+	mmngr_max_blocks = mmngr_memory_size / PMMNGR_BLOCK_SIZE;
+
+	if (mmngr_memory_size % PMMNGR_BLOCK_SIZE != 0)
+		PANIC("MEMORY SUM IS NOT ALIGNED.");
+
+	mmngr_guard_bits = region_num;
+	memset(mmngr_bitmap, 0, ceil_division(mmngr_max_blocks + mmngr_guard_bits, PMMNGR_BLOCKS_PER_BYTE));
+}*/
 
 void pmmngr_init(uint32 size, physical_addr base)
 {
@@ -99,17 +142,19 @@ void pmmngr_init(uint32 size, physical_addr base)
 	memset(mmngr_bitmap, 0xff, pmmngr_get_block_count() / PMMNGR_BLOCKS_PER_BYTE);
 }
 
-void pmmngr_init_region(physical_addr base, uint32 size)
+void pmmngr_free_region(physical_memory_region* region)
 {
-	if (size == 0)		// error
+	if (region->length == 0)		// error
 		return;
 
-	uint32 aligned_addr = base / PMMNGR_BLOCK_SIZE;				// floor the base address as it is absolute
-	uint32 aligned_size = (size - 1) / PMMNGR_BLOCK_SIZE;		// same but make it zero based as it is length
+	pmmngr_block_align_region(region);
 
-	printfln("init aligned addr: %h aligned size: %h", aligned_addr, aligned_size);
+	uint32 aligned_addr = region->base / PMMNGR_BLOCK_SIZE;
+	uint32 aligned_size = region->length / PMMNGR_BLOCK_SIZE;
 
-	for (int i = 0; i <= aligned_size; i++)
+	printfln("init aligned addr: %h aligned size: %h", region->base, region->length);
+
+	for (int i = 0; i < aligned_size; i++)
 	{
 		if (mmap_test(aligned_addr) == true)	// if block is in use
 		{
@@ -118,21 +163,26 @@ void pmmngr_init_region(physical_addr base, uint32 size)
 		}
 	}
 
-	mmap_set(0);		// 0 always set to disable 0 allocation
-	//mmap_set(last_block_bit);  this way we ensure mmap_first_free_s loop does not go out of bounds
+	if (mmap_test(0) == false)		// if zero bit is unset, set it to disable 0 allocation
+	{
+		mmap_set(0);
+		mmngr_used_blocks++;
+	}
 }
 
-void pmmngr_deinit_region(physical_addr base, uint32 size)
+void pmmngr_reserve_region(physical_memory_region* region)
 {
-	if (size == 0)		// error
+	if (region->length == 0)		// error
 		return;
 
-	uint32 aligned_addr = base / PMMNGR_BLOCK_SIZE;
-	uint32 aligned_size = (size - 1) / PMMNGR_BLOCK_SIZE;
+	pmmngr_block_align_region(region);
+
+	uint32 aligned_addr = region->base / PMMNGR_BLOCK_SIZE;
+	uint32 aligned_size = region->length / PMMNGR_BLOCK_SIZE;
 
 	printfln("deinit aligned addr: %h aligned size: %h", aligned_addr, aligned_size);
 
-	for (int i = 0; i <= aligned_size; i++)
+	for (int i = 0; i < aligned_size; i++)
 	{
 		if (mmap_test(aligned_addr) == false)		// if block is not in use
 		{
@@ -172,8 +222,10 @@ void pmmngr_free_block(void* block)
 	}
 }
 
-void* pmmngr_alloc_blocks(uint32 count)
+void* pmmngr_alloc_blocks(uint32 size)
 {
+	uint32 count = ceil_division(size, pmmngr_get_block_size());
+
 	if (pmmngr_get_free_block_count() < count)	// not enough memory
 		return 0;
 
@@ -191,8 +243,10 @@ void* pmmngr_alloc_blocks(uint32 count)
 	return (void*)addr;
 }
 
-void pmmngr_free_blocks(void* block, uint32 count)
+void pmmngr_free_blocks(void* block, uint32 size)
 {
+	uint32 count = ceil_division(size, pmmngr_get_block_size());
+
 	physical_addr addr = (physical_addr)block;
 	int frame = addr / PMMNGR_BLOCK_SIZE;
 

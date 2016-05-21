@@ -95,13 +95,16 @@ BiosGetMemorySize64MB:
 ; ebx : next entry or 0 if finished
 ; ecx : actual length returned in bytes
 ; es:di biffer filled
+; variable memory_map_len : entries entered (stored in bp)
+
+memory_map_len dd 0
 
 BiosGetMemoryMap:
 	
 	pushad
 	
 	xor ebx, ebx
-	xor bp, bp 			; number of entries stored here
+	xor ebp, ebp 		; number of entries stored here
 	mov edx, 'PAMS'		; little endian SMAP
 	mov eax, 0xe820
 	mov ecx, 24			; size of our MemoryMapEntry struct
@@ -132,7 +135,7 @@ BiosGetMemoryMap:
 		jcxz .skip_entry
 		
 	.good_entry:
-		inc bp			; one more entry
+		inc ebp			; one more entry
 		add di, 24		; save this entry by moving the di pointer to the next memory location
 		
 	.skip_entry:
@@ -143,6 +146,7 @@ BiosGetMemoryMap:
 	.error:
 		stc				; set carry
 	.done:
+		mov dword [memory_map_len], ebp
 		popad 
 		ret
 

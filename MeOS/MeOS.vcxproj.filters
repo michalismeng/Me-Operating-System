@@ -63,6 +63,15 @@
     <ClCompile Include="mmngr_phys.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="keyboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HeapManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OrderedArray.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="kasm.asm">
@@ -119,6 +128,15 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="mmngr_virtual.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keyboard.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HeapManager.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OrderedArray.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

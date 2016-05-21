@@ -57,17 +57,14 @@ void vmmngr_initialize()		// identity map kernel
 	register_interrupt_handler(14, page_fault);
 }
 
-bool vmmngr_alloc_page(pt_entry* entry)
-{
+bool vmmngr_alloc_page(virtual_addr base)
+{		
 	physical_addr addr = (physical_addr)pmmngr_alloc_block();
 
 	if (!addr)
 		return false;
 
-	pt_entry_add_attrib(entry, I86_PTE_PRESENT);
-	pt_entry_add_attrib(entry, I86_PTE_WRITABLE);
-	pt_entry_set_frame(entry, addr);
-
+	vmmngr_map_page(addr, base);
 	return true;
 }
 
