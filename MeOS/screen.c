@@ -31,7 +31,7 @@ void UpdateCursor()
 	uint16 temp = SCREEN_WIDTH * cursorY + cursorX;
 
 	outportb(0x3D4, 14);
-	outportb(0x3D5, temp >> 8);	// CRT register send high byte location of the cursor	
+	outportb(0x3D5, temp >> 8);	// CRT register send high byte location of the cursor
 	outportb(0x3D4, 15);
 	outportb(0x3D5, temp);		// then send the low byte location of the cursor
 }
@@ -96,8 +96,8 @@ void Printch(char c)
 		cursorX += TAB_SIZE - cursorX % TAB_SIZE;
 		break;
 	case '\r':
-		cursorX = 0;
-		break;
+		//cursorX = 0;
+		//break;
 	case '\n':
 		cursorX = 0;
 		cursorY++;
@@ -120,7 +120,7 @@ void Printch(char c)
 
 void Print(char* str)
 {
-	uint16 length = strlength(str);
+	uint16 length = strlen(str);
 
 	uint16 i = 0;
 	for (i; i < length; i++)
@@ -129,7 +129,7 @@ void Print(char* str)
 
 void PrintCentered(char* str)
 {
-	uint16 length = strlength(str);
+	uint16 length = strlen(str);
 	uint8 startPos = (SCREEN_WIDTH - length) / 2;
 
 	cursorX = startPos;
@@ -162,7 +162,6 @@ void PrintLine()
 {
 	Printch('\n');
 }
-
 
 void SetMinWritable(uint8 min)
 {

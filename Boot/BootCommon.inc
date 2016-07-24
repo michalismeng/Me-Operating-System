@@ -14,6 +14,32 @@ Print:
 PrintDone:
 			popa
 			ret					; we are done, so return
+		
+; compares two null-terminated strings at si and di cx times
+Strcmp:
+	pusha
+	
+	.compare:
+		mov al, byte [ds:si]
+		mov bl, byte [ds:di]
+		cmp al, bl
+		
+		jne .nequal
+		
+		inc si
+		inc di
+		dec cx
+		jnz .compare
+		
+		popa
+		mov ax, 1
+		ret
+	
+	.nequal:
+		popa
+		mov ax, 0
+		ret
+	
 			
 Reset:
 	mov ah, 0

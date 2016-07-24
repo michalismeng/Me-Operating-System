@@ -7,9 +7,11 @@ extern "C" {
 
 #include "types.h"
 
-uint16 strlength(const char* ch);
+	// get the length of a string
+	uint16 strlen(const char* ch);
 
-uint8 strEqual(char* s1, char* s2);
+	// compares two strings: -1 if first un-match of s1 is lower than s2, 0 if equal, 1 if first un-match of s1 is greater than s2
+	int8 strcmp(const char* s1, const char* s2);
 
 #ifdef __cplusplus
 }

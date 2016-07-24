@@ -12,11 +12,11 @@ typedef uint32 virtual_addr;
 #define PAGES_PER_TABLE 1024	// intel arch definitions
 #define TABLES_PER_DIR	1024
 
-	// definitions for entry extraction based on virtual address. (see virtual address format)
+// definitions for entry extraction based on virtual address. (see virtual address format)
 
-#define PAGE_DIR_INDEX(x)			( ((x) >> 22) & 0x3ff )		// Get the 10 upper bits of x 
+#define PAGE_DIR_INDEX(x)			( ((x) >> 22) & 0x3ff )		// Get the 10 upper bits of x
 #define PAGE_TABLE_INDEX(x)			( ((x) >> 12) & 0x3ff )		// Get the 10 "middle" bits of x
-#define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )				// Physical address is 4KB aligned, so return all bits except the 12 first
+#define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )			// Physical address is 4KB aligned, so return all bits except the 12 first
 
 // page table definition
 struct ptable

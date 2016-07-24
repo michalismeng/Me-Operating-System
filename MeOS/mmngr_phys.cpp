@@ -111,26 +111,6 @@ void pmmngr_block_align_region(physical_memory_region* reg)
 
 // INTERFACE FUNCTIONS
 
-/*void pmmngr_init(physical_addr bitmap_base, physical_memory_region* available_regions, uint32 region_num)
-{
-	mmngr_bitmap = (uint32*)bitmap_base;
-	
-	for (uint32 i = 0; i < region_num; i++)
-	{
-		pmmngr_block_align_region(available_regions + i);
-		mmngr_memory_size += available_regions[i].length;		// length has changed
-		printfln("base: %h length: %h", available_regions[i].base, available_regions[i].length);
-	}
-
-	mmngr_max_blocks = mmngr_memory_size / PMMNGR_BLOCK_SIZE;
-
-	if (mmngr_memory_size % PMMNGR_BLOCK_SIZE != 0)
-		PANIC("MEMORY SUM IS NOT ALIGNED.");
-
-	mmngr_guard_bits = region_num;
-	memset(mmngr_bitmap, 0, ceil_division(mmngr_max_blocks + mmngr_guard_bits, PMMNGR_BLOCKS_PER_BYTE));
-}*/
-
 void pmmngr_init(uint32 size, physical_addr base)
 {
 	mmngr_memory_size = size;

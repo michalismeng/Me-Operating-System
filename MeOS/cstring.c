@@ -1,6 +1,6 @@
 #include "cstring.h"
 
-uint16 strlength(const char* ch)		// return the number of characters the string has, not including the trailing \0
+uint16 strlen(const char* ch)		// return the number of characters the string has, not including the trailing \0
 {
 	uint16 i = 0;
 	while (ch[i] != '\0')
@@ -9,25 +9,17 @@ uint16 strlength(const char* ch)		// return the number of characters the string 
 	return i;
 }
 
-uint8 strEqual(char* s1, char* s2)
+int8 strcmp(const char* s1, const char* s2)
 {
-	uint8 result = 1;
-	uint16 size = strlength(s1);
+	int8 res = 0;
 
-	if (size != strlength(s2))
-		result = 0;
-	else
-	{
-		uint16 i = 0;
-		for (i; i < size; i++)
-		{
-			if (s1[i] != s2[i])
-			{
-				result = 0;
-				break;
-			}
-		}
-	}
+	while (!(res = *s1 - *s2) && *s2)
+		s1++, s2++;
 
-	return result;
+	if (res < 0)
+		res = -1;
+	else if (res > 0)
+		res = 1;
+
+	return res;
 }

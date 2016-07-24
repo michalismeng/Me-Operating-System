@@ -43,8 +43,6 @@ OrderedArray::OrderedArray(virtual_addr start_address, uint32 max_size, lessthan
 	
 	memset((void*)start_address, 0, sizeof(ordered_type) * max_size);
 
-	printfln("ordered array created");
-
 	size = 0;
 	this->max_size = max_size;
 	less_than = less;
@@ -57,7 +55,7 @@ OrderedArray::~OrderedArray()
 
 void OrderedArray::DestroyArray()
 {
-	pmmngr_free_blocks(array, ceil_division(max_size * sizeof(ordered_type), pmmngr_get_block_size()));
+	//pmmngr_free_blocks(array, ceil_division(max_size * sizeof(ordered_type), pmmngr_get_block_size()));
 }
 
 bool OrderedArray::Insert(ordered_type item)

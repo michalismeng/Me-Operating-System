@@ -50,7 +50,7 @@ main:
 	
 	mov ax, 0x9000
 	mov ss, ax
-	mov sp, 0xFFFF		   ; stack at 0x7c0:0
+	mov sp, 0xFFFF		   ; no no no stack at 0x7c0:0
 	
 	sti
 	
