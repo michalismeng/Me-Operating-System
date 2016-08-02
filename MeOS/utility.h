@@ -40,6 +40,7 @@ extern "C" {
 
 	void PANIC(char* str);
 	void DEBUG(char* str);
+	void WARNING(char* str);
 	void ASSERT(bool expr);
 
 #ifdef __cplusplus

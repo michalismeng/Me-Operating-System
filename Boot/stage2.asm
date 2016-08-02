@@ -53,7 +53,6 @@ main:
 	mov sp, 0xFFFF		   ; no no no stack at 0x7c0:0
 	
 	sti
-	
 	mov byte [drive], dl				; boot loader passes this info to us through dl just before it jumps
 	
 	call EnableA20Bios

@@ -41,7 +41,7 @@ void vmmngr_map_page(physical_addr phys, virtual_addr virt)
 	pt_entry_add_attrib(page, I86_PTE_PRESENT);				// and reset
 	pt_entry_add_attrib(page, I86_PTE_WRITABLE);
 	pt_entry_set_frame(page, phys);
-}	
+}
 
 void vmmngr_initialize()		// identity map kernel
 {
@@ -58,8 +58,13 @@ void vmmngr_initialize()		// identity map kernel
 }
 
 bool vmmngr_alloc_page(virtual_addr base)
-{		
-	physical_addr addr = (physical_addr)pmmngr_alloc_block();
+{
+	//TODO: cater for memory mapped IO where (in the most simple case) an identity map must be done.
+	//TODO: fix this function
+	physical_addr addr = base;
+
+	if (base < 0xF0000000)		// memory mapped IO above 3GB
+		addr = (physical_addr)pmmngr_alloc_block();
 
 	if (!addr)
 		return false;
@@ -103,7 +108,7 @@ void vmmngr_flush_TLB_entry(virtual_addr addr)
 	_asm
 	{
 		cli
-		invlpg addr		; use assembly special instruction
+		invlpg addr; use assembly special instruction
 		sti
 	}
 }

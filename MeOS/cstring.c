@@ -23,3 +23,11 @@ int8 strcmp(const char* s1, const char* s2)
 
 	return res;
 }
+
+void strcpy(char* destination, const char* source)
+{
+	char* s = source;
+
+	while (*destination = *s)
+		destination++, s++;
+}

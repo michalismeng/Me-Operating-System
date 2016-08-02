@@ -1,4 +1,7 @@
 *
+*.sln
+*.bat
+
 !*.asm
 !*.inc
 !*.cpp

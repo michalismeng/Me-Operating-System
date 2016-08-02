@@ -6,8 +6,13 @@
 #include "mmngr_virtual.h"
 
 #include "keyboard.h"
+#include "SerialDebugger.h"
+#include "Simple_fs.h"
 
 #include "OrderedArray.h"
+
+#include "PCI.h"
+#include "AHCI.h"
 
 extern "C" uint8 canOutput = 1;
 
@@ -35,9 +40,6 @@ void get_cmd(char* buff, int max_size)
 {
 	KEYCODE key = KEY_UNKNOWN;
 	int i = 0;
-
-	printf("cmd>");
-	SetMinWritable(strlen("cmd>"));
 
 	while (true)
 	{
@@ -75,22 +77,62 @@ bool run_cmd(char* cmd)
 		printfln("Help messages");
 	else if (strcmp(cmd, "clear") == 0)
 		ClearScreen();
+	else if (strcmp(cmd, "reset") == 0)
+		kybrd_reset_system();
+	else if (strcmp(cmd, "read") == 0)
+	{
+		unsigned char buffer[512];
+		printf("Enter the path of the file you want to read: ");
+		get_cmd(cmd, 28);
+
+		FILE file = volOpenFile(cmd);
+
+		if ((file.flags & 3) == FS_INVALID)
+			printfln("File could not be found.");
+		else
+		{
+			volReadFile(&file, buffer, 512);
+			volCloseFile(&file);
+		}
+	}
+	else if (strcmp(cmd, "dis_output") == 0)
+		canOutput = false;
+	else if (strcmp(cmd, "en_output") == 0)
+		canOutput = true;
+	else if (strcmp(cmd, "dis_kybrd") == 0)
+		kybrd_disable();
 	else
-		printfln("Unknown command: %s", cmd);
+		printfln("Unknown command: %s.", cmd);
+
+	return false;
 }
 
 void Run()
 {
 	char cmd[30];
+	SetMinWritable(strlen("cmd>"));
 
 	while (true)
 	{
+		printf("cmd>");
 		get_cmd(cmd, 28);
 
 		if (run_cmd(cmd) == true)
 			break;
 	}
 }
+
+void print(char* arr)
+{
+	for (int i = 0; i < 512; i++)
+	{
+		if (isprint(arr[i]))
+			Printch(arr[i]);
+	}
+}
+
+extern HBA_MEM_t* ab;
+char buf[512];
 
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
@@ -103,21 +145,25 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	init_descriptor_tables();
 	__asm sti
 
-	init_pit_timer(1000, timer_callback);
-
 	SetColor(DARK_BLUE, WHITE);
 	ClearScreen();
+
+	init_pit_timer(1000, timer_callback);
+	init_serial();
 
 	printf("Welcome to ME Operating System\n");
 
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
-	printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
+	serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
 
-	printf("Kernel size: %u bytes\n", kernel_size_bytes);
+	serial_printf("Kernel size: %u bytes\n", kernel_size_bytes);
 
-	printf("Boot device: %h\n", boot_info->m_bootDevice);
+	serial_printf("Boot device: %h\n", boot_info->m_bootDevice);
 
 	bios_memory_region* region = (bios_memory_region*)0x500;
+
+	HBA_MEM_t* abar = PCIFindAHCI();
+	serial_printf("Found abar at: %h\n", abar);
 
 	pmmngr_init(memoryKB, 0x100000 + kernel_size_bytes);
 
@@ -129,7 +175,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 		if (i > 0 && region[i].startLo == 0)
 			break;
 
-		printf("region %i: start: 0x%x %x length (bytes): 0x%x %x type: %i (%s)\n", i,
+		serial_printf("region %i: start: 0x%x %x length (bytes): 0x%x %x type: %i (%s)\n", i,
 			region[i].startHi, region[i].startLo,
 			region[i].sizeHi, region[i].sizeLo,
 			region[i].type, strMemoryTypes[region[i].type - 1]);
@@ -145,7 +191,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	vmmngr_initialize();
 	pmmngr_paging_enable(true);
 
-	printfln("Virtual manager initialized");
+	serial_printf("Virtual manager initialize\n");
 
 	/*OrderedArray oa(0xc0000000, 0x4000, Standard_LessThan_Predicate);
 
@@ -155,7 +201,16 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 
 	oa.Print();*/
 
+	fsysSimpleInitialize();
+
+	init_ahci(abar, 0x100000 + kernel_size_bytes + 4097);
+
 	init_keyboard();
+
+	ahci_read(0, 0, 0, 1, buf);
+	print(buf);
+	buf[511] = 0;
+	ahci_write(0, 0, 0, 1, buf);
 
 	Run();
 
