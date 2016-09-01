@@ -19,16 +19,13 @@ extern "C" {
 		uint8 access;			// Access flags, determine what ring this segment can be used in.
 		uint8 granularity;
 		uint8 base_high;		// The last 8 bits of the base.
-
 	};
 
 	struct gdt_ptr_struct
 	{
 		uint16 limit;			// the size of the gdt table MINUS one (this is the last valid index of our table)
 		uint32 base;			// The address of the first gdt_entry_t struct.
-
 	};
-
 
 	struct idt_entry_struct
 	{
@@ -37,14 +34,12 @@ extern "C" {
 		uint8 always0;
 		uint8 flags;			// flags
 		uint16 base_high;		// the higher 16 bits of the address to execute
-
 	};
 
 	struct idt_ptr_struct
 	{
 		uint16 limit;			// the size of the idt table MINUS one again as gdt table
 		uint32 base;			// the addres of the first idt_entry_t struct
-
 	};
 
 #pragma pack(pop, 1)
@@ -54,14 +49,11 @@ extern "C" {
 	typedef struct idt_entry_struct	idt_entry_t;
 	typedef struct idt_ptr_struct	idt_ptr_t;
 
-
-
 	extern gdt_entry_t 	gdt_entries[5];
 	extern gdt_ptr_t 	gdt_ptr;
 
 	extern idt_entry_t 	idt_entries[256];
 	extern idt_ptr_t 	idt_ptr;
-
 
 	// initializes GDT and IDT
 	void init_descriptor_tables();
@@ -72,7 +64,6 @@ extern "C" {
 
 	// calls asm code to load gdt tables
 	extern void flush_gdt(uint32 addr);
-
 
 	// initializes IDTs
 	void init_idt();
@@ -114,6 +105,7 @@ extern "C" {
 	extern void isr29();
 	extern void isr30();
 	extern void isr31();
+	extern void isr128();
 	///////////////////////////
 
 	// asm externals of hardware interrupt handlers

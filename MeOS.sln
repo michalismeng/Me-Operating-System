@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeOS", "MeOS.vcxproj", "{7B919060-AD16-4CEE-BD54-597430A46460}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestDLL", "..\TestDLL\TestDLL.vcxproj", "{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{7B919060-AD16-4CEE-BD54-597430A46460}.Release|x64.Build.0 = Release|x64
 		{7B919060-AD16-4CEE-BD54-597430A46460}.Release|x86.ActiveCfg = Release|Win32
 		{7B919060-AD16-4CEE-BD54-597430A46460}.Release|x86.Build.0 = Release|Win32
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Debug|x64.ActiveCfg = Debug|x64
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Debug|x64.Build.0 = Debug|x64
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Debug|x86.ActiveCfg = Debug|Win32
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Debug|x86.Build.0 = Debug|Win32
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Release|x64.ActiveCfg = Release|x64
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Release|x64.Build.0 = Release|x64
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Release|x86.ActiveCfg = Release|Win32
+		{D79AC598-E8FB-4A15-9076-7A1B4FEDF8CA}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

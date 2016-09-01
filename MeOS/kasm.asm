@@ -60,7 +60,7 @@ endm
 IRQ macro irq_index, index
   irq&irq_index& PROC
 
-	cli
+	;cli
 
 	push 0
 	push &index&
@@ -104,6 +104,8 @@ ISR_NOERRORCODE 29
 ISR_NOERRORCODE 30
 ISR_NOERRORCODE 31
 
+ISR_NOERRORCODE 128
+
 IRQ 0,  32
 IRQ 1,  33
 IRQ 2,  34
@@ -124,6 +126,7 @@ IRQ 15, 47
 extern isr_handler : near
 extern irq_handler : near
 
+; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  CHECK IRET AND IRETD
 isr_common_stub:
 				; already pushed error_code, interrupt no
   pushad		; push eax, ecx, edx, ebx, esp, ebp, esi, edi
@@ -139,16 +142,16 @@ isr_common_stub:
 
   call isr_handler
 
-  pop ebx
-  mov ds, bx
-  mov es, bx
-  mov fs, bx
-  mov gs, bx
+  pop eax
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
 
   popad
   add esp, 8
-  sti
-  iret        ; pop CS, EIP, EFLAGS, SS, and ESP
+  ;sti
+  iretd        ; pop CS, EIP, EFLAGS, SS, and ESP
 
 irq_common_stub:
   pushad
@@ -173,11 +176,7 @@ irq_common_stub:
 
   popad
   add esp, 8
-  sti
+  ;sti
   iretd
-
-  call_interrupt:
-	int 10
-	ret
 
 END

@@ -1,13 +1,13 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#include "types.h"
-#include "screen.h"
-#include "cstring.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "types.h"
+#include "screen.h"
+#include "cstring.h"
 
 #define isdigit(arg) ( arg >= '0' && arg <= '9' ? 1 : 0 )
 #define isalpha(arg) ( ((arg >= 'a' && arg <= 'z') || (arg >= 'A' && arg <= 'Z')) ? 1 : 0 )
@@ -20,6 +20,9 @@ extern "C" {
 #define tolower(arg) (  isupper(arg) ? arg + 32 : arg )
 #define toupper(arg) (  islower(arg) ? arg - 32 : arg )
 
+#define min(a, b)	 ( a < b ? a : b )
+#define max(a, b)	 ( a < b ? b : a )
+
 	extern char hexes[];
 
 	void uitoa(uint32 val, char* buffer, uint8 base);
@@ -30,6 +33,7 @@ extern "C" {
 	void printfln(char* fmt, ...);
 
 	void memset(void* base, uint8 val, uint32 length);
+	void memcpy(void* dest, void* source, uint32 length);
 
 	uint32 atoui(char* buffer);
 	uint32 atoui_dec(char* buffer, uint16 length);

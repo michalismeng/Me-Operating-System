@@ -1,11 +1,4 @@
-*
-*.sln
-*.bat
-
-!*.asm
-!*.inc
-!*.cpp
-!*.c
-!*.h
-!*.hpp
-!.gitignore
+/*
+!*.xmind
+!MeOS/
+!Boot/

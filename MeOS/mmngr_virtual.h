@@ -17,13 +17,16 @@ extern "C" {
 #define PAGES_PER_TABLE 1024	// intel arch definitions
 #define TABLES_PER_DIR	1024
 
+#define DEFAULT_FLAGS I86_PDE_PRESENT | I86_PDE_WRITABLE	// default flags for page tables and pages.
+
 	// definitions for entry extraction based on virtual address. (see virtual address format)
 
 #define PAGE_DIR_INDEX(x)			( ((x) >> 22) & 0x3ff )		// Get the 10 upper bits of x
 #define PAGE_TABLE_INDEX(x)			( ((x) >> 12) & 0x3ff )		// Get the 10 "middle" bits of x
 #define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )			// Physical address is 4KB aligned, so return all bits except the 12 first
 
-// page table definition
+	void page_fault(registers_struct regs);
+	// page table definition
 	struct ptable
 	{
 		pt_entry entries[PAGES_PER_TABLE];
@@ -43,7 +46,7 @@ extern "C" {
 	// INTERFACE
 
 	// maps the virtual address given to the physical address given
-	void vmmngr_map_page(physical_addr phys, virtual_addr virt);
+	void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags);
 
 	// initializes the virtual memory manager
 	void vmmngr_initialize();
@@ -77,6 +80,18 @@ extern "C" {
 
 	// print a directory structure (for debug purposes)
 	void vmmngr_print(pdirectory* dir);
+
+	// returns the physical address associated with this virtual address
+	physical_addr vmmngr_get_phys_addr(virtual_addr addr);
+
+	// returns true if the page given by the virtual address is present IN RAM
+	bool vmmngr_is_page_present(virtual_addr addr);
+
+	// creates a page table for the dir address space
+	bool vmmngr_create_table(pdirectory* dir, virtual_addr addr, uint32 flags);
+
+	// creates a new address space
+	pdirectory* vmmngr_create_address_space();
 
 #ifdef __cplusplus
 }

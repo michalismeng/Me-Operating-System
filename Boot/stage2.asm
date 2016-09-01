@@ -80,7 +80,19 @@ main:
 
 	mov di, 0x500		; es:di = 0x0:0x500
 	call BiosGetMemoryMap
+
+	; check if apm is supported
+	;mov ah, 53h
+	;mov al, 0
+	;xor bx, bx
+	;int 15h
+
+	;jc no_apm
 	
+	;cli
+	;hlt
+
+	;no_apm:
 	; Load global descriptor tables
 	cli
 	
@@ -89,13 +101,14 @@ main:
 	mov	eax, cr0			; set bit 0 in cr0--enter pmode
 	or	eax, 1
 	mov	cr0, eax
-	
+
 	jmp 0x8:Stage3
 	
 	
 bits 32
 
 %include "Boot/common32.inc"
+%include "Boot/paging.inc"
 
 kernel_size dd 0
 
@@ -106,9 +119,11 @@ Stage3:							; PMode here
 	mov es, ax
 	
 	mov ss, ax
-	mov esp, 0xFFFF
+	mov esp, 0x90000
+
+	call EnablePaging
 	
-	call CopyKernel						; copy kernel to 1MB
+	call CopyKernel						; copy kernel to 3GB (virtual)
 	
 	mov edx, dword [kernel_size]		; size of kernel in bytes
 	
@@ -127,6 +142,9 @@ Stage3:							; PMode here
 
 	mov eax, 0x2BADB002
 	mov ebx, 0
+
+	;mov esi, A20Enable
+	;call Print
 	
 	push dword [memory_map_len]
 	push dword boot_info

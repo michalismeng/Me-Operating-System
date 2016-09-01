@@ -10,6 +10,46 @@ const uint8 TAB_SIZE = 20;
 
 uint8 canOutput;
 
+typedef void* (*fun)();
+
+fun functions[] =
+{
+	SetColor,
+	Print,
+	ClearLine,
+	UpdateCursor,
+	SetCursor,
+	ClearScreen,
+	ScrollUp,
+	Printch,
+	PrintCentered,
+	SetForegroundColor,
+	SetBackgroundColor,
+	MakeColor,
+	PrintLine,
+	SetMinWritable
+};
+
+void* screen_control_function(uint32 command, ...)
+{
+	va_list l;
+	va_start(l, command);
+
+	switch (command)
+	{
+	case 0:
+	{
+		uint8 back = va_arg(l, uint8), front = va_arg(l, uint8);
+		return functions[0](back, front);
+	}
+	case 1:
+		return functions[1](va_arg(l, char*));
+	}
+
+	va_end(l);
+	return 0;
+}
+
 void ClearLine(uint8 from, uint8 to)
 {
 	uint16 row = SCREEN_WIDTH * from * SCREEN_DEPTH;
@@ -120,11 +160,14 @@ void Printch(char c)
 
 void Print(char* str)
 {
-	uint16 length = strlen(str);
+	/*uint16 length = strlen(str);
 
 	uint16 i = 0;
 	for (i; i < length; i++)
-		Printch(str[i]);
+		Printch(str[i]);*/
+
+	while (*str != 0)
+		Printch(*str++);
 }
 
 void PrintCentered(char* str)

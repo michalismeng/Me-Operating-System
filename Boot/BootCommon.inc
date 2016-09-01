@@ -15,7 +15,7 @@ PrintDone:
 			popa
 			ret					; we are done, so return
 		
-; compares two null-terminated strings at si and di cx times
+; compares two null-terminated strings at si and di
 Strcmp:
 	pusha
 	
@@ -28,12 +28,16 @@ Strcmp:
 		
 		inc si
 		inc di
-		dec cx
-		jnz .compare
+
+		cmp al, 0
+		je .end
+
+		jmp .compare
 		
-		popa
-		mov ax, 1
-		ret
+		.end:
+			popa
+			mov ax, 1
+			ret
 	
 	.nequal:
 		popa

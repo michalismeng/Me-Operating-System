@@ -3,25 +3,26 @@ bits 16
 jmp short main				; short jump uses relative address (jmp +12 bytes) and not absolute. We want this as segments are not yet set and	
 							; we have used not org directive
 							
-sectors: dd 0				; for test purposes contains the sectors to load for the kernel image
-first_cluster: dd 0
-index_entry: dd 0
+sectors: dd 0
+index_start: dd 0
+index_count: dd 0
+reserved_sectors: dd 0
 
 main:
 
 	cli
 	mov     ax, 0x07C0
-    mov     ds, ax
+	mov     ds, ax
 	mov     fs, ax
-    mov     gs, ax
-     
-    mov     ax, 0x0000
-    mov     ss, ax
-    mov     sp, 0x7C00 
+	mov     gs, ax
+	 
+	mov     ax, 0x0000
+	mov     ss, ax
+	mov     sp, 0x7C00 
 	
 	mov ax, 0x7e0
 	mov es, ax
-    sti
+	sti
 	
 	mov byte [drive], dl
 	
@@ -35,9 +36,9 @@ main:
 	mov si, reset_done
 	call Print
 	
-	mov bx, 0x0				; buffer to read to (es:bx)
-	mov cl, 1				; LBA sector to start reading from used in GetTrack
-	mov dx, word [sectors]	; count of sectors to be read
+	mov bx, 0x0								; buffer to read to (es:bx)
+	mov cl, 1								; LBA sector to start reading from used in GetTrack
+	mov dx, word [reserved_sectors]			; count of sectors to be read
 	
 	read_loop:
 		push dx

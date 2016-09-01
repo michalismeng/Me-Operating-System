@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 
-
 #include "types.h"
 #include "cstring.h"
 #include "system.h"
@@ -41,6 +40,8 @@ extern "C" {
 
 	extern const uint8 SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DEPTH;		// screen width, height and depth
 	extern const uint8 TAB_SIZE;
+
+	void* screen_control_function(uint32 command, ...);
 
 	void ClearLine(uint8 from, uint8 to);
 

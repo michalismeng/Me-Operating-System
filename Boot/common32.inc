@@ -4,13 +4,13 @@
 ; includes all protected mode 32 bit utilities
 
 %define KERNEL_RMODE_BASE 0x8200
-%define KERNEL_PMODE_BASE 0X100000
+%define KERNEL_PMODE_BASE 0xc0000000
 
 CopyKernel:
 	
 	pusha 
 	
-	mov eax, dword [0x7c00 + 0x2]		; get sectors loaded
+	mov eax, dword [0x7c00 + 14]		; get sectors loaded
 	sub eax, 2							; this is one sector for stage2
 	
 	mov ebx, 512						; multiply sector by bytes per sector

@@ -9,12 +9,16 @@
 #include "SerialDebugger.h"
 #include "Simple_fs.h"
 
-#include "OrderedArray.h"
-
 #include "PCI.h"
 #include "AHCI.h"
 
+#include "memory.h"
+#include "mngr_device.h"
+
 extern "C" uint8 canOutput = 1;
+extern HBA_MEM_t* ab;
+
+heap* kernel_heap = 0;
 
 void GetMemoryStats()
 {
@@ -23,6 +27,16 @@ void GetMemoryStats()
 	printfln("Used blocks: %u", pmmngr_get_block_use_count());
 
 	printfln("");
+}
+
+void print(char* arr)
+{
+	for (int i = 0; i < 512; i++)
+	{
+		if (isprint(arr[i]))
+			Printch(arr[i]);
+		arr[i] = 0;
+	}
 }
 
 KEYCODE getch()
@@ -81,7 +95,20 @@ bool run_cmd(char* cmd)
 		kybrd_reset_system();
 	else if (strcmp(cmd, "read") == 0)
 	{
-		unsigned char buffer[512];
+		if (vmmngr_is_page_present(0x500000) == false)
+			vmmngr_alloc_page(0x500000);
+
+		printf("Enter the sector number to read from: ");
+		get_cmd(cmd, 20);
+		DWORD sector = atoui(cmd);
+
+		physical_addr addr = vmmngr_get_phys_addr((virtual_addr)0x500000);
+
+		if (false/*ahci_read(0, sector, 0, 1, (VOID PTR)addr) != AHCIResult::AHCI_NO_ERROR*/)
+			DEBUG("AHCI ERROR");
+		else
+			print((char*)0x500000);
+		/*unsigned char buffer[512];
 		printf("Enter the path of the file you want to read: ");
 		get_cmd(cmd, 28);
 
@@ -93,7 +120,7 @@ bool run_cmd(char* cmd)
 		{
 			volReadFile(&file, buffer, 512);
 			volCloseFile(&file);
-		}
+		}*/
 	}
 	else if (strcmp(cmd, "dis_output") == 0)
 		canOutput = false;
@@ -101,6 +128,8 @@ bool run_cmd(char* cmd)
 		canOutput = true;
 	else if (strcmp(cmd, "dis_kybrd") == 0)
 		kybrd_disable();
+	else if (strcmp(cmd, "caps") == 0)
+		ahci_print_caps();
 	else
 		printfln("Unknown command: %s.", cmd);
 
@@ -122,17 +151,9 @@ void Run()
 	}
 }
 
-void print(char* arr)
-{
-	for (int i = 0; i < 512; i++)
-	{
-		if (isprint(arr[i]))
-			Printch(arr[i]);
-	}
-}
+//TODO: CHECK ASM IRET
 
-extern HBA_MEM_t* ab;
-char buf[512];
+#include "process.h"
 
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
@@ -151,7 +172,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	init_pit_timer(1000, timer_callback);
 	init_serial();
 
-	printf("Welcome to ME Operating System\n");
+	printf("Welcome to ME Operating System!\n");
 
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
 	serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
@@ -162,10 +183,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 
 	bios_memory_region* region = (bios_memory_region*)0x500;
 
-	HBA_MEM_t* abar = PCIFindAHCI();
-	serial_printf("Found abar at: %h\n", abar);
-
-	pmmngr_init(memoryKB, 0x100000 + kernel_size_bytes);
+	pmmngr_init(memoryKB, 0xC0000000 + kernel_size_bytes);
 
 	for (uint32 i = 0; i < memory_map_length; i++)
 	{
@@ -191,26 +209,36 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	vmmngr_initialize();
 	pmmngr_paging_enable(true);
 
+	HBA_MEM_t* abar = PCIFindAHCI();
+	serial_printf("Found abar at: %h\n", abar);
+
 	serial_printf("Virtual manager initialize\n");
 
-	/*OrderedArray oa(0xc0000000, 0x4000, Standard_LessThan_Predicate);
-
-	oa.Insert(0);
-	oa.Insert((ordered_type)10);
-	oa.Insert((ordered_type)2);
-
-	oa.Print();*/
+	kernel_heap = heap_create(0x300000, 0x2000);		// initialize the heap
 
 	fsysSimpleInitialize();
-
-	init_ahci(abar, 0x100000 + kernel_size_bytes + 4097);
-
 	init_keyboard();
 
-	ahci_read(0, 0, 0, 1, buf);
-	print(buf);
-	buf[511] = 0;
-	ahci_write(0, 0, 0, 1, buf);
+	uint32 ahci_base = 0x200000;
+	init_ahci(abar, ahci_base + ahci_base % 1024);	// ahci must be 1K aligned. (otherwise... crash)
+
+	//ahci_send_identify(0, (VOID PTR)addr);
+	//printfln("\nIdentification sector count: %u", *(uint32*)(buf + 120));
+
+	init_device_manager();
+
+	/*PDEVICE screen = mngr_device_add(0);
+	mngr_device_add_std_info(screen, "SCREEN", 1, screen_control_function, 0);
+
+	screen->device_control(0, BLACK, BLUE);
+	screen->device_control(1, "Hello world!\n");
+	screen->device_control(0, BLUE, WHITE);
+	screen->device_control(1, "Hello_world!\n");*/
+
+	//ClearScreen();
+	uint32 id = process_create("TestDLL.exe");
+	if (id != 0)
+		process_execute();
 
 	Run();
 

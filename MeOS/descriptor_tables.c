@@ -18,6 +18,11 @@ void GPF(registers_t regs)
 	PANIC("General Protection Fault");
 }
 
+void test_handle(registers_t regs)
+{
+	printfln("message: %s", regs.ebx);
+}
+
 void init_descriptor_tables()
 {
 	init_gdt();
@@ -27,6 +32,7 @@ void init_descriptor_tables()
 
 	register_interrupt_handler(0, DivisionByZero);
 	register_interrupt_handler(13, GPF);
+	register_interrupt_handler(0x80, test_handle);
 }
 
 void init_gdt()
@@ -84,6 +90,8 @@ void init_idt()
 	idt_set_gate(29, (uint32)isr29, 0x08, 0x8E);
 	idt_set_gate(30, (uint32)isr30, 0x08, 0x8E);
 	idt_set_gate(31, (uint32)isr31, 0x08, 0x8E);
+
+	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 
 	idt_set_gate(32, (uint32)irq0, 0x08, 0x8E);
 	idt_set_gate(33, (uint32)irq1, 0x08, 0x8E);

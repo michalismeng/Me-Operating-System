@@ -19,6 +19,9 @@ extern "C" {
 	// copies source string to destination. destination must be capable of holding the source string.
 	void strcpy(char* destination, const char* source);
 
+	// copies source string to destination. Checks if destination can hold the source string.
+	uint8 strcpy_s(char* destination, uint16 destsz, const char* source);
+
 #ifdef __cplusplus
 }
 #endif

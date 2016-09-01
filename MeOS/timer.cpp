@@ -36,7 +36,7 @@ uint32 Timer::Restart()
 	return temp;
 }
 
-uint32 Timer::GetElapsedMillis()
+volatile uint32 Timer::GetElapsedMillis()
 {
 	return millis() - start;
 }

@@ -31,3 +31,15 @@ void strcpy(char* destination, const char* source)
 	while (*destination = *s)
 		destination++, s++;
 }
+
+uint8 strcpy_s(char* destination, uint16 destsz, const char* source)
+{
+	uint16 len = strlen(source);
+
+	// TODO: More error-checking.
+	if (len > destsz)
+		return 1;
+
+	strcpy(destination, source);
+	return 0;
+}
