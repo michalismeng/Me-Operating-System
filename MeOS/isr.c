@@ -7,7 +7,7 @@ void __cdecl isr_handler(registers_t regs)
 	if (interrupt_handlers[regs.int_no] != 0)
 	{
 		isr_t handler = interrupt_handlers[regs.int_no];
-		handler(regs);
+		handler(&regs);
 	}
 	else
 		printf("Unhandled exception %u", regs.int_no);
@@ -18,7 +18,9 @@ void __cdecl irq_handler(registers_t regs)
 	if (interrupt_handlers[regs.int_no] != 0)
 	{
 		isr_t handler = interrupt_handlers[regs.int_no];
-		handler(regs);
+		handler(&regs);
+
+		//__asm call handler
 	}
 	else
 		printf("Hardware interrupt: %u", regs.int_no);

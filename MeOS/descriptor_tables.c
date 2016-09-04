@@ -8,19 +8,19 @@ idt_ptr_t 	idt_ptr;
 
 isr_t interrupt_handlers[256];
 
-void DivisionByZero(registers_t regs)
+void DivisionByZero(registers_t* regs)
 {
 	PANIC("Divion by zero");
 }
 
-void GPF(registers_t regs)
+void GPF(registers_t* regs)
 {
 	PANIC("General Protection Fault");
 }
 
-void test_handle(registers_t regs)
+void test_handle(registers_t* regs)
 {
-	printfln("message: %s", regs.ebx);
+	printfln("message: %s", regs->ebx);
 }
 
 void init_descriptor_tables()

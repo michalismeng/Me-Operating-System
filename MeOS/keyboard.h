@@ -291,7 +291,7 @@ bool kybrd_is_disabled();
 void kybrd_reset_system();
 bool kybrd_is_disabled();
 
-void keyboard_callback(registers_t regs);
+void keyboard_callback(registers_t* regs);
 void init_keyboard();
 
 #endif

@@ -60,7 +60,7 @@ endm
 IRQ macro irq_index, index
   irq&irq_index& PROC
 
-	;cli
+	cli
 
 	push 0
 	push &index&
@@ -106,7 +106,7 @@ ISR_NOERRORCODE 31
 
 ISR_NOERRORCODE 128
 
-IRQ 0,  32
+;IRQ 0,  32		handle that specially
 IRQ 1,  33
 IRQ 2,  34
 IRQ 3,  35
@@ -122,6 +122,15 @@ IRQ 12, 44
 IRQ 13, 45
 IRQ 14, 46
 IRQ 15, 47
+
+extern scheduler_interrupt : near
+
+irq0 PROC		; special handle for the timer interrupt as this is where our scheduler messes with the stack
+
+	cli
+	jmp scheduler_interrupt
+
+irq0 ENDP
 
 extern isr_handler : near
 extern irq_handler : near
@@ -178,5 +187,6 @@ irq_common_stub:
   add esp, 8
   ;sti
   iretd
+	
 
 END

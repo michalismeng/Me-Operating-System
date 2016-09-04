@@ -3,7 +3,7 @@
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
 
-void page_fault(registers_struct regs)
+void page_fault(registers_struct* regs)
 {
 	uint32 addr;
 	_asm
@@ -18,7 +18,7 @@ void page_fault(registers_struct regs)
 		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
 	else
 	{
-		printfln("ERROR CODE: %u", regs.err_code);
+		printfln("ERROR CODE: %u", regs->err_code);
 		PANIC("page fault");
 	}
 }

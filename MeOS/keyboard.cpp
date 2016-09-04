@@ -304,7 +304,7 @@ bool kybrd_is_disabled()
 	return _kybrd_disable;
 }
 
-void keyboard_callback(registers_t regs)
+void keyboard_callback(registers_t* regs)
 {
 	int code = 0;
 
@@ -318,7 +318,6 @@ void keyboard_callback(registers_t regs)
 		if (code == 0xE0 || code == 0xE1)
 		{
 			DEBUG("Hit keyboard extended capability");
-			return;
 		}
 
 		if (code & 0x80)	// break code specific to Original Scan Set (test bit 7)

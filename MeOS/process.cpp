@@ -1,19 +1,112 @@
 #include "process.h"
 
-// private data
+// private data and functions
 
-process current_process = { 0,0,0,PROCESS_ACTIVE,0 };
+task* current_task = 0;
+queue<task> ready_queue;
+
+static uint32 lastID = 0;
+
+void task_switch()
+{
+	if (ready_queue.count == 1)
+		return;
+
+	if (ready_queue.count != 0)
+	{
+		queue_insert(&ready_queue, *current_task);
+		queue_remove(&ready_queue);
+		current_task = queue_peek(&ready_queue);
+	}
+}
 
 // public functions
 
+__declspec(naked) void scheduler_interrupt()
+{
+	ticks++;
+	__asm
+	{
+		cmp current_task, 0
+		je no_tasks
+
+		pushad
+
+		push ds
+		push es
+		push fs
+		push gs
+
+		; save current esp to current_task
+
+		mov eax, dword ptr[current_task]
+		mov[eax], esp
+
+		call task_switch
+
+		; restore previous esp from the now changed current task pointer
+
+		mov eax, dword ptr[current_task]
+		mov esp, [eax]
+
+		; restore registers saved at the time current task was preempted.These are not the segments above as esp has changed.
+
+		pop gs
+		pop fs
+		pop es
+		pop ds
+
+		popad
+
+		no_tasks : mov al, 20h
+				   out 20h, al
+				   iretd
+	}
+}
+
+void init_multitasking()
+{
+	queue_init(&ready_queue);
+}
+
+void task_setup_stack(task* t, uint32 entry, uint32 esp)
+{
+	trap_frame* f;
+
+	esp -= sizeof(trap_frame);		// prepare esp for manual data push
+	f = (trap_frame*)esp;
+
+	/* manual setup of the task's stack */
+	f->flags = 0x202;		// IF set along with some ?reserved? bit
+	f->cs = 0x8;
+	f->ds = 0x10;
+	f->eax = 0;
+	f->ebp = 0;
+	f->ebx = 0;
+	f->ecx = 0;
+	f->edi = 0;
+	f->edx = 0;
+	f->eip = entry;
+	f->es = 0x10;
+	f->esi = 0;
+	f->esp = 0;
+	f->fs = 0x10;
+	f->gs = 0x10;
+
+	t->ss = 0x10;
+	t->esp = esp;
+}
+
 uint32 process_create(char* app_name)
 {
-	process* proc;
-	thread* main_thread;
+	task t;
 
 	FILE file = fsysSimpleDirectory(app_name);
 	if (file.flags == FS_INVALID)
+	{
+		DEBUG("File was not found.");
 		return 0;
+	}
 
 	uint8 buf[512];
 	fsysSimpleRead(&file, buf, 512);
@@ -21,7 +114,7 @@ uint32 process_create(char* app_name)
 	/* validation of PE image */
 	if (!validate_PE_image(buf))
 	{
-		DEBUG("Could not load PE image");
+		DEBUG("Could not load PE image. Corrupt image or data.");
 		return 0;
 	}
 
@@ -36,26 +129,15 @@ uint32 process_create(char* app_name)
 
 	/* kernel mapping to new address space goes here */
 
-	proc = process_get_current();
-	proc->id = 1;
-	proc->page_dir = address_space;
-	proc->priority = 1;
-	proc->state = PROCESS_ACTIVE;
-	proc->thread_count = 1;
-
-	main_thread = &proc->threads[0];
-	main_thread->kernelStack = 0;
-	main_thread->parent = proc;
-	main_thread->state = THREAD_STATE::PROCESS_ACTIVE;
-	main_thread->initialStack = 0;
-	main_thread->stackLimit = (void*)((uint32)main_thread->initialStack + 4096);
-	main_thread->imageBase = nt_header->OptionalHeader.ImageBase;
-	main_thread->imageSize = nt_header->OptionalHeader.SizeOfImage;
-
-	memset(&main_thread->frame, 0, sizeof(trapFrame));
-
-	main_thread->frame.eip = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
-	main_thread->frame.flags = 0x200;
+	t.id = ++lastID;
+	t.page_dir = address_space;
+	t.priority = 1;
+	t.state = TASK_READY;
+	t.parent = 0;
+	t.stack_base = 0;
+	t.stack_limit = (void*)4096;
+	t.image_base = nt_header->OptionalHeader.ImageBase;
+	t.image_size = nt_header->OptionalHeader.SizeOfImage;
 
 	/* copy image to memory */
 	uint8* memory = (uint8*)pmmngr_alloc_block();
@@ -63,7 +145,7 @@ uint32 process_create(char* app_name)
 	memcpy(memory, buf, 512);
 
 	uint32 i = 1;
-	for (; i <= main_thread->imageSize / 512; i++)
+	for (; i <= t.image_size / 512; i++)
 	{
 		if (file.eof == true)
 			break;
@@ -71,7 +153,7 @@ uint32 process_create(char* app_name)
 	}
 
 	printfln("image base: %h, size: %u", nt_header->OptionalHeader.ImageBase, nt_header->OptionalHeader.SizeOfImage);
-	vmmngr_map_page(proc->page_dir, (physical_addr)memory, nt_header->OptionalHeader.ImageBase, DEFAULT_FLAGS);
+	vmmngr_map_page(t.page_dir, (physical_addr)memory, nt_header->OptionalHeader.ImageBase, DEFAULT_FLAGS);
 
 	i = 1;
 	while (file.eof != true)
@@ -85,50 +167,56 @@ uint32 process_create(char* app_name)
 			fsysSimpleRead(&file, cur + 512 * cur_block, 512);
 		}
 
-		vmmngr_map_page(proc->page_dir, (physical_addr)cur, nt_header->OptionalHeader.ImageBase + i * 4096, DEFAULT_FLAGS);
+		vmmngr_map_page(t.page_dir, (physical_addr)cur, nt_header->OptionalHeader.ImageBase + i * 4096, DEFAULT_FLAGS);
 		i++;
 	}
 
 	void* stack = (void*)(nt_header->OptionalHeader.ImageBase + nt_header->OptionalHeader.SizeOfImage + 4096);
 	void* stack_phys = pmmngr_alloc_block();
 
-	vmmngr_map_page(proc->page_dir, (physical_addr)stack_phys, (virtual_addr)stack, DEFAULT_FLAGS);
+	vmmngr_map_page(t.page_dir, (physical_addr)stack_phys, (virtual_addr)stack, DEFAULT_FLAGS);
 
-	main_thread->initialStack = stack;
-	main_thread->frame.esp = (uint32)main_thread->initialStack;
-	main_thread->frame.ebp = main_thread->frame.esp;
+	t.stack_base = stack;
+	t.stack_limit = (void*)((uint32)t.stack_base + 4096);
 
-	return proc->id;
+	task_setup_stack(&t, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase,
+		(uint32)t.stack_base);
+
+	queue_insert(&ready_queue, t);
+	return t.id;
 }
 
-process* process_get_current()
+uint32 task_create(uint32 entry, uint32 esp)
 {
-	return &current_process;
+	task t;
+	t.id = ++lastID;
+	t.image_base = entry;
+	t.image_size = 0;
+	t.page_dir = vmmngr_get_directory();
+
+	task_setup_stack(&t, entry, esp);
+	queue_insert(&ready_queue, t);
+
+	return t.id;
 }
 
-void process_execute()
+void task_exeute(task t)
 {
-	process* proc = process_get_current();
-
-	uint32 entryPoint = proc->threads[0].frame.eip;
-	uint32 procStack = proc->threads[0].frame.ebp;
-
-	__asm cli
-	pmmngr_load_PDBR((physical_addr)proc->page_dir);
-
 	__asm
 	{
-		; change to user mode selectors
-
-		; create a interrupt return stack frame
-		push 0x10; to be changed to user mode selector
-		push dword ptr procStack
-		push 0x200
-		push 0x8
-		push dword ptr entryPoint
-
+		mov esp, t.esp
+		pop gs
+		pop fs
+		pop es
+		pop ds
+		popad
 		iretd
 	}
+}
+
+void start()
+{
+	current_task = queue_peek(&ready_queue);
 }
 
 bool validate_PE_image(void* image)
@@ -158,4 +246,18 @@ bool validate_PE_image(void* image)
 		return false;
 
 	return true;
+}
+
+void print_ready_queue()
+{
+	if (ready_queue.count == 0)
+		return;
+
+	queue_node<task>* ptr = ready_queue.head;
+	printfln("ready queue count: %u", ready_queue.count);
+	while (ptr != 0)
+	{
+		printfln("Task: %u with address space at: %h and esp: %h", ptr->data.id, ptr->data.page_dir, ptr->data.esp);
+		ptr = ptr->next;
+	}
 }

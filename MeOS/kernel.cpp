@@ -15,6 +15,8 @@
 #include "memory.h"
 #include "mngr_device.h"
 
+#include "process.h"
+
 extern "C" uint8 canOutput = 1;
 extern HBA_MEM_t* ab;
 
@@ -58,6 +60,7 @@ void get_cmd(char* buff, int max_size)
 	while (true)
 	{
 		key = getch();
+		//printf("input");
 
 		if (key == KEY_RETURN)
 		{
@@ -108,19 +111,6 @@ bool run_cmd(char* cmd)
 			DEBUG("AHCI ERROR");
 		else
 			print((char*)0x500000);
-		/*unsigned char buffer[512];
-		printf("Enter the path of the file you want to read: ");
-		get_cmd(cmd, 28);
-
-		FILE file = volOpenFile(cmd);
-
-		if ((file.flags & 3) == FS_INVALID)
-			printfln("File could not be found.");
-		else
-		{
-			volReadFile(&file, buffer, 512);
-			volCloseFile(&file);
-		}*/
 	}
 	else if (strcmp(cmd, "dis_output") == 0)
 		canOutput = false;
@@ -139,7 +129,7 @@ bool run_cmd(char* cmd)
 void Run()
 {
 	char cmd[30];
-	SetMinWritable(strlen("cmd>"));
+	//SetMinWritable(strlen("cmd>"));
 
 	while (true)
 	{
@@ -147,13 +137,30 @@ void Run()
 		get_cmd(cmd, 28);
 
 		if (run_cmd(cmd) == true)
-			break;
+			printfln("Unfortunately cannot exit.");
 	}
 }
 
-//TODO: CHECK ASM IRET
+void test1()
+{
+	printfln("Hello everyone");
+	sleep(3000);
+	printfln("Thread 1");
+	while (true);
+}
 
-#include "process.h"
+void test2()
+{
+	printfln("hello from the other side");
+	sleep(400);
+	printfln("Thread 2");
+	while (true);
+}
+
+void idle()
+{
+	while (true) _asm pause;
+}
 
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
@@ -169,7 +176,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	SetColor(DARK_BLUE, WHITE);
 	ClearScreen();
 
-	init_pit_timer(1000, timer_callback);
+	init_pit_timer(50, timer_callback);
 	init_serial();
 
 	printf("Welcome to ME Operating System!\n");
@@ -235,12 +242,33 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	screen->device_control(0, BLUE, WHITE);
 	screen->device_control(1, "Hello_world!\n");*/
 
-	//ClearScreen();
-	uint32 id = process_create("TestDLL.exe");
-	if (id != 0)
-		process_execute();
+	ClearScreen();
+	init_multitasking();
+	//uint32 id = process_create("TestDLL.exe");
+	//process_create("TestDLL2.exe");
 
-	Run();
+	vmmngr_alloc_page(0x700000 - 4096);
+	task_create((uint32)test1, 0x700000);		// create test1 task
+
+	vmmngr_alloc_page(0x850000 - 4096);
+	task_create((uint32)Run, 0x850000);			// create Run task
+
+	vmmngr_alloc_page(0x600000 - 4096);
+	task_create((uint32)idle, 0x600000);		// create idle task
+
+	vmmngr_alloc_page(0x750000 - 4096);
+	task_create((uint32)test2, 0x750000);		// create test2 task
+
+	print_ready_queue();
+
+	task* t = &ready_queue.head->data;
+
+	_asm cli
+	start();
+
+	task_exeute(*t);
+	///////////////////////////////////////
+	//Run();
 
 	_asm cli
 

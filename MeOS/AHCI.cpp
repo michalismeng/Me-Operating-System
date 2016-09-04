@@ -170,7 +170,7 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 }
 
 bool finished = false;
-void ahci_callback(registers_t regs)
+void ahci_callback(registers_t* regs)
 {
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 	{
@@ -268,7 +268,6 @@ void ahci_port_rebase(uint8 port_num)
 
 	port->serr = (DWORD)-1;		// clear the error status register
 	//port->ie = (DWORD)-1;
-
 	if (ahci_start_cmd(port) == false)
 	{
 		printfln("port %u is not ok due to start", port_num);

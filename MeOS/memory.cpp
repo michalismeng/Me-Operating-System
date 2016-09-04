@@ -41,6 +41,11 @@ void operator delete(void* ptr)
 	heap_free(kernel_heap, ptr);
 }
 
+void operator delete(void* ptr, unsigned int)
+{
+	heap_free(kernel_heap, ptr);
+}
+
 void operator delete[](void* ptr)
 {
 	heap_free(kernel_heap, ptr);

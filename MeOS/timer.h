@@ -11,7 +11,7 @@ extern "C" {
 #include "utility.h"
 #include "screen.h"
 
-	void timer_callback(registers_t regs);
+	void timer_callback(registers_t* regs);
 	void sleep(uint32 _time);
 	uint32 millis();						// returns the milliseconds since start (= ticks / PIT frequency)
 

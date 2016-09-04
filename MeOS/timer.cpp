@@ -3,7 +3,7 @@
 volatile uint32 ticks;					// volatile is necessary for the sleep function, where compiler thinks millis is constant valued
 extern uint16 cursorX, cursorY;
 
-void timer_callback(registers_t regs)
+void timer_callback(registers_t* regs)
 {
 	ticks++;
 	uint16 x = cursorX, y = cursorY;
@@ -21,7 +21,7 @@ uint32 millis()
 void sleep(uint32 _time)
 {
 	uint32 start = millis();
-	while (millis() - start < _time);
+	while (millis() < start + _time);
 }
 
 Timer::Timer()
