@@ -3,6 +3,8 @@
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
 
+pdirectory* kernel_directory = 0;		// kernel page directory
+
 void page_fault(registers_struct* regs)
 {
 	uint32 addr;
@@ -30,22 +32,7 @@ void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uin
 	pd_entry* e = vmmngr_pdirectory_lookup_entry(dir, virt);
 
 	if (pd_entry_test_attrib(e, I86_PDE_PRESENT) == false)	// table is not present
-	{
-		/*ptable* table = (ptable*)pmmngr_alloc_block();
-
-		printfln("created table %i at %h", PAGE_DIR_INDEX(virt), table);
-
-		if (!table)
-			return;		// not enough memory
-
-		memset(table, 0, sizeof(ptable));			// reset the whole table (page pointers)
-
-		pd_entry_add_attrib(e, I86_PDE_PRESENT);	// set this table present in the directory (table pointers)
-		pd_entry_add_attrib(e, I86_PDE_WRITABLE);
-		pd_entry_set_frame(e, (physical_addr)table);*/
-
 		vmmngr_create_table(dir, virt, flags);
-	}
 
 	// here we have a guaranteed working table (perhaps empty)
 
@@ -57,10 +44,10 @@ void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uin
 	pt_entry_set_frame(page, phys);
 }
 
-void vmmngr_initialize()		// identity map kernel
+void vmmngr_initialize()
 {
 	pdirectory* pdir = (pdirectory*)pmmngr_alloc_block();
-	current_directory = pdir;
+	kernel_directory = pdir;
 	printfln("alloced dir at: %h", pdir);
 
 	memset(pdir, 0, sizeof(pdirectory));
@@ -117,9 +104,12 @@ bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr)
 {
 	if (!dir)
 		return false;
+	current_directory = dir;
 
 	current_pdbr = pdbr;
+
 	pmmngr_load_PDBR(current_pdbr);
+
 	return true;
 }
 
@@ -246,6 +236,21 @@ pdirectory* vmmngr_create_address_space()
 	if (!dir)
 		return 0;
 
+	printfln("creating addr space at: %h", dir);
+
 	memset(dir, 0, sizeof(pdirectory));
 	return dir;
+}
+
+void vmmngr_map_kernel_space(pdirectory* pdir)
+{
+	if (!pdir)
+		return;
+
+	memcpy(pdir, kernel_directory, sizeof(pdirectory));
+}
+
+void vmmngr_switch_to_kernel_directory()
+{
+	vmmngr_switch_directory(kernel_directory, (physical_addr)kernel_directory);
 }

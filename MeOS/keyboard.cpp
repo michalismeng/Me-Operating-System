@@ -2,7 +2,7 @@
 
 // driver private data
 
-char _scancode;
+uint32 _scancode;
 bool _numlock, _capslock, _scrolllock;
 bool _shift, _alt, _ctrl;
 int _kybrd_error = 0;
@@ -12,7 +12,7 @@ bool _kybrd_resend_res = false;
 bool _kybrd_disable = false;
 
 // original scane set where array index == make code.
-int _kybrd_scancode_std[] =
+KEYCODE _kybrd_scancode_std[] =
 {
 	//! key			scancode
 	KEY_UNKNOWN,	//0
@@ -343,6 +343,8 @@ void keyboard_callback(registers_t* regs)
 			case KEY_RALT:
 				_alt = false;
 				break;
+			default:
+				break;
 			}
 		}
 		else	// this is a make code
@@ -382,6 +384,8 @@ void keyboard_callback(registers_t* regs)
 				_scrolllock = !_scrolllock;
 				kybrd_set_leds(_numlock, _capslock, _scrolllock);
 				break;
+			default:
+				break;
 			}
 		}
 
@@ -400,6 +404,8 @@ void keyboard_callback(registers_t* regs)
 		case KYBRD_ERR_RESEND_CMD:
 			DEBUG("Resend requested");
 			_kybrd_resend_res = true;
+			break;
+		default:
 			break;
 		}
 	}

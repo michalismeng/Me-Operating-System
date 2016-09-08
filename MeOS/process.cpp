@@ -2,35 +2,49 @@
 
 // private data and functions
 
-task* current_task = 0;
-queue<task> ready_queue;
+TCB* current_thread = 0;
+
+queue<TCB*> ready_queue;
+queue<TCB*> sleeping_queue;
+
+queue<PCB> process_queue;
 
 static uint32 lastID = 0;
 
-void task_switch()
+void thread_switch()
 {
 	if (ready_queue.count == 1)
 		return;
 
 	if (ready_queue.count != 0)
 	{
-		queue_insert(&ready_queue, *current_task);
+		queue_insert(&ready_queue, current_thread);
 		queue_remove(&ready_queue);
-		current_task = queue_peek(&ready_queue);
+		current_thread = queue_peek(&ready_queue);
+
+		if (current_thread == 0)
+			DEBUG("thread null ERROR");
 	}
 }
 
 // public functions
 
+char* x = "hello %h";
+
+extern "C" void timer_callback(registers_t* regs);	// default callback for timer.
+
 __declspec(naked) void scheduler_interrupt()
 {
-	ticks++;
 	__asm
 	{
-		cmp current_task, 0
-		je no_tasks
-
 		pushad
+
+		mov edx, [ticks]
+		inc edx
+		mov[ticks], edx
+
+		cmp current_thread, 0
+		je no_tasks
 
 		push ds
 		push es
@@ -39,28 +53,43 @@ __declspec(naked) void scheduler_interrupt()
 
 		; save current esp to current_task
 
-		mov eax, dword ptr[current_task]
+		mov eax, dword ptr[current_thread]
 		mov[eax], esp
 
-		call task_switch
+		call thread_switch
 
-		; restore previous esp from the now changed current task pointer
+		; switch address space using a neutral stack
 
-		mov eax, dword ptr[current_task]
+		mov esp, 0x90000
+
+		mov eax, dword ptr[current_thread]	// deref current_thread
+		mov eax, [eax + 8]					// deref parent of thread
+		mov eax, [eax]						// get page dir
+
+		push eax
+		push eax
+
+		call vmmngr_switch_directory
+
+		; restore previous esp from the now changed current thread pointer
+
+		mov eax, dword ptr[current_thread]
 		mov esp, [eax]
 
 		; restore registers saved at the time current task was preempted.These are not the segments above as esp has changed.
 
 		pop gs
+
 		pop fs
 		pop es
 		pop ds
 
-		popad
+		no_tasks :
+		mov al, 20h
+			out 20h, al
 
-		no_tasks : mov al, 20h
-				   out 20h, al
-				   iretd
+			popad
+			iretd
 	}
 }
 
@@ -69,10 +98,10 @@ void init_multitasking()
 	queue_init(&ready_queue);
 }
 
-void task_setup_stack(task* t, uint32 entry, uint32 esp)
+void thread_setup_stack(TCB* t, uint32 entry, uint32 esp)
 {
+	printfln("creating thread esp: %h", esp);
 	trap_frame* f;
-
 	esp -= sizeof(trap_frame);		// prepare esp for manual data push
 	f = (trap_frame*)esp;
 
@@ -99,7 +128,8 @@ void task_setup_stack(task* t, uint32 entry, uint32 esp)
 
 uint32 process_create(char* app_name)
 {
-	task t;
+	PCB* p;
+	TCB* t;
 
 	FILE file = fsysSimpleDirectory(app_name);
 	if (file.flags == FS_INVALID)
@@ -123,21 +153,34 @@ uint32 process_create(char* app_name)
 
 	/* address space creation goes here */
 
-	pdirectory* address_space = vmmngr_get_directory();
+	pdirectory* address_space = vmmngr_create_address_space();
 	if (!address_space)
 		return 0;
 
 	/* kernel mapping to new address space goes here */
+	vmmngr_map_kernel_space(address_space);
+	//vmmngr_switch_directory(address_space, (physical_addr)address_space);
 
-	t.id = ++lastID;
-	t.page_dir = address_space;
-	t.priority = 1;
-	t.state = TASK_READY;
-	t.parent = 0;
-	t.stack_base = 0;
-	t.stack_limit = (void*)4096;
-	t.image_base = nt_header->OptionalHeader.ImageBase;
-	t.image_size = nt_header->OptionalHeader.SizeOfImage;
+	queue_insert(&process_queue, PCB());
+
+	p = &process_queue.tail->data;
+
+	queue_insert(&p->threads, TCB());
+
+	p->id = ++lastID;
+	p->page_dir = address_space;
+	p->parent = 0;
+	p->image_base = nt_header->OptionalHeader.ImageBase;
+	p->image_size = nt_header->OptionalHeader.SizeOfImage;
+
+	t = &p->threads.tail->data;
+
+	t->id = ++lastID;
+	t->priority = 1;
+	t->state = THREAD_READY;
+	t->stack_base = 0;
+	t->stack_limit = (void*)4096;
+	t->parent = p;
 
 	/* copy image to memory */
 	uint8* memory = (uint8*)pmmngr_alloc_block();
@@ -145,20 +188,22 @@ uint32 process_create(char* app_name)
 	memcpy(memory, buf, 512);
 
 	uint32 i = 1;
-	for (; i <= t.image_size / 512; i++)
+	for (; i <= p->image_size / 512; i++)
 	{
 		if (file.eof == true)
 			break;
 		fsysSimpleRead(&file, memory + 512 * i, 512);
 	}
 
-	printfln("image base: %h, size: %u", nt_header->OptionalHeader.ImageBase, nt_header->OptionalHeader.SizeOfImage);
-	vmmngr_map_page(t.page_dir, (physical_addr)memory, nt_header->OptionalHeader.ImageBase, DEFAULT_FLAGS);
+	printfln("image base: %h, size: %u entry at: %h", nt_header->OptionalHeader.ImageBase, nt_header->OptionalHeader.SizeOfImage, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase);
+	vmmngr_map_page(p->page_dir, (physical_addr)memory, nt_header->OptionalHeader.ImageBase, DEFAULT_FLAGS);
 
 	i = 1;
 	while (file.eof != true)
 	{
 		uint8* cur = (uint8*)pmmngr_alloc_block();
+		vmmngr_map_page(p->page_dir, (physical_addr)cur, nt_header->OptionalHeader.ImageBase + i * 4096, DEFAULT_FLAGS);
+
 		for (uint32 cur_block = 0; cur_block < 8; cur_block++)
 		{
 			if (file.eof == true)
@@ -167,56 +212,80 @@ uint32 process_create(char* app_name)
 			fsysSimpleRead(&file, cur + 512 * cur_block, 512);
 		}
 
-		vmmngr_map_page(t.page_dir, (physical_addr)cur, nt_header->OptionalHeader.ImageBase + i * 4096, DEFAULT_FLAGS);
 		i++;
 	}
 
 	void* stack = (void*)(nt_header->OptionalHeader.ImageBase + nt_header->OptionalHeader.SizeOfImage + 4096);
 	void* stack_phys = pmmngr_alloc_block();
 
-	vmmngr_map_page(t.page_dir, (physical_addr)stack_phys, (virtual_addr)stack, DEFAULT_FLAGS);
+	vmmngr_map_page(p->page_dir, (physical_addr)stack_phys, (virtual_addr)stack, DEFAULT_FLAGS);
 
-	t.stack_base = stack;
-	t.stack_limit = (void*)((uint32)t.stack_base + 4096);
+	t->stack_base = stack;
+	t->stack_limit = (void*)((uint32)t->stack_base + 4096);
 
-	task_setup_stack(&t, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase,
-		(uint32)t.stack_base);
+	pdirectory* old_dir = vmmngr_get_directory();
+
+	vmmngr_switch_directory(address_space, (physical_addr)address_space);
+
+	thread_setup_stack(t, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase,
+		(uint32)t->stack_base);
+
+	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
 
 	queue_insert(&ready_queue, t);
-	return t.id;
+	return p->id;
 }
 
-uint32 task_create(uint32 entry, uint32 esp)
+uint32 thread_create(PCB* parent, uint32 entry, uint32 esp)
 {
-	task t;
-	t.id = ++lastID;
-	t.image_base = entry;
-	t.image_size = 0;
-	t.page_dir = vmmngr_get_directory();
+	TCB* t;
+	queue_insert(&parent->threads, TCB());
+	t = &parent->threads.tail->data;
 
-	task_setup_stack(&t, entry, esp);
+	t->id = ++lastID;
+	t->parent = parent;
+	t->stack_base = (void*)esp;
+
+	pdirectory* old_dir = vmmngr_get_directory();
+	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
+
+	thread_setup_stack(t, entry, esp);
+
+	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
 	queue_insert(&ready_queue, t);
 
-	return t.id;
+	return t->id;
 }
 
-void task_exeute(task t)
+void thread_execute(TCB t)
 {
 	__asm
 	{
+		mov eax, t.parent
+		mov eax, [eax]
+
+		push eax
+		push eax
+
+		call vmmngr_switch_directory
+
+		; make a good stack
+		add esp, 8
+
 		mov esp, t.esp
 		pop gs
 		pop fs
 		pop es
 		pop ds
 		popad
+
 		iretd
 	}
 }
 
 void start()
 {
-	current_task = queue_peek(&ready_queue);
+	current_thread = queue_peek(&ready_queue);
 }
 
 bool validate_PE_image(void* image)
@@ -250,14 +319,15 @@ bool validate_PE_image(void* image)
 
 void print_ready_queue()
 {
+	//printfln("printing ready queue.");
 	if (ready_queue.count == 0)
 		return;
 
-	queue_node<task>* ptr = ready_queue.head;
+	queue_node<TCB*>* ptr = ready_queue.head;
 	printfln("ready queue count: %u", ready_queue.count);
 	while (ptr != 0)
 	{
-		printfln("Task: %u with address space at: %h and esp: %h", ptr->data.id, ptr->data.page_dir, ptr->data.esp);
+		printfln("Task: %h with address space at: %h and esp: %h", ptr->data, ptr->data->parent->page_dir, ptr->data->esp);
 		ptr = ptr->next;
 	}
 }

@@ -24,11 +24,9 @@ heap* kernel_heap = 0;
 
 void GetMemoryStats()
 {
-	printfln("Max blocks: %u", pmmngr_get_block_count());
-	printfln("Available blocks: %u", pmmngr_get_free_block_count());
-	printfln("Used blocks: %u", pmmngr_get_block_use_count());
-
-	printfln("");
+	serial_printf("Max blocks: %u\n", pmmngr_get_block_count());
+	serial_printf("Available blocks: %u\n", pmmngr_get_free_block_count());
+	serial_printf("Used blocks: %u\n", pmmngr_get_block_use_count());
 }
 
 void print(char* arr)
@@ -59,8 +57,7 @@ void get_cmd(char* buff, int max_size)
 
 	while (true)
 	{
-		key = getch();
-		//printf("input");
+		key = (KEYCODE)getch();
 
 		if (key == KEY_RETURN)
 		{
@@ -107,7 +104,7 @@ bool run_cmd(char* cmd)
 
 		physical_addr addr = vmmngr_get_phys_addr((virtual_addr)0x500000);
 
-		if (false/*ahci_read(0, sector, 0, 1, (VOID PTR)addr) != AHCIResult::AHCI_NO_ERROR*/)
+		if (ahci_read(0, sector, 0, 1, (VOID PTR)addr) != AHCIResult::AHCI_NO_ERROR)
 			DEBUG("AHCI ERROR");
 		else
 			print((char*)0x500000);
@@ -120,6 +117,8 @@ bool run_cmd(char* cmd)
 		kybrd_disable();
 	else if (strcmp(cmd, "caps") == 0)
 		ahci_print_caps();
+	else if (strcmp(cmd, "memstats") == 0)
+		GetMemoryStats();
 	else
 		printfln("Unknown command: %s.", cmd);
 
@@ -129,7 +128,7 @@ bool run_cmd(char* cmd)
 void Run()
 {
 	char cmd[30];
-	//SetMinWritable(strlen("cmd>"));
+	SetMinWritable(strlen("cmd>"));
 
 	while (true)
 	{
@@ -152,9 +151,11 @@ void test1()
 void test2()
 {
 	printfln("hello from the other side");
-	sleep(400);
-	printfln("Thread 2");
-	while (true);
+	while (true)
+	{
+		sleep(3000);
+		printfln("Thread 2");
+	}
 }
 
 void idle()
@@ -232,7 +233,7 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	//ahci_send_identify(0, (VOID PTR)addr);
 	//printfln("\nIdentification sector count: %u", *(uint32*)(buf + 120));
 
-	init_device_manager();
+	//init_device_manager();
 
 	/*PDEVICE screen = mngr_device_add(0);
 	mngr_device_add_std_info(screen, "SCREEN", 1, screen_control_function, 0);
@@ -243,34 +244,39 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	screen->device_control(1, "Hello_world!\n");*/
 
 	ClearScreen();
+
 	init_multitasking();
+	process_create("TestDLL.exe");
+
 	//uint32 id = process_create("TestDLL.exe");
-	//process_create("TestDLL2.exe");
 
-	vmmngr_alloc_page(0x700000 - 4096);
-	task_create((uint32)test1, 0x700000);		// create test1 task
+	extern queue<PCB> process_queue;
 
-	vmmngr_alloc_page(0x850000 - 4096);
-	task_create((uint32)Run, 0x850000);			// create Run task
+	PCB* p = &process_queue.head->data;
 
-	vmmngr_alloc_page(0x600000 - 4096);
-	task_create((uint32)idle, 0x600000);		// create idle task
+	uint32 phys = (uint32)pmmngr_alloc_block();
+	vmmngr_map_page(p->page_dir, phys, 0x700000 - 4096, DEFAULT_FLAGS);
 
-	vmmngr_alloc_page(0x750000 - 4096);
-	task_create((uint32)test2, 0x750000);		// create test2 task
+	phys = (uint32)pmmngr_alloc_block();
+	vmmngr_map_page(p->page_dir, phys, 0x600000 - 4096, DEFAULT_FLAGS);
+
+	thread_create(p, (uint32)test2, 0x600000);		// create test2 task
+	thread_create(p, (uint32)Run, 0x700000);
 
 	print_ready_queue();
 
-	task* t = &ready_queue.head->data;
+	TCB* t = ready_queue.head->data;
 
 	_asm cli
 	start();
+	_asm sti
 
-	task_exeute(*t);
+	thread_execute(*t);
 	///////////////////////////////////////
-	//Run();
 
-	_asm cli
+	Run();
+
+	//_asm cli
 
 	SetColor(DARK_RED, WHITE);
 	ClearScreen();

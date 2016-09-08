@@ -15,6 +15,8 @@ void timer_callback(registers_t* regs)
 
 uint32 millis()
 {
+	if (frequency == 0)		// TODO: Sometimes we get division by zero on ahci port 0 rebase. check that
+		PANIC("Zero freq");
 	return (1000 * ticks) / frequency;
 }
 

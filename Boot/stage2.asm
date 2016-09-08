@@ -119,7 +119,7 @@ Stage3:							; PMode here
 	mov es, ax
 	
 	mov ss, ax
-	mov esp, 0x90000
+	mov esp, 0xFFFF
 
 	call EnablePaging
 	
@@ -142,9 +142,6 @@ Stage3:							; PMode here
 
 	mov eax, 0x2BADB002
 	mov ebx, 0
-
-	;mov esi, A20Enable
-	;call Print
 	
 	push dword [memory_map_len]
 	push dword boot_info

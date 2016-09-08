@@ -63,7 +63,15 @@ void queue_insert(queue<T>* q, const T& element)
 }
 
 template<class T>
-T* queue_peek(queue<T>* q)
+T queue_peek(queue<T>* q)
+{
+	if (q->count > 0)
+		return q->head->data;
+	return T();
+}
+
+template<class T>
+T* queue_peek_ptr(queue<T>* q)
 {
 	if (q->count > 0)
 		return &q->head->data;

@@ -9,8 +9,7 @@ static uint32 mmngr_used_blocks = 0;
 static uint32 mmngr_max_blocks = 0;
 static uint32* mmngr_bitmap = 0;
 
-
-//PRIVATE - AUX FUNCTIONS 
+//PRIVATE - AUX FUNCTIONS
 
 inline void mmap_set(int bit)
 {
@@ -37,7 +36,7 @@ int mmap_first_free()
 			int bit = 1;
 			for (int j = 0; j < 32; j++)
 			{
-				if (! (mmngr_bitmap[i] & bit))	// bit not set
+				if (!(mmngr_bitmap[i] & bit))	// bit not set
 					return i * 32 + j;
 
 				bit <<= 1;
@@ -86,7 +85,7 @@ int mmap_first_free_s(uint32 count)
 	return -1;
 }
 
-// modifies reg: base and length to be block aligned and to be within the former borders (new_base >= base and new_length <= length) 
+// modifies reg: base and length to be block aligned and to be within the former borders (new_base >= base and new_length <= length)
 void pmmngr_block_align_region(physical_memory_region* reg)
 {
 	uint32 new_base = reg->base;
@@ -106,8 +105,6 @@ void pmmngr_block_align_region(physical_memory_region* reg)
 	reg->base = new_base;
 	reg->length = new_length;
 }
-
-
 
 // INTERFACE FUNCTIONS
 
@@ -270,17 +267,17 @@ void pmmngr_paging_enable(bool flag)
 	_asm
 	{
 		mov eax, cr0
-		cmp byte ptr [flag], 1
+		cmp byte ptr[flag], 1
 		jne disable
 
-		enable:
-			or eax, 0x80000000	// set bit 31 of cr0 register
+		enable :
+		or eax, 0x80000000	// set bit 31 of cr0 register
 			jmp done
 
-		disable:
-			and eax, 0x7FFFFFFF	// unset bit 31
-		
-		done:
+			disable :
+		and eax, 0x7FFFFFFF	// unset bit 31
+
+			done :
 			mov cr0, eax
 	}
 }
@@ -292,7 +289,7 @@ bool pmmngr_get_paging_enabled()
 	_asm
 	{
 		mov eax, cr0
-		mov dword ptr [res], eax
+		mov dword ptr[res], eax
 	}
 
 	if (res & 0x80000000)		// check bit 31
@@ -303,10 +300,12 @@ bool pmmngr_get_paging_enabled()
 
 void pmmngr_load_PDBR(physical_addr addr)
 {
-	_asm 
+	_asm
 	{
-		mov	eax, dword ptr [addr]
+		pushad
+		mov	eax, dword ptr[addr]
 		mov	cr3, eax
+		popad
 	}
 }
 
@@ -314,9 +313,9 @@ physical_addr pmmngr_get_PDBR()
 {
 	physical_addr addr;
 
-	_asm 
+	_asm
 	{
 		mov	eax, cr3
-		mov dword ptr [addr], eax
+		mov dword ptr[addr], eax
 	}
 }

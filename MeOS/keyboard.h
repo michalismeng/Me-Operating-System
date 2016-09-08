@@ -89,7 +89,7 @@ enum KYBRD_CTRL_CMDS
 	KYBRD_CTRL_CMD_MOUSE_WRITE = 0xD4
 };
 
-enum KEYCODE
+enum KEYCODE : uint32
 {
 	// Alphanumeric keys
 

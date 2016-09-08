@@ -16,15 +16,16 @@ extern "C" {
 
 	extern volatile uint32 ticks;
 
-	enum TASK_STATE {
-		TASK_NONE,
-		TASK_SLEEP,			// task resides in the sleep queue until its count-down timer reaches zero. It is then enqueued in the ready queue.
-		TASK_READY,			// task resides in the ready queue where it waits to be scheduled to run.
-		TASK_RUNNING,		// task does not reside in any queue as it is currently running.
-		TASK_BLOCK			// task resides in the block queue as it has requested blocking I/O service and waits for it to finish.
+	enum THREAD_STATE {
+		THREAD_NONE,
+		THREAD_SLEEP,			// task resides in the sleep queue until its count-down timer reaches zero. It is then enqueued in the ready queue.
+		THREAD_READY,			// task resides in the ready queue where it waits to be scheduled to run.
+		THREAD_RUNNING,			// task does not reside in any queue as it is currently running.
+		THREAD_BLOCK			// task resides in the block queue as it has requested blocking I/O service and waits for it to finish.
 	};
 
 #pragma pack(push, 1)
+	// represents the stack right before the thread is loaded. Must have this exact form.
 	struct trap_frame
 	{
 		/* pushed by isr. */
@@ -47,38 +48,47 @@ extern "C" {
 		uint32 flags;
 	};
 
-	struct task
+#pragma pack(pop, 1)
+
+	typedef struct process_control_block PCB;
+
+	typedef struct thread_control_block
 	{
 		uint32 esp;
 		uint32 ss;
 
-		task* parent;			// parent task that created this task. Task 0 has a null parent
-		task* next;				// sibling task that is next to this task
+		PCB* parent;			// parent process that created this thread.
 
-		uint32 id;				// task unique id
-		uint32 priority;		// task priority
+		uint32 id;				// thread unique id
+		uint32 priority;		// thread priority
 
-		void* stack_base;		// address of the base of the task's stack
-		void* stack_limit;		// end address of the task's stack incremented by 1. stack_base <= valid_stack < stack_limit
+		void* stack_base;		// address of the base of the thread's stack
+		void* stack_limit;		// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
 
-		TASK_STATE state;		// the current state of the task
-		pdirectory* page_dir;	// address space of the task
+		THREAD_STATE state;		// the current state of the thread
+	}TCB;
 
-		uint32 image_base;		// base of the image this task is running
-		uint32 image_size;		// size of the image this task is running
-	};
+	typedef struct process_control_block
+	{
+		pdirectory* page_dir;				// address space of the process
+		process_control_block* parent;		// parent PCB that created us. PCB 0 has null parent
+		uint32 id;							// unique process id
 
-	extern queue<task> ready_queue;
+		uint32 image_base;					// base of the image this task is running
+		uint32 image_size;					// size of the image this task is running
 
-#pragma pack(pop, 1)
+		queue<TCB> threads;					// child threads of the process
+	}PCB;
+
+	extern queue<TCB*> ready_queue;
 
 	void scheduler_interrupt();
 
 	void init_multitasking();
 
 	uint32 process_create(char* app_name);
-	uint32 task_create(uint32 entry, uint32 esp);
-	void task_exeute(task t);
+	uint32 thread_create(PCB* parent, uint32 entry, uint32 esp);
+	void thread_execute(TCB t);
 
 	void start();
 
@@ -86,7 +96,7 @@ extern "C" {
 
 	void print_ready_queue();
 
-	void task_switch();
+	void thread_switch();
 
 #ifdef __cplusplus
 }

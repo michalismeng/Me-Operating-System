@@ -25,7 +25,7 @@ extern "C" {
 #define PAGE_TABLE_INDEX(x)			( ((x) >> 12) & 0x3ff )		// Get the 10 "middle" bits of x
 #define PAGE_GET_PHYSICAL_ADDR(x)	( (*x) & ~0xfff )			// Physical address is 4KB aligned, so return all bits except the 12 first
 
-	void page_fault(registers_struct regs);
+	void page_fault(registers_struct* regs);
 	// page table definition
 	struct ptable
 	{
@@ -92,6 +92,11 @@ extern "C" {
 
 	// creates a new address space
 	pdirectory* vmmngr_create_address_space();
+
+	// maps the kernel pages to the directory given
+	void vmmngr_map_kernel_space(pdirectory* pdir);
+
+	void vmmngr_switch_to_kernel_directory();
 
 #ifdef __cplusplus
 }

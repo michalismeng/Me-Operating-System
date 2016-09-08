@@ -19,8 +19,6 @@ void __cdecl irq_handler(registers_t regs)
 	{
 		isr_t handler = interrupt_handlers[regs.int_no];
 		handler(&regs);
-
-		//__asm call handler
 	}
 	else
 		printf("Hardware interrupt: %u", regs.int_no);

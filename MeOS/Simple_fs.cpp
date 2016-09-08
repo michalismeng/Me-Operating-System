@@ -10,7 +10,7 @@ FILESYSTEM _fsysSimple;
 FILE fsysSimpleDirectory(const char* dir_name)
 {
 	char buf[512];
-	if (ahci_read(0, 0, 0, 1, buf) != AHCI_NO_ERROR)
+	if (ahci_read(1, 0, 0, 1, buf) != AHCI_NO_ERROR)
 		DEBUG("FS boot: Could not read");
 	// take bytes 6,7
 	uint32 volSize = *(uint32*)(buf + 2);

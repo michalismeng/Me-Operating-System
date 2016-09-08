@@ -106,7 +106,7 @@ ISR_NOERRORCODE 31
 
 ISR_NOERRORCODE 128
 
-;IRQ 0,  32		handle that specially
+;IRQ 0,  32		;handle that specially
 IRQ 1,  33
 IRQ 2,  34
 IRQ 3,  35
@@ -187,6 +187,5 @@ irq_common_stub:
   add esp, 8
   ;sti
   iretd
-	
 
 END
