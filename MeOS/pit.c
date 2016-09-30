@@ -51,13 +51,12 @@ void stop_sound()
 	outportb(PC_SPEAKER_PORT, temp);
 }
 
-/*void beep(uint32 frequency, uint32 time)
+void beep(uint32 frequency, uint32 time)
 {
-	Timer t;
 	play_sound(frequency);
-	while (t.GetElapsedMillis() < time);
+	sleep(time);
 	stop_sound();
-}*/
+}
 
 /*void play_pattern(uint32 freq[], uint32 time[], uint32 size, uint32 mult)
 {

@@ -163,6 +163,8 @@ void idle()
 	while (true) _asm pause;
 }
 
+#include "vfs.h"
+
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
 	uint32 kernel_size_bytes;
@@ -242,6 +244,10 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	screen->device_control(1, "Hello world!\n");
 	screen->device_control(0, BLUE, WHITE);
 	screen->device_control(1, "Hello_world!\n");*/
+
+	vfs_test();
+
+	while (true);		// block multi-tasking for VFS establishment
 
 	ClearScreen();
 

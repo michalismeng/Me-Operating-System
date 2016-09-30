@@ -119,7 +119,7 @@ Stage3:							; PMode here
 	mov es, ax
 	
 	mov ss, ax
-	mov esp, 0xFFFF
+	mov esp, 0x90000
 
 	call EnablePaging
 	

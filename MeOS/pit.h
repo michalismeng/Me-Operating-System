@@ -7,7 +7,7 @@ extern "C" {
 
 #include "system.h"
 #include "isr.h"
-//#include "timer.h"
+	//#include "timer.h"
 
 #define PIT_CLOCK_CYCLE			1193180	// hz
 
@@ -53,7 +53,7 @@ extern "C" {
 	void init_pit_timer(uint32 frequency, isr_t callback);
 	void play_sound(uint32 frequency);
 	void stop_sound();
-	//void beep(uint32 frequency, uint32 time);
+	void beep(uint32 frequency, uint32 time);
 
 	//void play_pattern(uint32 freq[], uint32 time[], uint32 size, uint32 mult);
 

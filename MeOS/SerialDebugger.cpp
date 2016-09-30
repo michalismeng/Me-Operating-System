@@ -6,7 +6,7 @@ bool _serial_port_found = false;
 
 void init_serial()
 {
-	if (PORT == 0)				// communication failed
+	if (*(uint8*)PORT == 0)				// communication failed
 	{
 		DEBUG("COM port not found");
 		return;

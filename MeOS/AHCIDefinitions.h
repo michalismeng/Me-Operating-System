@@ -39,6 +39,8 @@ extern "C" {
 
 	// ------------------FIS Definitions------------------------------
 
+#pragma pack(push, 1)
+
 	typedef struct FIS_REG_H2D_struct
 	{
 		// DWORD 0
@@ -314,6 +316,8 @@ extern "C" {
 		// 0x80
 		HBA_PRDT_ENTRY_t prdt_entry[1];	// Physical region descriptor table entries, 0 ~ 65535
 	} HBA_CMD_TBL_t;
+
+#pragma pack(pop, 1)
 
 	// Generic Host Control Registers offsets
 	enum GHC_REGISTERS

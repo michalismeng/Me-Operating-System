@@ -29,10 +29,6 @@ void thread_switch()
 
 // public functions
 
-char* x = "hello %h";
-
-extern "C" void timer_callback(registers_t* regs);	// default callback for timer.
-
 __declspec(naked) void scheduler_interrupt()
 {
 	__asm

@@ -169,9 +169,9 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 	return AHCI_NO_ERROR;
 }
 
-bool finished = false;
 void ahci_callback(registers_t* regs)
 {
+	printfln("sata callback");
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 	{
 		if (ahci_is_interrupt_pending(i))
@@ -179,17 +179,14 @@ void ahci_callback(registers_t* regs)
 			HBA_PORT_t* port = &abar->ports[i];
 			printfln("\nPort %u status: %h and ci %h", i, port->is, port->ci);
 
-			port->is = port->is;
-			//ahci_clear_interrupt(i);
-			abar->is &= ~(1 << i);
+			port->ie &= ~1;
+			ahci_clear_interrupt(i);
 
-			if (abar->is == 0)
-				PANIC("is zero");
+			//if (abar->is == 0)
+			//	PANIC("is zero");
 
 			//FIS_REG_D2H* fis = (FIS_REG_D2H*)port->fb;
-			//printfln("FIS type: %u count reg: %u", fis->fis_type, fis->countl);
-
-			finished = true;
+			//printfln("FIS at %h %h", fis, fis->fis_type);
 		}
 	}
 
@@ -217,7 +214,7 @@ void init_ahci(HBA_MEM_t* _abar, uint32 base)
 
 	register_interrupt_handler(43, ahci_callback);
 
-	ahci_enable_interrupts(false);
+	ahci_enable_interrupts(true);
 
 	printfln("ahci driver initialized with port_ok %h", port_ok);
 }
@@ -432,8 +429,9 @@ volatile inline bool ahci_is_interrupt_pending(uint8 port)
 
 void ahci_clear_interrupt(uint8 port)
 {
+	// IS is RWC (write 1 to clear)
 	if (ahci_is_interrupt_pending(port))
-		abar->is &= ~(1 << port);
+		abar->is |= (1 << port);
 }
 
 inline uint16 ahci_get_major_vs()
