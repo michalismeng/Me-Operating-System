@@ -1,8 +1,7 @@
 #ifndef SIMPLE_FS_H_26072016
 #define SIMPLE_FS_H_26072016
 
-// this file contains only dummy implementations of the below functions, to validate command input and fsys funcionality
-// to be developped
+#include "vfs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +12,7 @@ extern "C" {
 #include "SerialDebugger.h"
 #include "fsys.h"
 #include "cstring.h"
+#include "MassStorageDefinitions.h"
 
 	FILE fsysSimpleDirectory(const char* dir_name);
 	void fsysSimpleMount();
@@ -21,6 +21,8 @@ extern "C" {
 	FILE fsysSimpleOpen(const char* filename);
 
 	void fsysSimpleInitialize();
+
+	list<vfs_node*> simple_fs_mount(mass_storage_info* info);
 
 #pragma pack(push, 1)
 

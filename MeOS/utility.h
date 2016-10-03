@@ -24,10 +24,15 @@ extern "C" {
 #define max(a, b)	 ( a < b ? b : a )
 
 	extern char hexes[];
+	extern char alphabet[];
 
+	// takes an unsigned int and returns to buffer its string base-representation
 	void uitoa(uint32 val, char* buffer, uint8 base);
-
 	void itoa(int32 val, char* buffer, uint8 base);
+
+	// takes an unsigned int and returns its alpha representation
+	// 1 -> a | 2 -> b | 25 -> aa
+	void uitoalpha(uint32 val, char* buffer);
 
 	void printf(char* fmt, ...);
 	void printfln(char* fmt, ...);

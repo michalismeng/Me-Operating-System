@@ -92,3 +92,49 @@ void fsysSimpleInitialize()
 	// register volume at device 0
 	volRegisterFileSystem(&_fsysSimple, 0);
 }
+
+list<vfs_node*> simple_fs_mount(mass_storage_info* info)
+{
+	list<vfs_node*> l;
+	list_init(&l);
+
+	char* buf = (char*)info->entry_point(0, info, 0, 0, 1);
+
+	uint32 first_index_sector = *(uint32*)(buf + 6);
+	uint32 index_count = *(uint32*)(buf + 10);
+
+	vfs_node** nodes = (vfs_node**)malloc(sizeof(vfs_node) * index_count);
+	uint32* parents = (uint32*)malloc(sizeof(uint32) * index_count);
+
+	uint32 sectors_to_read = ceil_division(index_count, 8);
+	uint32 count = 0;
+	for (int i = 0; i < sectors_to_read; i++)
+	{
+		char* buffer = (char*)info->entry_point(0, info, info->volume_size - i - 1, 0, 1);
+
+		for (int j = 0; j < 8; j++)
+		{
+			MSFSEntry* entry = (MSFSEntry*)(buffer + 512 - j * sizeof(MSFSEntry));
+			if (entry->first_sector == 0)
+				continue;
+
+			nodes[count] = vfs_create_node(entry->name, true, VFS_FILE | VFS_READ | VFS_WRITE, entry->size, sizeof(uint32));
+			*(uint32*)nodes[count]->deep_md = entry->first_sector;
+			parents[count] = entry->parent_index;
+			count++;
+		}
+	}
+
+	for (uint32 i = 0; i < index_count; i++)
+	{
+		if (parents[i] == 0)
+			list_insert_back(&l, nodes[i]);
+		else
+			list_insert_back(&nodes[parents[i] - 1]->children, nodes[i]);
+	}
+
+	free(nodes);
+	free(parents);
+
+	return l;
+}

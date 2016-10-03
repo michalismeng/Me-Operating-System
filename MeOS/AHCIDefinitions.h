@@ -8,6 +8,7 @@ extern "C" {
 #include "types.h"
 #include "utility.h"
 #include "timer.h"
+#include "MassStorageDefinitions.h"
 
 #define	SATA_SIG_ATA	0x00000101	// SATA drive
 #define	SATA_SIG_ATAPI	0xEB140101	// SATAPI drive
@@ -23,7 +24,11 @@ extern "C" {
 #define ATA_DEV_BUSY	0x80
 #define ATA_DEV_DRQ		0x08
 
-#define CMD_SLOTS 		5
+	struct ahci_storage_info
+	{
+		mass_storage_info storage_info;		// general mass storage info
+		uint8 volume_port;					// ahci port for this volume
+	};
 
 	enum FIS_TYPE
 	{

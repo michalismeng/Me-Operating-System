@@ -6,6 +6,27 @@ HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci con
 uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
 
+char buffer[4096];			// TODO: Make one page buffer more lovely
+
+void* ahci_main(uint32 ahci_command, ...)
+{
+	va_list l;
+	va_start(l, ahci_command);
+
+	switch (ahci_command)
+	{
+	case 0:
+	{
+		ahci_storage_info* info = va_arg(l, ahci_storage_info*);
+		DWORD startl = va_arg(l, DWORD);
+		DWORD starth = va_arg(l, DWORD);
+		DWORD count = va_arg(l, DWORD);
+
+		return ahci_read(info, startl, starth, count);
+	}
+	}
+}
+
 bool ahci_start_cmd(HBA_PORT_t* port)
 {
 	if ((port->cmd & HBA_PxCMD_CR) != 0 || (port->cmd & HBA_PxCMD_FR) != 0 || (port->cmd & HBA_PxCMD_FRE) != 0)
@@ -59,7 +80,7 @@ int32 ahci_find_empty_slot(HBA_PORT_t* port)
 {
 	DWORD slots = (port->sact | port->ci);
 
-	for (int i = 0; i < CMD_SLOTS; i++)
+	for (int i = 0; i < ahci_get_no_command_slots(); i++)
 	{
 		if ((slots & 1) == 0)
 			return i;
@@ -209,14 +230,48 @@ void init_ahci(HBA_MEM_t* _abar, uint32 base)
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 	{
 		if (ahci_is_port_implemented(i))
+		{
 			ahci_port_rebase(i);
+
+			if (ahci_is_port_ok(i))
+				ahci_setup_vfs_port(i);
+		}
 	}
 
-	register_interrupt_handler(43, ahci_callback);
-
-	ahci_enable_interrupts(true);
+	//register_interrupt_handler(43, ahci_callback);
+	//ahci_enable_interrupts(false);
 
 	printfln("ahci driver initialized with port_ok %h", port_ok);
+}
+
+void ahci_print_dmd(ahci_storage_info* info)
+{
+	printfln("size: %h, port: %u, serial: %s", info->storage_info.volume_size, info->volume_port, info->storage_info.serial_number);
+}
+
+void ahci_setup_vfs_port(uint8 port_num)
+{
+	char buf[512];
+
+	// read identify packet
+	if (ahci_send_identify(port_num, buf) != AHCIResult::AHCI_NO_ERROR)
+		return;
+
+	// create device node and get deep metadata
+	char name[8] = { 0 };
+	name[0] = 's'; name[1] = 'd';		// to be safe
+
+	uitoalpha(port_num, name + 2);
+	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, sizeof(ahci_storage_info));
+
+	// populate storage struct
+	uint16* ptr = (uint16*)buf;
+
+	dev_dmd->storage_info.volume_size = *(uint32*)(ptr + 60);
+	memcpy(dev_dmd->storage_info.serial_number, ptr + 10, 20);
+	dev_dmd->storage_info.sector_size = 512;
+	dev_dmd->storage_info.entry_point = ahci_main;
+	dev_dmd->volume_port = port_num;
 }
 
 void ahci_port_rebase(uint8 port_num)
@@ -283,6 +338,16 @@ AHCIResult ahci_read(uint8 port_num, DWORD startl, DWORD starth, DWORD count, VO
 		return PORT_NOT_OK;
 
 	return ahci_data_transfer(port, startl, starth, count, buf, true);
+}
+
+char* ahci_read(ahci_storage_info* info, DWORD startl, DWORD starth, DWORD count)
+{
+	uint8 cnt = min(count, 8);
+	if (ahci_read(info->volume_port, startl, starth, cnt, (VOID*)vmmngr_get_phys_addr((virtual_addr)buffer))
+		!= AHCIResult::AHCI_NO_ERROR)
+		return 0;
+
+	return buffer;
 }
 
 AHCIResult ahci_write(uint8 port_num, DWORD startl, DWORD starth, DWORD count, VOID* _buf)

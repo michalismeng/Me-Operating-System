@@ -1,14 +1,15 @@
+#ifndef PCI_H
+#define PCI_H
+
+#include "AHCI.h"		// we do not need everything to be extern C
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 	// this file is totally incomplete and serves as a quick way to find the ahci driver
 
-#ifndef PCI_H
-#define PCI_H
-
 #include "types.h"
-#include "AHCI.h"
 #include "SerialDebugger.h"
 
 #define PCI_DATA_REGISTER 0xCF8
@@ -23,8 +24,8 @@ extern "C" {
 
 	HBA_MEM_t* PCIFindAHCI();
 
-#endif
-
 #ifdef __cplusplus
 }
+#endif
+
 #endif

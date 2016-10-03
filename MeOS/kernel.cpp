@@ -164,6 +164,7 @@ void idle()
 }
 
 #include "vfs.h"
+#include "FAT32_fs.h"
 
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
@@ -224,10 +225,12 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 
 	serial_printf("Virtual manager initialize\n");
 
-	kernel_heap = heap_create(0x300000, 0x2000);		// initialize the heap
+	kernel_heap = heap_create(0x300000, 0x4000);		// initialize the heap
 
 	fsysSimpleInitialize();
 	init_keyboard();
+
+	init_vfs();
 
 	uint32 ahci_base = 0x200000;
 	init_ahci(abar, ahci_base + ahci_base % 1024);	// ahci must be 1K aligned. (otherwise... crash)
@@ -237,15 +240,47 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 
 	//init_device_manager();
 
-	/*PDEVICE screen = mngr_device_add(0);
-	mngr_device_add_std_info(screen, "SCREEN", 1, screen_control_function, 0);
+	//vfs_print_all();
 
-	screen->device_control(0, BLACK, BLUE);
-	screen->device_control(1, "Hello world!\n");
-	screen->device_control(0, BLUE, WHITE);
-	screen->device_control(1, "Hello_world!\n");*/
+	/*ahci_storage_info* info = (ahci_storage_info*)vfs_find_child(vfs_get_dev(), "sd1")->deep_md;
+	print(ahci_read(info, 2, 0));
 
-	vfs_test();
+	printfln("end read");*/
+
+	/*auto disk = vfs_find_child(vfs_get_dev(), "sdb");
+	list<vfs_node*> l = simple_fs_mount((mass_storage_info*)disk->deep_md);
+
+	auto node = vfs_create_node("sdb_mount", false, 0, 0, 0);
+	node->children = l;
+	list_insert_back(&vfs_get_root()->children, node);
+
+	vfs_print_all();*/
+
+	ClearScreen();
+
+	auto disk = vfs_find_child(vfs_get_dev(), "sdc");
+	auto l = fat_fs_mount((mass_storage_info*)disk->deep_md);
+
+	auto node = vfs_create_node("sdc_mount", false, 0, 0, 0);
+	node->children = l;
+	list_insert_back(&vfs_get_root()->children, node);
+
+	vfs_print_all();
+
+	char* path = "sdc_mount/BEST.TXT";
+	vfs_node* n = vfs_find_node(path);
+
+	fat_fs_load_file_layout((mass_storage_info*)disk->deep_md, n);
+	fat_file_layout layout = *(fat_file_layout*)n->deep_md;
+
+	auto l_node = layout.head;
+	printf("clusters for %s: ", n->shallow_md.name);
+
+	while (l_node != 0)
+	{
+		printf("%u ", l_node->data);
+		l_node = l_node->next;
+	}
 
 	while (true);		// block multi-tasking for VFS establishment
 

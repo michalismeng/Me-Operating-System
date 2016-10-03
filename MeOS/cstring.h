@@ -22,6 +22,9 @@ extern "C" {
 	// copies source string to destination. Checks if destination can hold the source string.
 	uint8 strcpy_s(char* destination, uint16 destsz, const char* source);
 
+	// returns a pointer to the first occurence of the 'c' character given
+	char* strchr(const char* str, int c);
+
 #ifdef __cplusplus
 }
 #endif

@@ -43,3 +43,12 @@ uint8 strcpy_s(char* destination, uint16 destsz, const char* source)
 	strcpy(destination, source);
 	return 0;
 }
+
+char* strchr(const char* str, int c)
+{
+	while (*str != 0)
+		if (*str++ == c)
+			return str - 1;
+
+	return 0;		// entry not found
+}

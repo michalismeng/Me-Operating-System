@@ -2,6 +2,7 @@
 #define PROCESS_H_28082016
 
 #include "queue.h"
+#include "Simple_fs.h"		// to be removed
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,8 +12,6 @@ extern "C" {
 #include "utility.h"
 #include "mmngr_virtual.h"
 #include "PE_Definitions.h"
-
-#include "Simple_fs.h"		// to be removed
 
 	extern volatile uint32 ticks;
 

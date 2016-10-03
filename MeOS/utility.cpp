@@ -1,6 +1,7 @@
 #include "utility.h"
 
-char hexes[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+char hexes[] = "0123456789ABCDEF";
+char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
 
 void uitoa(uint32 val, char* buffer, uint8 base)
 {
@@ -25,6 +26,30 @@ void uitoa(uint32 val, char* buffer, uint8 base)
 	}
 
 	buffer[length] = 0;		// not required but to be sure. buffer[i] = 0 above is enough and is not affected by the reverse process.
+}
+
+void uitoalpha(uint32 val, char* buffer)
+{
+	uint16 i = 0;
+	do
+	{
+		buffer[i] = alphabet[val % 26];
+		i++;
+	} while ((val /= 26) != 0);
+
+	buffer[i] = 0;
+
+	uint16 length = strlen(buffer);
+
+	i = 0;
+	for (; i < length / 2; i++)
+	{
+		char temp = buffer[i];
+		buffer[i] = buffer[length - 1 - i];
+		buffer[length - 1 - i] = temp;
+	}
+
+	//buffer[length] = 0;
 }
 
 void itoa(int32 val, char* buffer, uint8 base)

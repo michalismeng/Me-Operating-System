@@ -2,7 +2,7 @@
 
 vfs_node* root;
 
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 length, uint32 deep_metadata_length)
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length)
 {
 	vfs_node* n = (vfs_node*)malloc(sizeof(vfs_node) + deep_metadata_length);
 
@@ -19,7 +19,7 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 		n->shallow_md.name = name;				// shallow copy name
 
 	n->shallow_md.attributes = attributes;
-	n->shallow_md.file_length = length;
+	n->shallow_md.file_length = file_length;
 
 	return n;
 }
@@ -39,16 +39,74 @@ vfs_node* vfs_find_child(vfs_node* node, char* name)
 	return 0;
 }
 
+vfs_node* vfs_get_dev()
+{
+	return vfs_find_child(root, "dev");
+}
+
+vfs_node* vfs_get_root()
+{
+	return root;
+}
+
+vfs_node* vfs_find_relative_node(vfs_node* start, char* path)
+{
+	//expected path: something/folder/another_folder/file.txt  (or just something till a folder level). No leading slash
+	if (path == 0)
+		return 0;
+
+	vfs_node* next = start;
+	char* slash;
+
+	while (true)
+	{
+		slash = strchr(path, '/');
+
+		if (slash == 0)		// remaining path contains no slashes
+		{
+			// just find the last-on-path node and return
+			next = vfs_find_child(next, path);
+			return next;
+		}
+		else
+		{
+			*slash = 0;							// null terminate the path substring to make it a temp string
+
+			next = vfs_find_child(next, path);
+
+			*slash = '/';						// restore the substring
+			path = slash + 1;					// continue to the next substring
+		}
+
+		if (next == 0)	// path could not be constructed. Child not found
+			return 0;
+	}
+
+	return 0;
+}
+
+vfs_node* vfs_find_node(char* path)
+{
+	//expected path: something/folder/another_folder/file.txt  (or just something till a folder level). No leading slash
+	return vfs_find_relative_node(vfs_get_root(), path);
+}
+
+void* vfs_create_device(char* name, uint32 deep_metadata_length)
+{
+	auto node = vfs_create_node(name, true, VFS_DEVICE | VFS_READ, 0, deep_metadata_length);
+
+	if (node == 0)
+		return 0;
+
+	list_insert_back(&vfs_get_dev()->children, node);
+	return node->deep_md;
+}
+
 void init_vfs()
 {
 	// create root - /dev
 	root = vfs_create_node("root", false, 0, 0, 0);
-	auto dev = vfs_create_node("dev", false, 0, 0, 0);
-
-	list_insert_back(&root->children, dev);
-
-	list_insert_back(&dev->children, vfs_create_node("sda", false, 0, 0, 0));
-	list_insert_back(&dev->children, vfs_create_node("sdb", false, 0, 0, 0));
+	list_insert_back(&root->children, vfs_create_node("dev", false, 0, 0, 0));
 }
 
 void print_vfs(vfs_node* node, int level)
@@ -69,20 +127,15 @@ void print_vfs(vfs_node* node, int level)
 
 void vfs_print_node(vfs_node* node)
 {
+	if (node == 0)
+	{
+		printf("null node");
+		return;
+	}
 	printf("%s\t%u bytes, %u", node->shallow_md.name, node->shallow_md.file_length, node->shallow_md.attributes);
 }
 
-void vfs_test()
+void vfs_print_all()
 {
-	init_vfs();
-
-	auto temp = vfs_create_node("folder", false, 0, 0, 0);
-	auto temp2 = vfs_create_node("michalis.txt", false, 0, 1, 0);
-
-	list_insert_back(&root->children, temp);
-	list_insert_back(&vfs_find_child(root, "folder")->children, temp2);
-
 	print_vfs(root, 0);
-
-	printfln("finish");
 }
