@@ -7,7 +7,6 @@ extern "C" {
 
 #include "system.h"
 #include "isr.h"
-	//#include "timer.h"
 
 #define PIT_CLOCK_CYCLE			1193180	// hz
 

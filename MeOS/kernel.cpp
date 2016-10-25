@@ -16,6 +16,10 @@
 #include "mngr_device.h"
 
 #include "process.h"
+#include "mutex.h"
+
+#include "vfs.h"
+#include "FAT32_fs.h"
 
 extern "C" uint8 canOutput = 1;
 extern HBA_MEM_t* ab;
@@ -140,22 +144,48 @@ void Run()
 	}
 }
 
+int a = 0;
+mutex m;
+
 void test1()
 {
-	printfln("Hello everyone");
-	sleep(3000);
-	printfln("Thread 1");
+	for (int i = 0; i < 10000000; i++)
+	{
+		while (mutex_try_acquire(&m) == false);
+
+		__asm
+		{
+			mov eax, dword ptr[a]
+			inc eax
+			pause
+			mov dword ptr[a], eax
+		}
+		mutex_release(&m);
+	}
+
+	printfln("test1 a=%u", a);
 	while (true);
 }
 
 void test2()
 {
-	printfln("hello from the other side");
-	while (true)
+	for (int i = 0; i < 10000000; i++)
 	{
-		sleep(3000);
-		printfln("Thread 2");
+		mutex_acquire(&m);
+
+		__asm
+		{
+			mov eax, dword ptr[a]
+			inc eax
+			pause
+			mov dword ptr[a], eax
+		}
+		mutex_release(&m);
 	}
+
+	printfln("test2 a=%u", a);
+
+	while (true);
 }
 
 void idle()
@@ -163,8 +193,7 @@ void idle()
 	while (true) _asm pause;
 }
 
-#include "vfs.h"
-#include "FAT32_fs.h"
+#include "ordered_vector.h"
 
 int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 {
@@ -235,42 +264,19 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	uint32 ahci_base = 0x200000;
 	init_ahci(abar, ahci_base + ahci_base % 1024);	// ahci must be 1K aligned. (otherwise... crash)
 
-	//ahci_send_identify(0, (VOID PTR)addr);
-	//printfln("\nIdentification sector count: %u", *(uint32*)(buf + 120));
-
-	//init_device_manager();
-
-	//vfs_print_all();
-
-	/*ahci_storage_info* info = (ahci_storage_info*)vfs_find_child(vfs_get_dev(), "sd1")->deep_md;
-	print(ahci_read(info, 2, 0));
-
-	printfln("end read");*/
-
-	/*auto disk = vfs_find_child(vfs_get_dev(), "sdb");
-	list<vfs_node*> l = simple_fs_mount((mass_storage_info*)disk->deep_md);
-
-	auto node = vfs_create_node("sdb_mount", false, 0, 0, 0);
-	node->children = l;
-	list_insert_back(&vfs_get_root()->children, node);
-
-	vfs_print_all();*/
-
 	ClearScreen();
 
-	auto disk = vfs_find_child(vfs_get_dev(), "sdc");
-	auto l = fat_fs_mount((mass_storage_info*)disk->deep_md);
+	/*auto disk = vfs_find_child(vfs_get_dev(), "sdc");
+	auto hierarchy = fat_fs_mount("sdc_mount", (mass_storage_info*)disk->deep_md);
 
-	auto node = vfs_create_node("sdc_mount", false, 0, 0, 0);
-	node->children = l;
-	list_insert_back(&vfs_get_root()->children, node);
+	list_insert_back(&vfs_get_root()->children, hierarchy);
 
 	vfs_print_all();
 
 	char* path = "sdc_mount/BEST.TXT";
 	vfs_node* n = vfs_find_node(path);
 
-	fat_fs_load_file_layout((mass_storage_info*)disk->deep_md, n);
+	fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, (mass_storage_info*)disk->deep_md, n);
 	fat_file_layout layout = *(fat_file_layout*)n->deep_md;
 
 	auto l_node = layout.head;
@@ -282,12 +288,36 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 		l_node = l_node->next;
 	}
 
-	while (true);		// block multi-tasking for VFS establishment
+	//while (true);		// block multi-tasking for VFS establishment*/
 
 	ClearScreen();
 
 	init_multitasking();
 	process_create("TestDLL.exe");
+	mutex_init(&m);
+
+	ordered_vector<int> x;
+	ordered_vector_init(&x);
+
+	ordered_vector_insert(&x, 10);
+	ordered_vector_insert(&x, 5);
+	ordered_vector_insert(&x, 12);
+	ordered_vector_insert(&x, 7);
+	ordered_vector_insert(&x, 1);
+
+	for (int i = 0; i < x.count; i++)
+		printf("%u ", x.data[i]);
+
+	printfln("");
+
+	printfln("10 at %u", ordered_vector_find(&x, 1));
+	printfln("10 at %u", ordered_vector_find(&x, 12));
+
+	ordered_vector_remove(&x, ordered_vector_find(&x, 10));
+
+	printfln("10 at %u", ordered_vector_find(&x, 12));
+
+	printfln("");
 
 	//uint32 id = process_create("TestDLL.exe");
 
@@ -302,22 +332,20 @@ int kmain(multiboot_info* boot_info, uint32 memory_map_len)
 	vmmngr_map_page(p->page_dir, phys, 0x600000 - 4096, DEFAULT_FLAGS);
 
 	thread_create(p, (uint32)test2, 0x600000);		// create test2 task
-	thread_create(p, (uint32)Run, 0x700000);
+	thread_create(p, (uint32)test1, 0x700000);
 
 	print_ready_queue();
 
 	TCB* t = ready_queue.head->data;
 
 	_asm cli
-	start();
+	multitasking_start();
 	_asm sti
 
 	thread_execute(*t);
 	///////////////////////////////////////
 
 	Run();
-
-	//_asm cli
 
 	SetColor(DARK_RED, WHITE);
 	ClearScreen();

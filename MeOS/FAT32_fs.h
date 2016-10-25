@@ -107,14 +107,22 @@ enum FAT_DIR_ATTRIBUTES
 	FAT_VOLUME_ID = 8,
 	FAT_DIRECTORY = 16,
 	FAT_ARCHIVE = 32,
-	LFN = FAT_READ_ONLY | FAT_HIDDEN | FAT_SYSTEM | FAT_VOLUME_ID		// LONG FILE NAME
+	FAT_LFN = FAT_READ_ONLY | FAT_HIDDEN | FAT_SYSTEM | FAT_VOLUME_ID		// LONG FILE NAME
 };
-
-typedef list<uint32> fat_file_layout;
 
 #pragma pack(pop, 1)
 
-list<vfs_node*> fat_fs_mount(mass_storage_info* info);
-void fat_fs_load_file_layout(mass_storage_info* info, vfs_node* node);
+typedef list<uint32> fat_file_layout;
+
+struct fat_mount_data
+{
+	uint32 partition_offset;			// start of the FAT partition where the volume ID is located
+	uint32 fat_lba;
+	uint32 cluster_lba;
+	uint32 root_dir_first_cluster;
+};
+
+vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info);
+void fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node);
 
 #endif

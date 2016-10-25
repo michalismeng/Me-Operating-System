@@ -1,6 +1,8 @@
 #ifndef MASS_STORAGE_HEADERS_01102016
 #define MASS_STORAGE_HEADERS_01102016
 
+// this file contains the interface needed by anyone who wishes to send standard commands to a Mass Storage Device
+
 #include "types.h"
 
 struct mass_storage_info

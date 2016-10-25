@@ -5,7 +5,8 @@
 TCB* current_thread = 0;
 
 queue<TCB*> ready_queue;
-queue<TCB*> sleeping_queue;
+list<TCB*> sleeping_queue;
+list<TCB*> blocking_queue;
 
 queue<PCB> process_queue;
 
@@ -13,6 +14,7 @@ static uint32 lastID = 0;
 
 void thread_switch()
 {
+	// this must be an uninterruptable code section
 	if (ready_queue.count == 1)
 		return;
 
@@ -20,24 +22,110 @@ void thread_switch()
 	{
 		queue_insert(&ready_queue, current_thread);
 		queue_remove(&ready_queue);
+
 		current_thread = queue_peek(&ready_queue);
+		while (current_thread->state != THREAD_STATE::THREAD_READY)
+		{
+			queue_remove(&ready_queue);
+			current_thread = queue_peek(&ready_queue);
+		}
 
 		if (current_thread == 0)
 			DEBUG("thread null ERROR");
 	}
 }
 
+void thread_current_block()
+{
+	__asm
+	{
+		mov eax, 1
+		int 0x81
+	}
+}
+
+void thread_current_sleep(uint32 time)
+{
+	__asm
+	{
+		mov eax, 3
+		mov ebx, dword ptr[time]
+		int 0x81
+	}
+}
+
+void thread_notify(uint32 id)
+{
+	__asm
+	{
+		mov eax, 2
+		mov ebx, dword ptr[id]
+		int 0x81
+	}
+}
+
+TCB* thread_get_current()
+{
+	return current_thread;
+}
+
+// decreases by timeslice the sleep time of all threads in the sleep_queue
+void thread_dec_sleep_time()
+{
+	if (sleeping_queue.count == 0)
+		return;
+
+	list_node<TCB*>* ptr = sleeping_queue.head;
+	list_node<TCB*>* prev = 0;
+
+	while (ptr != 0)
+	{
+		auto thread = ptr->data;
+		if (1000 / frequency > ptr->data->sleep_time)
+		{
+			if (prev == 0)
+			{
+				list_remove_front(&sleeping_queue);
+				ptr = sleeping_queue.head;
+				prev = 0;
+			}
+			else
+			{
+				ptr = ptr->next;
+				list_remove(&sleeping_queue, prev);
+			}
+
+			thread->state = THREAD_READY;
+			thread->sleep_time = 0;
+			queue_insert(&ready_queue, thread);
+		}
+		else
+		{
+			thread->sleep_time -= 1000 / frequency;
+			prev = ptr;
+			ptr = ptr->next;
+		}
+	}
+}
+
 // public functions
+
+extern "C" void timer_callback(registers_t* regs);
 
 __declspec(naked) void scheduler_interrupt()
 {
 	__asm
 	{
+		cli
 		pushad
 
-		mov edx, [ticks]
-		inc edx
-		mov[ticks], edx
+		; push 0
+		call timer_callback
+		; add esp, 4
+
+		; mov edx, [ticks]
+		; inc edx
+		; mov[ticks], edx
 
 		cmp current_thread, 0
 		je no_tasks
@@ -52,11 +140,11 @@ __declspec(naked) void scheduler_interrupt()
 		mov eax, dword ptr[current_thread]
 		mov[eax], esp
 
-		call thread_switch
-
-		; switch address space using a neutral stack
+		// switch address space using a neutral stack
 
 		mov esp, 0x90000
+		call thread_switch
+		call thread_dec_sleep_time
 
 		mov eax, dword ptr[current_thread]	// deref current_thread
 		mov eax, [eax + 8]					// deref parent of thread
@@ -75,7 +163,6 @@ __declspec(naked) void scheduler_interrupt()
 		; restore registers saved at the time current task was preempted.These are not the segments above as esp has changed.
 
 		pop gs
-
 		pop fs
 		pop es
 		pop ds
@@ -89,9 +176,96 @@ __declspec(naked) void scheduler_interrupt()
 	}
 }
 
+__declspec(naked) void dispatcher_thread_current_block()
+{
+	if (current_thread->state != THREAD_STATE::THREAD_RUNNING && current_thread->state != THREAD_STATE::THREAD_READY)
+		PANIC("current thread error");	// iretd
+
+	THREAD_SAVE_STATE;
+
+	// TODO: remove blocked thread from ready queue inserted by thread switch
+	current_thread->state = THREAD_BLOCK;
+	list_insert_back(&blocking_queue, current_thread);		// insert thread in the blocking queue
+
+	thread_switch();
+	thread_execute(*current_thread);
+}
+
+__declspec(naked) void dispatcher_thread_current_sleep()
+{
+	if (current_thread->state != THREAD_STATE::THREAD_RUNNING && current_thread->state != THREAD_STATE::THREAD_READY)
+		PANIC("current thread sleep error");	// iretd
+
+	THREAD_SAVE_STATE;
+
+	// set sleep time. We cannot use local variables as this is a naked function
+	_asm
+	{
+		mov eax, dword ptr[current_thread]		// deref current_thread
+		mov dword ptr[eax + 12], ebx			// deref sleep_time and store ebx(actual sleep time value)
+	}
+
+	current_thread->state = THREAD_SLEEP;
+	list_insert_back(&sleeping_queue, current_thread);
+
+	thread_switch();
+	thread_execute(*current_thread);
+}
+
+void dispatcher_thread_notify(uint32 id)
+{
+	if (blocking_queue.count == 0)
+		return;
+
+	list_node<TCB*>* ptr = blocking_queue.head;
+	list_node<TCB*>* prev = 0;
+	TCB* thread = 0;
+
+	while (ptr != 0)
+	{
+		if (ptr->data->id == id)
+		{
+			thread = ptr->data;
+			list_remove(&blocking_queue, prev);
+		}
+		prev = ptr;
+		ptr = ptr->next;
+	}
+
+	if (thread == 0)
+		return;
+
+	thread->state = THREAD_STATE::THREAD_READY;
+	queue_insert(&ready_queue, thread);
+}
+
+extern "C" __declspec(naked) void process_dispatcher()
+{
+	__asm
+	{
+		cmp eax, 1
+		je dispatcher_thread_current_block
+
+		cmp eax, 3										// ebx stores the amount of milliseconds to sleep
+		je dispatcher_thread_current_sleep				// put the currently executing thread to sleep
+
+		cmp eax, 2
+		jne _next
+
+		push ebx
+		call dispatcher_thread_notify					// thread id to awake is loaded into ebx register
+		add esp, 4
+
+		_next :
+		iretd
+	}
+}
+
 void init_multitasking()
 {
 	queue_init(&ready_queue);
+	list_init(&sleeping_queue);
+	list_init(&blocking_queue);
 }
 
 void thread_setup_stack(TCB* t, uint32 entry, uint32 esp)
@@ -101,7 +275,7 @@ void thread_setup_stack(TCB* t, uint32 entry, uint32 esp)
 	esp -= sizeof(trap_frame);		// prepare esp for manual data push
 	f = (trap_frame*)esp;
 
-	/* manual setup of the task's stack */
+	/* manual setup of the thread's stack */
 	f->flags = 0x202;		// IF set along with some ?reserved? bit
 	f->cs = 0x8;
 	f->ds = 0x10;
@@ -241,6 +415,7 @@ uint32 thread_create(PCB* parent, uint32 entry, uint32 esp)
 	t->id = ++lastID;
 	t->parent = parent;
 	t->stack_base = (void*)esp;
+	t->state = THREAD_STATE::THREAD_READY;
 
 	pdirectory* old_dir = vmmngr_get_directory();
 	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
@@ -257,6 +432,7 @@ void thread_execute(TCB t)
 {
 	__asm
 	{
+		// get the new address space
 		mov eax, t.parent
 		mov eax, [eax]
 
@@ -268,18 +444,22 @@ void thread_execute(TCB t)
 		; make a good stack
 		add esp, 8
 
+		// restore stack where all thread data where saved
 		mov esp, t.esp
+
+		// and pop them
 		pop gs
 		pop fs
 		pop es
 		pop ds
+
 		popad
 
 		iretd
 	}
 }
 
-void start()
+void multitasking_start()
 {
 	current_thread = queue_peek(&ready_queue);
 }
@@ -315,7 +495,6 @@ bool validate_PE_image(void* image)
 
 void print_ready_queue()
 {
-	//printfln("printing ready queue.");
 	if (ready_queue.count == 0)
 		return;
 
@@ -323,7 +502,7 @@ void print_ready_queue()
 	printfln("ready queue count: %u", ready_queue.count);
 	while (ptr != 0)
 	{
-		printfln("Task: %h with address space at: %h and esp: %h", ptr->data, ptr->data->parent->page_dir, ptr->data->esp);
+		printfln("Task: %h with address space at: %h and esp: %h", ptr->data->id, ptr->data->parent->page_dir, ptr->data->esp);
 		ptr = ptr->next;
 	}
 }

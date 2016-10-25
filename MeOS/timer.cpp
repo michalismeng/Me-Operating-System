@@ -9,21 +9,27 @@ void timer_callback(registers_t* regs)
 	uint16 x = cursorX, y = cursorY;
 
 	SetCursor(0, SCREEN_HEIGHT - 2);
-	printf("%u", ticks);
+	printf("t=%u m=%u", ticks, millis());
 	SetCursor(x, y);
 }
 
 uint32 millis()
 {
-	if (frequency == 0)		// TODO: Sometimes we get division by zero on ahci port 0 rebase. check that
+	if (frequency == 0)
 		PANIC("Zero freq");
 	return (1000 * ticks) / frequency;
 }
 
 void sleep(uint32 _time)
 {
-	uint32 start = millis();
-	while (millis() < start + _time);
+	//uint32 start = millis();
+	//while (millis() < start + _time);
+	__asm
+	{
+		mov eax, 3
+		mov ebx, dword ptr[_time]
+		int 0x81
+	}
 }
 
 Timer::Timer()

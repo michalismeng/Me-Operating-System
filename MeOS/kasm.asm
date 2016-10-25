@@ -124,6 +124,7 @@ IRQ 14, 46
 IRQ 15, 47
 
 extern scheduler_interrupt : near
+extern process_dispatcher : near
 
 irq0 PROC		; special handle for the timer interrupt as this is where our scheduler messes with the stack
 
@@ -131,6 +132,13 @@ irq0 PROC		; special handle for the timer interrupt as this is where our schedul
 	jmp scheduler_interrupt
 
 irq0 ENDP
+
+isr129 PROC
+
+	cli
+	jmp process_dispatcher ; special handle for process suspension/notification routines
+
+isr129 ENDP
 
 extern isr_handler : near
 extern irq_handler : near

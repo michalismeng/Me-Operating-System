@@ -13,6 +13,16 @@ extern "C" {
 #include "mmngr_virtual.h"
 #include "PE_Definitions.h"
 
+#define THREAD_SAVE_STATE \
+_asm	pushad \
+_asm	push ds \
+_asm	push es \
+_asm	push fs \
+_asm	push gs \
+_asm	mov eax, dword ptr[current_thread] \
+_asm	mov[eax], esp \
+_asm	mov esp, 0x90000
+
 	extern volatile uint32 ticks;
 
 	enum THREAD_STATE {
@@ -57,6 +67,7 @@ extern "C" {
 		uint32 ss;
 
 		PCB* parent;			// parent process that created this thread.
+		uint32 sleep_time;		// time in millis of thread sleep. Used for the sleep function
 
 		uint32 id;				// thread unique id
 		uint32 priority;		// thread priority
@@ -80,22 +91,26 @@ extern "C" {
 	}PCB;
 
 	extern queue<TCB*> ready_queue;
+	extern uint32 frequency;
 
 	void scheduler_interrupt();
 
 	void init_multitasking();
+	void multitasking_start();
 
 	uint32 process_create(char* app_name);
 	uint32 thread_create(PCB* parent, uint32 entry, uint32 esp);
 	void thread_execute(TCB t);
+	void thread_switch();
 
-	void start();
+	void thread_current_block();
+	void thread_current_sleep(uint32 time);
+	void thread_notify(uint32 id);
+
+	TCB* thread_get_current();
 
 	bool validate_PE_image(void* image);
-
 	void print_ready_queue();
-
-	void thread_switch();
 
 #ifdef __cplusplus
 }

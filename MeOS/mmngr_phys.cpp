@@ -318,4 +318,6 @@ physical_addr pmmngr_get_PDBR()
 		mov	eax, cr3
 		mov dword ptr[addr], eax
 	}
+
+	return addr;
 }

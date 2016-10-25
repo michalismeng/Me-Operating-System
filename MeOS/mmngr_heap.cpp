@@ -139,7 +139,7 @@ void* heap_realloc(heap* h, void* address, uint32 new_size)
 	if (block_size == new_size)
 		return address;
 
-	if (new_size < block_size)		// request to shrink allocated space
+	/*if (new_size < block_size)		// request to shrink allocated space
 	{
 		// try squeeze a new block
 		if (heap_is_next_unused(block))			// only one front merge required to squeeze a block
@@ -162,16 +162,18 @@ void* heap_realloc(heap* h, void* address, uint32 new_size)
 		}
 	}
 	else
-		return address;		// re-allocation does nothing as 'new_size' equals the currently allocated 'block_size'
+		return address;		// re-allocation does nothing as 'new_size' equals the currently allocated 'block_size'*/
 
-#ifdef HEAP_REALLOC_FIRST_IMPLEMENT
-	uint32 block_size = heap_block_size(h, block);
+#ifndef HEAP_REALLOC_FIRST_IMPLEMENT
+		//uint32 block_size = heap_block_size(h, block);
 
 	void* new_addr = heap_alloc(h, new_size);
 	if (new_addr == 0)
 		return 0;
 
 	memcpy(new_addr, address, min(block_size, new_size));
+	heap_free(h, address);
+
 	return new_addr;
 #endif
 }

@@ -73,3 +73,35 @@ void outportl(uint16 _port, uint32 _data)
 		out dx, eax			// MAJOR BUG: |out dx, ax| sends 16-bit value out
 	}
 }
+
+inline void int_off()
+{
+	_asm cli
+}
+
+inline void int_on()
+{
+	_asm sti
+}
+
+void int_gen(uint8 num)
+{
+	__asm
+	{
+		push eax
+		mov al, byte ptr[num]
+		mov byte ptr[label + 1], al
+		pop eax
+		label :
+		int 0
+	}
+}
+
+__declspec(naked) uint32 get_eip()
+{
+	__asm
+	{
+		mov eax, dword ptr[esp]
+		ret
+	}
+}

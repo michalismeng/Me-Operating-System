@@ -102,6 +102,9 @@ void vmmngr_free_page(pt_entry* entry)
 
 bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr)
 {
+	if (pmmngr_get_PDBR() == pdbr)
+		return false;
+
 	if (!dir)
 		return false;
 	current_directory = dir;

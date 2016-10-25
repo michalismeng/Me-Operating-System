@@ -11,24 +11,60 @@ uint32 fat_fs_get_next_cluster(mass_storage_info* info, uint32 fat_lba, uint32 c
 }
 
 // returns a compressed 8.3 (max 13 characters) with ALL spaces killed
-void fat_fs_retrive_short_name(char* name, char* extension, char buffer[13])
+void fat_fs_retrieve_short_name(fat_dir_entry_short* entry, char buffer[13])
 {
 	buffer[12] = 0;
 	uint8 name_index = 0;
 
 	for (uint8 i = 0; i < 8; i++)
-		if (name[i] != ' ')
-			buffer[name_index++] = name[i];
+		if (entry->name[i] != ' ')
+			buffer[name_index++] = entry->name[i];
 
 	buffer[name_index++] = '.';
 	uint8 prev_index = name_index;
 
 	for (uint8 i = 0; i < 3; i++)
-		if (extension[i] != ' ')
-			buffer[name_index++] = extension[i];
+		if (entry->extension[i] != ' ')
+			buffer[name_index++] = entry->extension[i];
 
 	if (name_index == prev_index)		// all three extension chars were spaces so delete . as this is (perhaps) a folder
 		buffer[--name_index] = 0;
+}
+
+// TODO: FIX THAAAAT
+void fat_fs_retrieve_long_name(fat_dir_entry_long* entry, char name[256])
+{
+	uint8 index = entry->order & ~0x40 - 1;		// all entry orders start at 1
+	bool name_end = false;						// detects a null terminator
+
+	for (uint8 i = 0; i < 5 && !name_end; i++)
+	{
+		if (entry->name1_5[i * 2] == 0)				// name is over so copy the last null termination and mark the end
+			name_end = true;
+
+		name[index * 13 + i] = entry->name1_5[i * 2];
+	}
+
+	for (uint8 i = 0; i < 6 && !name_end; i++)
+	{
+		if (entry->name6_11[i * 2] == 0)			// name is over so copy the last null termination and mark the end
+			name_end = true;
+
+		name[5 + index * 13 + i] = entry->name6_11[i * 2];
+	}
+
+	for (uint8 i = 0; i < 2 && !name_end; i++)
+	{
+		if (entry->name12_13[i * 2] == 0)			// name is over so copy the last null termination and mark the end
+			name_end = true;
+
+		name[index * 13 + i] = entry->name12_13[i * 2];
+	}
+
+	// if this is the last order entry and
+	// the name length is a multiple of 13 then there is no null paddind so we need to add it ourselves
+	if ((entry->order & 0x40) == 0x40 && !name_end)
+		name[index * 13 + 13] = 0;
 }
 
 inline uint32 fat_fs_get_entry_cluster(fat_dir_entry_short* e)
@@ -36,7 +72,42 @@ inline uint32 fat_fs_get_entry_cluster(fat_dir_entry_short* e)
 	return e->cluster_low + ((uint32)e->cluster_high & 0x0FFFFFFF);
 }
 
-//void fat_fs_create_long_entry()
+vfs_node* fat_fs_read_long_directory(mass_storage_info* info, uint32 fat_lba, uint32 cluster_lba,
+	uint32 current_cluster, fat_dir_entry_long* buffer_base, uint8& index)
+{
+	// we take the base buffer so that index can be used.
+	bool over = false;
+	char name[256] = { 0 };
+
+	uint32 offset = current_cluster;
+
+	while (true)
+	{
+		for (uint8 i = index; i < 16; i++)
+		{
+			fat_dir_entry_long* entry = buffer_base + i;
+
+			if ((entry->attributes & FAT_LFN) != FAT_LFN)		// this is a short entry so we are finished
+			{
+				index = i;
+
+				fat_dir_entry_short* s_entry = (fat_dir_entry_short*)entry;
+
+				//return vfs_create_node(name, true,  );
+			}
+
+			fat_fs_retrieve_long_name(entry, name);
+		}
+
+		offset = fat_fs_get_next_cluster(info, fat_lba, offset);
+		if (offset >= FAT_EOF)		// test for end of file marker
+			break;
+
+		buffer_base = (fat_dir_entry_long*)info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
+	}
+
+	return 0;
+}
 
 // starting at current_cluster reads directories and files. Perhaps they will span more than one cluster.
 list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, uint32 cluster_lba, uint32 current_cluster)
@@ -47,6 +118,8 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 	// used to follow the cluster chain for directories
 	uint32 offset = current_cluster;
 
+	bool working_on_lfn = false;
+
 	while (true)
 	{
 		fat_dir_entry_short* entry = (fat_dir_entry_short*)info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
@@ -55,19 +128,25 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 		for (uint8 i = 0; i < 16; i++)
 		{
 			if (entry[i].name[0] == 0)			// end
+			{
+				working_on_lfn = false;
 				break;
+			}
 
 			if (entry[i].name[0] == 0xE5)		//unused entry
+			{
+				working_on_lfn = false;
 				continue;
-
-			if ((entry[i].attributes & LFN) == LFN)		// this is along file name directory/file
-				printfln("long file name detected");
+			}
 
 			if ((entry[i].attributes & FAT_VOLUME_ID) == FAT_VOLUME_ID)		// volume id
+			{
+				working_on_lfn = false;
 				continue;
+			}
 
-			char name[13] = { 0 };			// fix 8.3 name
-			fat_fs_retrive_short_name((char*)entry[i].name, (char*)entry[i].extension, name);
+			char name[13] = { 0 };
+			fat_fs_retrieve_short_name(entry + i, name);
 
 			uint32 attrs = 0;
 			list<vfs_node*> children;
@@ -112,7 +191,7 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 	return l;
 }
 
-list<vfs_node*> fat_fs_mount(mass_storage_info* info)
+vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info)
 {
 	// read the whole root directory (all clusters) and load all folders and files
 
@@ -132,23 +211,31 @@ list<vfs_node*> fat_fs_mount(mass_storage_info* info)
 	uint32 root_dir_first_cluster = volume->extended.root_cluster_lba;
 
 	// read root directory along with each sub directory
-	return fat_fs_read_directory(info, fat_lba, cluster_lba, root_dir_first_cluster);
+	list<vfs_node*> hierarchy = fat_fs_read_directory(info, fat_lba, cluster_lba, root_dir_first_cluster);
+
+	// create the vfs mount point node and get the mount data pointer
+	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_DIRECTORY, 0, sizeof(fat_mount_data));
+	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
+
+	// set the mount point children to the list hierarchy just created
+	mount_point->children = hierarchy;
+
+	// load the data at the mount point
+	mount_data->cluster_lba = cluster_lba;
+	mount_data->fat_lba = fat_lba;
+	mount_data->partition_offset = partiton_offset;
+	mount_data->root_dir_first_cluster = root_dir_first_cluster;
+
+	return mount_point;
 }
 
-void fat_fs_load_file_layout(mass_storage_info* info, vfs_node* node)
+void fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node)
 {
-	// TODO: Remove these and take the mount point holding this info
-	fat_mbr* buffer = (fat_mbr*)info->entry_point(0, info, 0, 0, 1);
-	uint32 partiton_offset = buffer->primary_partition.lba_offset;
-	fat_volume_id* volume = (fat_volume_id*)info->entry_point(0, info, partiton_offset, 0, 1);
-	uint32 fat_lba = partiton_offset + volume->reserved_sector_count;
-	////////////////////
-
 	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
 
 	while (true)
 	{
-		uint32 next_cluster = fat_fs_get_next_cluster(info, fat_lba, layout->tail->data);
+		uint32 next_cluster = fat_fs_get_next_cluster(storgae_info, mount_info->fat_lba, layout->tail->data);
 		if (next_cluster >= FAT_EOF)
 			break;
 

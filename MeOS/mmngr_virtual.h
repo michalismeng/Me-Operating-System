@@ -16,6 +16,7 @@ extern "C" {
 
 #define PAGES_PER_TABLE 1024	// intel arch definitions
 #define TABLES_PER_DIR	1024
+#define PAGE_SIZE 4096
 
 #define DEFAULT_FLAGS I86_PDE_PRESENT | I86_PDE_WRITABLE	// default flags for page tables and pages.
 
