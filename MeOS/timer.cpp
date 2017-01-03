@@ -20,6 +20,11 @@ uint32 millis()
 	return (1000 * ticks) / frequency;
 }
 
+uint32 get_ticks()
+{
+	return ticks;
+}
+
 void sleep(uint32 _time)
 {
 	//uint32 start = millis();

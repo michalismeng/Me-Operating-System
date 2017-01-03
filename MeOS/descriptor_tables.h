@@ -49,14 +49,14 @@ extern "C" {
 	typedef struct idt_entry_struct	idt_entry_t;
 	typedef struct idt_ptr_struct	idt_ptr_t;
 
-	extern gdt_entry_t 	gdt_entries[5];
+	extern gdt_entry_t*	gdt_entries;
 	extern gdt_ptr_t 	gdt_ptr;
 
-	extern idt_entry_t 	idt_entries[256];
+	extern idt_entry_t*	idt_entries;
 	extern idt_ptr_t 	idt_ptr;
 
-	// initializes GDT and IDT
-	void init_descriptor_tables();
+	// initializes GDT and IDT based on values fetched by the loader
+	void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t* idt_base);
 
 	// initializes GDTs
 	void init_gdt();
@@ -105,8 +105,7 @@ extern "C" {
 	extern void isr29();
 	extern void isr30();
 	extern void isr31();
-	extern void isr128();
-	extern void isr129();
+	extern void isr128();  // scheduler interrupt
 	///////////////////////////
 
 	// asm externals of hardware interrupt handlers

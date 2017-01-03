@@ -4,6 +4,9 @@
 #include "queue.h"
 #include "Simple_fs.h"		// to be removed
 
+#include "vm_contract.h"
+#include "open_file_table.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,6 +15,18 @@ extern "C" {
 #include "utility.h"
 #include "mmngr_virtual.h"
 #include "PE_Definitions.h"
+
+	// setups interrupt frame for the thread (flags - cs - eip) based on the function's return eip
+	// assumes that function is naked
+#define THREAD_INTERRUPT_FRAME \
+_asm	pushfd	\
+_asm	push cs	\
+_asm	push eax \
+_asm	mov eax, dword ptr[esp + 12]	\
+_asm	xchg eax, dword ptr[esp + 4]	\
+_asm	xchg eax, dword ptr[esp + 8]	\
+_asm	xchg eax, dword ptr[esp + 12]	\
+_asm	pop eax	\
 
 #define THREAD_SAVE_STATE \
 _asm	pushad \
@@ -31,6 +46,13 @@ _asm	mov esp, 0x90000
 		THREAD_READY,			// task resides in the ready queue where it waits to be scheduled to run.
 		THREAD_RUNNING,			// task does not reside in any queue as it is currently running.
 		THREAD_BLOCK			// task resides in the block queue as it has requested blocking I/O service and waits for it to finish.
+	};
+
+	enum THREAD_ATTRIBUTE {
+		THREAD_ATTR_NONE,
+		THREAD_KERNEL = 1,					// thread is solely kernel => it does not have a user counter-part
+		THREAD_NONPREEMPT = 1 << 1,			// thread is non pre-emptible. This applies only to kernel threads. Preemption state may change during thread execution
+		THREAD_UNINTERRUPTIBLE = 1 << 2		// thread is uninterruptible on SIGNALS ! Interrupts affect this thread. (uninterruptible is not cli)
 	};
 
 #pragma pack(push, 1)
@@ -66,16 +88,19 @@ _asm	mov esp, 0x90000
 		uint32 esp;
 		uint32 ss;
 
-		PCB* parent;			// parent process that created this thread.
-		uint32 sleep_time;		// time in millis of thread sleep. Used for the sleep function
+		PCB* parent;					// parent process that created this thread.
+		uint32 sleep_time;				// time in millis of thread sleep. Used for the sleep function
 
-		uint32 id;				// thread unique id
-		uint32 priority;		// thread priority
+		uint32 id;						// thread unique id
 
-		void* stack_base;		// address of the base of the thread's stack
-		void* stack_limit;		// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
+		uint32 plus_priority;			// priority gained due to different factors such as waiting in the queues
+		uint32 base_priority;			// base priority given at the thread creation time
 
-		THREAD_STATE state;		// the current state of the thread
+		void* stack_base;				// address of the base of the thread's stack
+		void* stack_limit;				// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
+
+		THREAD_STATE state;				// the current state of the thread
+		THREAD_ATTRIBUTE attribute;		// thread's extra attribute info
 	}TCB;
 
 	typedef struct process_control_block
@@ -84,33 +109,22 @@ _asm	mov esp, 0x90000
 		process_control_block* parent;		// parent PCB that created us. PCB 0 has null parent
 		uint32 id;							// unique process id
 
+											// TODO: Perhaps these members will be erased
 		uint32 image_base;					// base of the image this task is running
 		uint32 image_size;					// size of the image this task is running
+
+		local_file_table lft;				// local open file table
+
+		vm_contract memory_contract;		// virtual memory layout
 
 		queue<TCB> threads;					// child threads of the process
 	}PCB;
 
-	extern queue<TCB*> ready_queue;
-	extern uint32 frequency;
-
-	void scheduler_interrupt();
-
-	void init_multitasking();
-	void multitasking_start();
-
-	uint32 process_create(char* app_name);
-	uint32 thread_create(PCB* parent, uint32 entry, uint32 esp);
-	void thread_execute(TCB t);
-	void thread_switch();
-
-	void thread_current_block();
-	void thread_current_sleep(uint32 time);
-	void thread_notify(uint32 id);
-
-	TCB* thread_get_current();
+	uint32 process_create_s(char* app_name);
+	PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 high_address);
+	TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority);
 
 	bool validate_PE_image(void* image);
-	void print_ready_queue();
 
 #ifdef __cplusplus
 }

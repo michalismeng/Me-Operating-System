@@ -1,9 +1,12 @@
 #include "mmngr_virtual.h"
+#include "thread_sched.h"
 
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
 
 pdirectory* kernel_directory = 0;		// kernel page directory
+
+extern TCB* current_thread;
 
 void page_fault(registers_struct* regs)
 {
@@ -14,14 +17,18 @@ void page_fault(registers_struct* regs)
 		mov dword ptr addr, eax
 	}
 
-	printfln("PAGE_FALUT: FAULTING ADDRESS: %h", addr);
+	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u", addr, current_thread->id);
 
 	if (addr > 0xF0000000)		// auto allocate space for MMIO
 		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
 	else
 	{
-		printfln("ERROR CODE: %u", regs->err_code);
-		PANIC("page fault");
+		if (vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr) == 0)
+			PANIC("could not find address in memory contract");
+		else
+			vmmngr_alloc_page(addr);
+
+		//printfln("ERROR CODE: %u", regs->err_code);
 	}
 }
 
@@ -40,7 +47,7 @@ void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uin
 	pt_entry* page = vmmngr_ptable_lookup_entry(table, virt);	// we have the page
 
 	*page = 0;												// delete possible previous information (pt_entry is just a uint32)
-	*page |= DEFAULT_FLAGS;									// and reset
+	*page |= flags;											// and reset
 	pt_entry_set_frame(page, phys);
 }
 
@@ -69,6 +76,11 @@ void vmmngr_initialize()
 }
 
 bool vmmngr_alloc_page(virtual_addr base)
+{
+	return vmmngr_alloc_page_f(base, DEFAULT_FLAGS);
+}
+
+bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags)
 {
 	//TODO: cater for memory mapped IO where (in the most simple case) an identity map must be done.
 	//TODO: fix this function
@@ -102,13 +114,14 @@ void vmmngr_free_page(pt_entry* entry)
 
 bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr)
 {
+	// if the page directory hasn't change do not flush cr3 as such an action is a performance hit
 	if (pmmngr_get_PDBR() == pdbr)
-		return false;
+		return true;
 
 	if (!dir)
 		return false;
-	current_directory = dir;
 
+	current_directory = dir;
 	current_pdbr = pdbr;
 
 	pmmngr_load_PDBR(current_pdbr);
@@ -256,4 +269,9 @@ void vmmngr_map_kernel_space(pdirectory* pdir)
 void vmmngr_switch_to_kernel_directory()
 {
 	vmmngr_switch_directory(kernel_directory, (physical_addr)kernel_directory);
+}
+
+uint32 vmmngr_get_page_size()
+{
+	return PAGE_SIZE;
 }

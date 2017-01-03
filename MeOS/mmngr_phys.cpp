@@ -27,7 +27,7 @@ inline bool mmap_test(int bit)
 }
 
 // returns first free block
-int mmap_first_free()
+uint32 mmap_first_free()
 {
 	for (uint32 i = 0; i < mmngr_max_blocks / 32; i++)	// 32 blocks per uint32
 	{
@@ -44,7 +44,7 @@ int mmap_first_free()
 		}
 	}
 
-	return -1;
+	return 0;
 }
 
 // returns the first count free blocks
@@ -82,7 +82,7 @@ int mmap_first_free_s(uint32 count)
 		bit++;
 	}
 
-	return -1;
+	return 0;
 }
 
 // modifies reg: base and length to be block aligned and to be within the former borders (new_base >= base and new_length <= length)
@@ -106,6 +106,20 @@ void pmmngr_block_align_region(physical_memory_region* reg)
 	reg->length = new_length;
 }
 
+uint32 pmmngr_get_next_align(uint32 value)
+{
+	if (value % PMMNGR_BLOCK_SIZE != 0)
+		return value + PMMNGR_BLOCK_SIZE - value % PMMNGR_BLOCK_SIZE;
+	return value;
+}
+
+uint32 pmmngr_get_prev_align(uint32 value)
+{
+	if (value % PMMNGR_BLOCK_SIZE != 0)
+		return value - value % PMMNGR_BLOCK_SIZE;
+	return value;
+}
+
 // INTERFACE FUNCTIONS
 
 void pmmngr_init(uint32 size, physical_addr base)
@@ -124,12 +138,11 @@ void pmmngr_free_region(physical_memory_region* region)
 	if (region->length == 0)		// error
 		return;
 
-	pmmngr_block_align_region(region);
+	if (region->length % PMMNGR_BLOCK_SIZE != 0 || region->base % PMMNGR_BLOCK_SIZE != 0)
+		PANIC("align error");
 
 	uint32 aligned_addr = region->base / PMMNGR_BLOCK_SIZE;
 	uint32 aligned_size = region->length / PMMNGR_BLOCK_SIZE;
-
-	printfln("init aligned addr: %h aligned size: %h", region->base, region->length);
 
 	for (int i = 0; i < aligned_size; i++)
 	{
@@ -152,12 +165,11 @@ void pmmngr_reserve_region(physical_memory_region* region)
 	if (region->length == 0)		// error
 		return;
 
-	pmmngr_block_align_region(region);
+	if (region->length % PMMNGR_BLOCK_SIZE != 0 || region->base % PMMNGR_BLOCK_SIZE != 0)
+		PANIC("align error");
 
 	uint32 aligned_addr = region->base / PMMNGR_BLOCK_SIZE;
 	uint32 aligned_size = region->length / PMMNGR_BLOCK_SIZE;
-
-	printfln("deinit aligned addr: %h aligned size: %h", aligned_addr, aligned_size);
 
 	for (int i = 0; i < aligned_size; i++)
 	{
@@ -174,9 +186,9 @@ void* pmmngr_alloc_block()
 	if (pmmngr_get_free_block_count() <= 0)		// out of memory
 		return 0;
 
-	int frame = mmap_first_free();
+	uint32 frame = mmap_first_free();
 
-	if (frame == -1)		// out of memory
+	if (frame == 0)		// out of memory
 		return 0;
 
 	mmap_set(frame);		// here we set directly without mmap_test as this is done in mmap_first_free
@@ -206,12 +218,12 @@ void* pmmngr_alloc_blocks(uint32 size)
 	if (pmmngr_get_free_block_count() < count)	// not enough memory
 		return 0;
 
-	int frame = mmap_first_free_s(count);
+	uint32 frame = mmap_first_free_s(count);
 
-	if (frame == -1)		// out of memory
+	if (frame == 0)		// out of memory
 		return 0;
 
-	for (int i = 0; i < count; i++)
+	for (uint32 i = 0; i < count; i++)
 		mmap_set(frame + i);
 
 	physical_addr addr = frame * PMMNGR_BLOCK_SIZE;

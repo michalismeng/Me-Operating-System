@@ -5,6 +5,7 @@
 #include "types.h"
 #include "memory.h"
 #include "list.h"
+#include "MassStorageDefinitions.h"
 
 enum VFS_ATTRIBUTES
 {
@@ -25,12 +26,23 @@ enum VFS_ERROR
 
 // vfs node structures
 
+struct vfs_node;
+
+// defines standard operation function pointers to underlying file system implementations
+struct fs_functions
+{
+	int(*fs_read)(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* file, uint32 page, virtual_addr address);
+	int(*fs_write)();
+};
+
 struct shallow_metadata
 {
-	char* name;				// file name
-	uint32 name_length;		// name length
-	uint32 attributes;		// file attributes
-	uint32 file_length;		// file length (bytes)
+	char* name;					// file name
+	uint32 name_length;			// name length
+	uint32 attributes;			// file attributes
+	uint32 file_length;			// file length (bytes)
+	fs_functions funcions;		// file operations
+
 	// ?? date_created - modified
 };
 
@@ -69,6 +81,10 @@ vfs_node* vfs_find_node(char* path);
 // initialize the virtual file system
 void init_vfs();
 
+// include read and write to and from page-cache functions
+int vfs_read_file(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* file, uint32 page, virtual_addr address);
+
+// vfs debug print functions
 void print_vfs(vfs_node* node, int level);
 void vfs_print_node(vfs_node* node);
 void vfs_print_all();

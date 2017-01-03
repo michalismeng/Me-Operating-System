@@ -22,7 +22,10 @@ void ordered_vector_init(ordered_vector<T>* v)
 	v->count = 0;
 
 	v->r_size = 1;
-	v->data = new T[1];
+	v->data = (T*)malloc(sizeof(T));
+
+	if (v->data == 0)
+		printfln("data is zero");
 }
 
 // reserve space for 'num_elements' keeping the current elements inside the vector untouched
@@ -32,7 +35,7 @@ void ordered_vector_reserve(ordered_vector<T>* v, int num_elements)
 	v->data = (T*)realloc(v->data, num_elements * sizeof(T));
 	if (v->data == 0)		// allocation error
 	{
-		PANIC("ERROR");
+		PANIC("Ordered vector received null data");
 		return;
 	}
 
@@ -42,7 +45,7 @@ void ordered_vector_reserve(ordered_vector<T>* v, int num_elements)
 }
 
 template<class T>
-void ordered_vector_insert(ordered_vector<T>* v, const T& data)
+void ordered_vector_insert(ordered_vector<T>* v, T& data)
 {
 	if (v->count == v->r_size)
 		ordered_vector_reserve(v, 2 * v->count);
@@ -50,25 +53,6 @@ void ordered_vector_insert(ordered_vector<T>* v, const T& data)
 	uint32 i = v->count;
 
 	while (i > 0 && data < v->data[i - 1])
-	{
-		v->data[i] = v->data[i - 1];
-		i--;
-	}
-
-	v->data[i] = data;
-	v->count++;
-}
-
-// TODO: FIX THIS COMPILE CRAPPY FUNCTION
-template<class T>
-void ordered_vector_insert(ordered_vector<T>* x, const T& data, ordered_vector_comp comp)
-{
-	if (v->count == v->r_size)
-		ordered_vector_reserve(v, 2 * v->count);
-
-	uint32 i = v->count;
-
-	while (i > 0 && comp(&data, &v->data[i - 1]) == -1)
 	{
 		v->data[i] = v->data[i - 1];
 		i--;
@@ -95,7 +79,7 @@ void ordered_vector_remove(ordered_vector<T>* v, uint32 index)
 }
 
 template<class T>
-uint32 ordered_vector_find(ordered_vector<T>* v, const T& data)
+uint32 ordered_vector_find(ordered_vector<T>* v, T& data)
 {
 	uint32 first = 0, last = v->count - 1;
 
@@ -118,7 +102,8 @@ template<class T>
 void ordered_vector_uninit(ordered_vector<T>* v)
 {
 	free(v->data);
-	ordered_vector_init(v);
+	v->count = 0;
+	v->r_size = 0;
 }
 
 #endif

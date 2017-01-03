@@ -1,0 +1,4 @@
+#ifndef SEMAPHORE_H_02012017
+#define SEMAPHORE_H_02012017
+
+#endif

@@ -46,6 +46,9 @@ typedef uint8* va_list;
 //#define sz2(arg_type) (4 - sizeof(arg_type) % 4)
 #define va_arg(pointer, arg_type) ( *(arg_type*)( (pointer += sz(arg_type)) - sz(arg_type) ) )
 
+// returns the current instruction pointer
+extern uint32 get_eip(void);
+
 #ifdef __cplusplus
 }
 #endif

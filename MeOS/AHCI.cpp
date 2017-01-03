@@ -21,8 +21,15 @@ void* ahci_main(uint32 ahci_command, ...)
 		DWORD startl = va_arg(l, DWORD);
 		DWORD starth = va_arg(l, DWORD);
 		DWORD count = va_arg(l, DWORD);
+		DWORD addr = va_arg(l, DWORD);
 
-		return ahci_read(info, startl, starth, count);
+		if (addr == 0)
+			return ahci_read(info, startl, starth, count);
+		else
+		{
+			ahci_read(info->volume_port, startl, starth, count, (VOID*)addr);
+			return 0;
+		}
 	}
 	}
 }

@@ -23,7 +23,7 @@ extern "C" {
 	typedef void(*isr_t)(registers_t* regs);
 	void register_interrupt_handler(uint8 n, isr_t handler);
 
-	extern isr_t interrupt_handlers[256];
+	extern isr_t* interrupt_handlers;
 
 #endif
 

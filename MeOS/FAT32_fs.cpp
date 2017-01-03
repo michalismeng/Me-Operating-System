@@ -5,7 +5,8 @@ uint32 fat_fs_get_next_cluster(mass_storage_info* info, uint32 fat_lba, uint32 c
 {
 	// each 512 byte sector has 128 fat entries. We need to find out which part of FAT to load
 	uint32 fat_offset = current_cluster / 128;
-	uint32* buffer = (uint32*)info->entry_point(0, info, fat_lba + fat_offset, 0, 8);	// read FAT portion
+	uint32* buffer = (uint32*)mass_storage_read(info, fat_lba + fat_offset, 0, 8, 0);		// read FAT portion(address does nothing)
+		// replaces: info->entry_point(0, info, fat_lba + fat_offset, 0, 8);
 
 	return buffer[current_cluster] & 0x0FFFFFFF;		// clear 4 top most bits as they are reserved (FAT28 as we implement)
 }
@@ -103,7 +104,8 @@ vfs_node* fat_fs_read_long_directory(mass_storage_info* info, uint32 fat_lba, ui
 		if (offset >= FAT_EOF)		// test for end of file marker
 			break;
 
-		buffer_base = (fat_dir_entry_long*)info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
+		buffer_base = (fat_dir_entry_long*)mass_storage_read(info, cluster_lba + (offset - 2) * 8, 0, 8, 0);
+		// replaces: info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
 	}
 
 	return 0;
@@ -122,9 +124,10 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 
 	while (true)
 	{
-		fat_dir_entry_short* entry = (fat_dir_entry_short*)info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
+		fat_dir_entry_short* entry = (fat_dir_entry_short*)mass_storage_read(info, cluster_lba + (offset - 2) * 8, 0, 8, 0);
+		// replaces: info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
 
-		// read all directory entries of this cluster. There are 16 entries as each is 32 bytes long
+	// read all directory entries of this cluster. There are 16 entries as each is 32 bytes long
 		for (uint8 i = 0; i < 16; i++)
 		{
 			if (entry[i].name[0] == 0)			// end
@@ -162,7 +165,8 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 					// This is a directory. It contains files and directories so read them all
 					uint32 clus = fat_fs_get_entry_cluster(entry + i);
 					children = fat_fs_read_directory(info, fat_lba, cluster_lba, clus);		// TODO: rethink this with buffers
-					info->entry_point(0, info, cluster_lba + current_cluster - 2, 0, 8);	// restore entry context.
+					mass_storage_read(info, cluster_lba + current_cluster - 2, 0, 8, 0);	// restore entry context.
+					//replaces: info->entry_point(0, info, cluster_lba + current_cluster - 2, 0, 8);
 				}
 			}
 			else
@@ -173,6 +177,7 @@ list<vfs_node*> fat_fs_read_directory(mass_storage_info* info, uint32 fat_lba, u
 			//attrs |= VFS_ATTRIBUTES::HIDDEN
 
 			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_file_layout));
+			node->shallow_md.funcions.fs_read = fat_fs_load_file;
 
 			// setup layout list and add the starting cluster
 			fat_file_layout* layout = (fat_file_layout*)node->deep_md;
@@ -199,11 +204,12 @@ vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info)
 	// TODO: move this part at partition/filesystem identification
 
 	// get the primary partition offset
-	fat_mbr* buffer = (fat_mbr*)info->entry_point(0, info, 0, 0, 1);
+	fat_mbr* buffer = (fat_mbr*)mass_storage_read(info, 0, 0, 1, 0);	//replaces: info->entry_point(0, info, 0, 0, 1);
 	uint32 partiton_offset = buffer->primary_partition.lba_offset;
 
 	// get the volume id of the primary partition
-	fat_volume_id* volume = (fat_volume_id*)info->entry_point(0, info, partiton_offset, 0, 1);
+	fat_volume_id* volume = (fat_volume_id*)mass_storage_read(info, partiton_offset, 0, 1, 0);
+	//replaces: info->entry_point(0, info, partiton_offset, 0, 1);
 
 	// gather important data
 	uint32 fat_lba = partiton_offset + volume->reserved_sector_count;
@@ -214,6 +220,7 @@ vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info)
 	list<vfs_node*> hierarchy = fat_fs_read_directory(info, fat_lba, cluster_lba, root_dir_first_cluster);
 
 	// create the vfs mount point node and get the mount data pointer
+	// TODO: Change VFS_DIRECTORY to VFS_MOUNT_POINT
 	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_DIRECTORY, 0, sizeof(fat_mount_data));
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
 
@@ -241,4 +248,25 @@ void fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* stor
 
 		list_insert_back(layout, next_cluster);
 	}
+}
+
+int fat_fs_load_file(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
+	uint32 file_page, virtual_addr address)
+{
+	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
+	fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
+
+	if (layout->count == 0)
+		return -1;
+
+	auto l = layout->head;
+	for (int i = 0; i < file_page; i++)
+	{
+		if (l == 0)
+			return -1;
+		l = l->next;
+	}
+
+	mass_storage_read(storage_info, mount_info->cluster_lba + (l->data - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));
+	return 0;
 }

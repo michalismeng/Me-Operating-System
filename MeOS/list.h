@@ -7,6 +7,8 @@
 #include "utility.h"
 #include "memory.h"
 
+#define LIST_PEEK(l) l->head->data
+
 template<class T>
 struct list_node
 {
@@ -30,17 +32,42 @@ void list_init(list<T>* l)
 }
 
 template<class T>
-void list_remove(list<T>* l, list_node<T>* prev)
+list_node<T>* list_get_prev(list<T>* l, T item)
 {
 	if (l->count == 0)
-		return;
+		return 0;
+
+	if (l->count == 1)
+		return l->head;
+
+	list_node<T>* temp = l->head;
+
+	while (temp != 0)
+	{
+		if (temp->next->data == item)
+			return temp;
+
+		temp = temp->next;
+	}
+
+	return 0;
+}
+
+template<class T>
+bool list_remove(list<T>* l, list_node<T>* prev)
+{
+	if (prev == 0)
+		return false;
+
+	if (l->count == 0)
+		return false;
 
 	if (l->count == 1)		// prev == head
 	{
 		l->count--;
 		delete prev;
 		l->head = l->tail = 0;
-		return;
+		return true;
 	}
 
 	list_node<T>* temp = prev->next;
@@ -50,8 +77,13 @@ void list_remove(list<T>* l, list_node<T>* prev)
 	delete temp;
 	l->count--;
 
+	if (l->count == 1)
+		l->tail = l->head;
+
 	if (l->count == 0)
 		l->head = l->tail = 0;
+
+	return true;
 }
 
 template<class T>
@@ -116,6 +148,27 @@ void list_merge_back(list<T>* l1, list<T>* l2)
 
 	l2->count = 0;
 	l2->head = l2->tail = 0;
+}
+
+// moves the node 'actual' right after the node 'prev'
+template<class T>
+void list_move_node(list<T>* l, list_node<T>* actual, list_node<T>* prev)
+{
+	PANIC("list move node not implemented");
+}
+
+// moves the first node to the end of the list
+template<class T>
+void list_head_to_tail(list<T>* l)
+{
+	if (l->count == 0 || l->count == 1)
+		return;
+
+	// this order is very importan and must be exactly like that
+	l->tail->next = l->head;
+	l->tail = l->head;
+	l->head = l->head->next;
+	l->tail->next = 0;
 }
 
 #endif

@@ -3,7 +3,7 @@
 
 ; includes all protected mode 32 bit utilities
 
-%define KERNEL_RMODE_BASE 0x8200
+%define KERNEL_RMODE_BASE 0x10000
 %define KERNEL_PMODE_BASE 0xc0000000
 
 CopyKernel:
@@ -16,7 +16,7 @@ CopyKernel:
 	mov ebx, 512						; multiply sector by bytes per sector
 	mul ebx	
 
-	mov dword [kernel_size], eax
+	mov dword [krn_ldr], eax
 	
 	mov ebx, 4							; divide by four as we copy dword each time
 	div ebx
@@ -31,4 +31,19 @@ CopyKernel:
 	popa
 	ret
 
+GetKrnLdrSize:
+
+	pusha 
+	
+	mov eax, dword [0x7c00 + 14]		; get sectors loaded
+	sub eax, 2							; this is one sector for stage2
+	
+	mov ebx, 512						; multiply sector by bytes per sector
+	mul ebx	
+
+	mov dword [krn_ldr], eax
+		
+	popa
+	ret
+	
 %endif

@@ -1,37 +1,24 @@
 #include "descriptor_tables.h"
 
-gdt_entry_t gdt_entries[5];
-gdt_ptr_t 	gdt_ptr;
+gdt_entry_t* gdt_entries;
+gdt_ptr_t 	 gdt_ptr;
 
-idt_entry_t idt_entries[256];
+idt_entry_t* idt_entries;
 idt_ptr_t 	idt_ptr;
 
-isr_t interrupt_handlers[256];
-
-void DivisionByZero(registers_t* regs)
-{
-	PANIC("Divion by zero");
-}
-
-void GPF(registers_t* regs)
-{
-	PANIC("General Protection Fault");
-}
+isr_t* interrupt_handlers;
 
 void test_handle(registers_t* regs)
 {
 	printfln("message: %s", regs->ebx);
 }
 
-void init_descriptor_tables()
+void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t* idt_base)
 {
-	init_gdt();
-	init_idt();
+	gdt_entries = gdt_base;
+	interrupt_handlers = isr_base;
+	idt_entries = idt_base;
 
-	memset(&interrupt_handlers, 0, sizeof(isr_t) * 256);
-
-	register_interrupt_handler(0, DivisionByZero);
-	register_interrupt_handler(13, GPF);
 	register_interrupt_handler(0x80, test_handle);
 }
 
@@ -92,7 +79,6 @@ void init_idt()
 	idt_set_gate(31, (uint32)isr31, 0x08, 0x8E);
 
 	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
-	idt_set_gate(0x81, (uint32)isr129, 0x08, 0x8E);
 
 	idt_set_gate(32, (uint32)irq0, 0x08, 0x8E);
 	idt_set_gate(33, (uint32)irq1, 0x08, 0x8E);

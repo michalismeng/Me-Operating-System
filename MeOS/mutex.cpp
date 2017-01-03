@@ -13,7 +13,7 @@ void mutex_acquire(mutex* m)
 	while (m->lock == 1)
 	{
 		queue_insert(&m->waiting_threads, thread_get_current());
-		thread_current_block();
+		thread_block(thread_get_current());
 	}
 
 	m->lock = 1;
@@ -44,7 +44,7 @@ void mutex_release(mutex* m)
 
 	if (m->waiting_threads.count > 0)
 	{
-		thread_notify(queue_peek(&m->waiting_threads)->id);
+		thread_notify(queue_peek(&m->waiting_threads));
 		queue_remove(&m->waiting_threads);
 	}
 

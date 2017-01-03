@@ -22,8 +22,6 @@ extern "C" {
 	inline void int_on();
 	inline void int_gen(uint8 num);
 
-	uint32 get_eip();
-
 #define low_address(addr) (addr & 0x0000FFFF)
 #define high_address(addr) (addr >> 16)
 

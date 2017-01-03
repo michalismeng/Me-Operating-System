@@ -10,7 +10,7 @@ FILESYSTEM _fsysSimple;
 FILE fsysSimpleDirectory(const char* dir_name)
 {
 	char buf[512];
-	if (ahci_read(1, 0, 0, 1, buf) != AHCI_NO_ERROR)
+	if (ahci_read(0, 0, 0, 1, buf) != AHCI_NO_ERROR)
 		DEBUG("FS boot: Could not read");
 	// take bytes 6,7
 	uint32 volSize = *(uint32*)(buf + 2);
@@ -21,7 +21,7 @@ FILE fsysSimpleDirectory(const char* dir_name)
 
 	for (uint32 i = 0; i < sectorsToRead; i++)
 	{
-		if (ahci_read(1, firstIndexSector, 0, 1, buf) != AHCI_NO_ERROR)
+		if (ahci_read(0, firstIndexSector, 0, 1, buf) != AHCI_NO_ERROR)
 			DEBUG("FS dirs: Could not read");
 
 		for (int ind = 7; ind >= 0; ind--)
@@ -55,7 +55,7 @@ void fsysSimpleMount()
 
 void fsysSimpleRead(PFILE file, uint8* buffer, uint32 length)
 {
-	if (ahci_read(1, file->file_start + file->position / 512, 0, ceil_division(length, 512), buffer) != AHCIResult::AHCI_NO_ERROR)
+	if (ahci_read(0, file->file_start + file->position / 512, 0, ceil_division(length, 512), buffer) != AHCIResult::AHCI_NO_ERROR)
 		DEBUG("Could not read");
 
 	file->position += length;
@@ -98,7 +98,8 @@ list<vfs_node*> simple_fs_mount(mass_storage_info* info)
 	list<vfs_node*> l;
 	list_init(&l);
 
-	char* buf = (char*)info->entry_point(0, info, 0, 0, 1);
+	char* buf = (char*)mass_storage_read(info, 0, 0, 1, 0);
+	//replaces: info->entry_point(0, info, 0, 0, 1);
 
 	uint32 first_index_sector = *(uint32*)(buf + 6);
 	uint32 index_count = *(uint32*)(buf + 10);
@@ -110,7 +111,8 @@ list<vfs_node*> simple_fs_mount(mass_storage_info* info)
 	uint32 count = 0;
 	for (int i = 0; i < sectors_to_read; i++)
 	{
-		char* buffer = (char*)info->entry_point(0, info, info->volume_size - i - 1, 0, 1);
+		char* buffer = (char*)mass_storage_read(info, info->volume_size - i - 1, 0, 1, 0);
+		//replaces: info->entry_point(0, info, info->volume_size - i - 1, 0, 1);
 
 		for (int j = 0; j < 8; j++)
 		{

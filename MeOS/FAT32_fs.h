@@ -122,7 +122,15 @@ struct fat_mount_data
 	uint32 root_dir_first_cluster;
 };
 
+// mount the FAT32 filesystem using the 'mount_name'.
+// returns the pointer to the mount file head
 vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info);
+
+// loads the file's, pointed by 'node', cluster chain
 void fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node);
+
+// loads a page (4KB) at specified address
+int fat_fs_load_file(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
+	uint32 file_page, virtual_addr address);
 
 #endif

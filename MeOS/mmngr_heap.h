@@ -1,9 +1,6 @@
 #ifndef MMNGR_HEAP_H_14082016
 #define MMNGR_HEAP_H_14082016
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include "types.h"
 #include "utility.h"
@@ -49,9 +46,5 @@ extern "C" {
 
 	// displays the heap master entry along with info for every block allocated.
 	void heap_display(heap* h);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

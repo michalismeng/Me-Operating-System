@@ -1,6 +1,8 @@
 bits 16
 
-org 0x7e00
+%define STAGE2_BASE		 0xFC00
+%define STAGE2_BASE_HIGH 0xFC0
+org STAGE2_BASE
 
 jmp main
 
@@ -42,15 +44,17 @@ main:
 	
 	cli
 	
-	mov ax, 0		; we are loaded at 0x7e0:0
+	mov ax, 0				; we are loaded at 0xFC0:0
 	mov ds, ax
-	mov es, ax
 	mov fs, ax
 	mov gs, ax
+
+	mov ax, 0
+	mov es, ax
 	
 	mov ax, 0x9000
 	mov ss, ax
-	mov sp, 0xFFFF		   ; no no no stack at 0x7c0:0
+	mov sp, 0xFFFF		   ; no no no stack at 0xFC0:0
 	
 	sti
 	mov byte [drive], dl				; boot loader passes this info to us through dl just before it jumps
@@ -81,23 +85,14 @@ main:
 	mov di, 0x500		; es:di = 0x0:0x500
 	call BiosGetMemoryMap
 
-	; check if apm is supported
-	;mov ah, 53h
-	;mov al, 0
-	;xor bx, bx
-	;int 15h
+	mov dword [boot_info + multiboot_info.mmap_addr], 0x500 
+	mov eax, dword [memory_map_len]
+	mov dword [boot_info + multiboot_info.mmap_length], eax
 
-	;jc no_apm
-	
-	;cli
-	;hlt
-
-	;no_apm:
-	; Load global descriptor tables
 	cli
-	
-	lgdt [gdt_info]
 
+	lgdt [gdt_info]
+	
 	mov	eax, cr0			; set bit 0 in cr0--enter pmode
 	or	eax, 1
 	mov	cr0, eax
@@ -110,10 +105,10 @@ bits 32
 %include "Boot/common32.inc"
 %include "Boot/paging.inc"
 
-kernel_size dd 0
+krn_ldr dd 0
 
 Stage3:							; PMode here
-
+	
 	mov ax, 0x10				; change all other segments to point to data descriptor
 	mov ds, ax
 	mov es, ax
@@ -121,15 +116,15 @@ Stage3:							; PMode here
 	mov ss, ax
 	mov esp, 0x90000
 
-	call EnablePaging
+	;call EnablePaging
 	
-	call CopyKernel						; copy kernel to 3GB (virtual)
-	
-	mov edx, dword [kernel_size]		; size of kernel in bytes
-	
+	;call CopyKernel						; copy kernel to 3GB (virtual)
+
+	call GetKrnLdrSize
+		
 	; Do black magic stuff of PE format... (See brokenthorn Kernel Setup)
-	mov ebx, [KERNEL_PMODE_BASE + 60]
-	add ebx, KERNEL_PMODE_BASE
+	mov ebx, [KERNEL_RMODE_BASE + 60]
+	add ebx, KERNEL_RMODE_BASE
 	
 	add ebx, 24
 	mov eax, [ebx]
@@ -143,7 +138,7 @@ Stage3:							; PMode here
 	mov eax, 0x2BADB002
 	mov ebx, 0
 	
-	push dword [memory_map_len]
+	push dword [krn_ldr]
 	push dword boot_info
 
 	call ebp		; execute kernel

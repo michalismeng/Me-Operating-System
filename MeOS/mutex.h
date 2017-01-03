@@ -5,7 +5,7 @@
 #include "types.h"
 #include "utility.h"
 #include "queue.h"
-#include "process.h"
+#include "thread_sched.h"
 
 struct mutex
 {

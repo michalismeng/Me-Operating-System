@@ -1,5 +1,7 @@
 bits 16
 
+%define STAGE2_BASE_HIGH 0xFC0
+
 jmp short main				; short jump uses relative address (jmp +12 bytes) and not absolute. We want this as segments are not yet set and	
 							; we have used not org directive
 							
@@ -20,8 +22,6 @@ main:
 	mov     ss, ax
 	mov     sp, 0x7C00 
 	
-	mov ax, 0x7e0
-	mov es, ax
 	sti
 	
 	mov byte [drive], dl
@@ -36,6 +36,8 @@ main:
 	mov si, reset_done
 	call Print
 	
+	mov ax, STAGE2_BASE_HIGH				; kernel loader high address
+	mov es, ax
 	mov bx, 0x0								; buffer to read to (es:bx)
 	mov cl, 1								; LBA sector to start reading from used in GetTrack
 	mov dx, word [reserved_sectors]			; count of sectors to be read
@@ -60,7 +62,7 @@ main:
 	
 	mov dl, byte [drive]
 
-	jmp 0x07e0:0x0			; far jump to where we load
+	jmp STAGE2_BASE_HIGH:0x0			; far jump to where we load
 	
 	ne_it:
 	cli
