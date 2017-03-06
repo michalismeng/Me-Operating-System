@@ -91,8 +91,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER
 	uint32                NumberOfRvaAndSizes;
 
 	IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
-} IMAGE_OPTIONAL_HEADER,
-*PIMAGE_OPTIONAL_HEADER;
+} IMAGE_OPTIONAL_HEADER, *PIMAGE_OPTIONAL_HEADER;
 
 typedef struct _IMAGE_NT_HEADERS {
 	uint32					Signature;
@@ -100,5 +99,18 @@ typedef struct _IMAGE_NT_HEADERS {
 	IMAGE_OPTIONAL_HEADER	OptionalHeader;
 } IMAGE_NT_HEADERS,
 *PIMAGE_NT_HEADERS;
+
+typedef struct _IMAGE_SECTION_HEADER {
+	uint8 Name[8];
+	uint32 VirtualSize;
+	uint32 VirtualAddress;
+	uint32 SizeOfRawData;
+	uint32 PointerToRawData;
+	uint32 PointerToRelocations;
+	uint16 PointerToLineNumbers;
+	uint16 NumberOfRelocations;
+	uint32 NumberOfLineNumbers;
+	uint32 Characteristics;
+}IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
 #endif

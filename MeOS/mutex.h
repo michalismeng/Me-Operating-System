@@ -1,6 +1,8 @@
 #ifndef MUTEX_H_13102016
 #define MUTEX_H_13102016
 
+/* This primitive is to be replaced by the binary semaphore implementation */
+
 #include "system.h"
 #include "types.h"
 #include "utility.h"

@@ -14,54 +14,69 @@ enum VFS_ATTRIBUTES
 	VFS_DIRECTORY,			// 00010
 	VFS_LINK,				// 00011
 	VFS_DEVICE,				// 00100
+	VFS_MOUNT_PT,			// 00101
+	VFS_PIPE,				// 00110
 	VFS_READ = 8,			// 01000
 	VFS_WRITE = 16,			// 10000
+	VFS_HIDDEN = 32,
 };
 
 enum VFS_ERROR
 {
 	VFS_OK,
+	VFS_INVALID_NODE,
+	VFS_INVALID_NODE_STRUCTURE,
 	VFS_PATH_NOT_FOUND,
+	VFS_PAGE_NOT_FOUND,
+	VFS_READ_ERROR,
+	VFS_FILE_NOT_OPEN
 };
 
 // vfs node structures
 
 struct vfs_node;
-
-// defines standard operation function pointers to underlying file system implementations
-struct fs_functions
-{
-	int(*fs_read)(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* file, uint32 page, virtual_addr address);
-	int(*fs_write)();
-};
-
-struct shallow_metadata
-{
-	char* name;					// file name
-	uint32 name_length;			// name length
-	uint32 attributes;			// file attributes
-	uint32 file_length;			// file length (bytes)
-	fs_functions funcions;		// file operations
-
-	// ?? date_created - modified
-};
-
+typedef int vfs_result;
 typedef char* deep_metadata;
+
+struct fs_operations
+{
+	vfs_result(*fs_read)(vfs_node* file, uint32 page, virtual_addr address);
+	vfs_result(*fs_write)(vfs_node* file, uint32 page, virtual_addr address);
+	vfs_result(*fs_open)(vfs_node* node);
+	vfs_result(*fs_close)();
+	vfs_result(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
+	vfs_result(*fs_ioctl)(uint32 command, ...);
+};
 
 struct vfs_node
 {
-	shallow_metadata shallow_md;		// shallow metadata: fixed part of vfs node
-	list<vfs_node*> children;			// children list
-	char deep_md[];						// deep metadata:    file-system/attribute specific part of vfs node
+	// shallow metadata: fixed part of vfs node
+
+	char* name;						// file name
+	uint32 name_length;				// name length
+	uint32 attributes;				// file attributes
+	uint32 file_length;				// file length (bytes)
+	vfs_node* tag;					// data node associated with this node
+	bool is_open;					// sets wether this file is open or closed
+
+	fs_operations* fs_ops;			// file basic operations
+	list<vfs_node*> children;		// children list
+
+	// deep metadata:    file-system/attribute specific part of vfs node
+
+	char deep_md[];
 };
 
 // vfs node list definitions
 
 // create a virtual file system node. Parameter name should be null terminated.
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length);
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, fs_operations* file_fncs);
 
 // create a virtual file system device node and return it's deep metadata ptr
-void* vfs_create_device(char* name, uint32 deep_metadata_length);
+vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs);
+
+// attaches a child node to its parent
+void vfs_add_child(vfs_node* parent, vfs_node* child);
 
 // find the child of a node based on its name
 vfs_node* vfs_find_child(vfs_node* node, char* name);
@@ -82,7 +97,19 @@ vfs_node* vfs_find_node(char* path);
 void init_vfs();
 
 // include read and write to and from page-cache functions
-int vfs_read_file(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* file, uint32 page, virtual_addr address);
+vfs_result vfs_read_file(vfs_node* node, uint32 page, virtual_addr address);
+
+// opens a file for operations. (Loads its drive layout)
+vfs_result vfs_open_file(vfs_node* node);
+
+// writes to an opened file
+vfs_result vfs_write_file(vfs_node* node, uint32 page, virtual_addr address);
+
+// looks down the path from parent until found or returns failure
+vfs_result vfs_lookup(vfs_node* parent, char* path, vfs_node** result);
+
+// begins a vfs_lookup operation at the root node
+vfs_result vfs_root_lookup(char* path, vfs_node** result);
 
 // vfs debug print functions
 void print_vfs(vfs_node* node, int level);

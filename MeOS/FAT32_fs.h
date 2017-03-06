@@ -4,6 +4,7 @@
 #include "types.h"
 #include "vfs.h"
 #include "MassStorageDefinitions.h"
+#include "vector.h"
 
 #define FAT_EOF	0x0FFFFFF8
 
@@ -112,7 +113,8 @@ enum FAT_DIR_ATTRIBUTES
 
 #pragma pack(pop, 1)
 
-typedef list<uint32> fat_file_layout;
+//typedef list<uint32> fat_file_layout;
+typedef vector<uint32> fat_file_layout;
 
 struct fat_mount_data
 {
@@ -124,13 +126,13 @@ struct fat_mount_data
 
 // mount the FAT32 filesystem using the 'mount_name'.
 // returns the pointer to the mount file head
-vfs_node* fat_fs_mount(char* mount_name, mass_storage_info* info);
+vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node);
 
 // loads the file's, pointed by 'node', cluster chain
-void fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node);
+vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node);
 
-// loads a page (4KB) at specified address
-int fat_fs_load_file(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
-	uint32 file_page, virtual_addr address);
+// transfers a file page (4KB) to or from the file
+vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
+	uint32 file_page, virtual_addr address, bool read);
 
 #endif

@@ -1,10 +1,6 @@
 #ifndef AHCI_H
 #define AHCI_H
 
-//#ifdef __cplusplus
-//extern "C" {
-//#endif
-
 #include "AHCIDefinitions.h"
 #include "screen.h"
 #include "timer.h"
@@ -46,9 +42,5 @@ inline bool ahci_is_port_ok(uint8 port);
 void ahci_print_caps();
 void ahci_setup_vfs_port(uint8 port_num);
 void ahci_print_dmd(ahci_storage_info* info);
-
-//#ifdef __cplusplus
-//}
-//#endif
 
 #endif

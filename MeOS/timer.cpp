@@ -29,12 +29,7 @@ void sleep(uint32 _time)
 {
 	//uint32 start = millis();
 	//while (millis() < start + _time);
-	__asm
-	{
-		mov eax, 3
-		mov ebx, dword ptr[_time]
-		int 0x81
-	}
+	//thread_sleep(thread_get_current(), _time);
 }
 
 Timer::Timer()

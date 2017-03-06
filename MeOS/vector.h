@@ -16,6 +16,12 @@ struct vector
 };
 
 template<class T>
+T& vector_at(vector<T>* v, uint32 pos)
+{
+	return v->data[pos];
+}
+
+template<class T>
 void vector_init(vector<T>* v, uint32 initial_length)
 {
 	if (initial_length == 0)
@@ -42,7 +48,7 @@ void vector_reserve(vector<T>* v, int num_elements)
 }
 
 template<class T>
-void vector_insert_back(vector<T>* v, T& data)
+void vector_insert_back(vector<T>* v, const T& data)
 {
 	if (v->count == v->r_size)
 		vector_reserve(v, 2 * v->count);

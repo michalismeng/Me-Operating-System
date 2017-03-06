@@ -18,6 +18,7 @@
 #include "process.h"
 #include "mutex.h"
 #include "spinlock.h"
+#include "semaphore.h"
 
 #include "vfs.h"
 #include "FAT32_fs.h"
@@ -27,10 +28,12 @@
 #include "page_cache.h"
 #include "thread_sched.h"
 
+#include "pipe.h"
+
 extern "C" uint8 canOutput = 1;
-extern HBA_MEM_t* ab;
 
 heap* kernel_heap = 0;
+HBA_MEM_t* _abar;
 
 void GetMemoryStats()
 {
@@ -154,12 +157,16 @@ int a = 0;
 mutex m;
 spinlock s;
 
+semaphore sem;
+
 void test1()
 {
 	for (int i = 0; i < 10000000; i++)
 	{
 		//mutex_acquire(&m);
-		spinlock_acquire(&s);
+		//spinlock_acquire(&s);
+
+		semaphore_wait(&sem);
 
 		__asm
 		{
@@ -169,12 +176,13 @@ void test1()
 			mov dword ptr[a], eax
 		}
 
-		spinlock_release(&s);
+		semaphore_signal(&sem);
 
+		//spinlock_release(&s);
 		//mutex_release(&m);
 	}
 
-	printfln("test1 a=%u", a);
+	printfln("test1 a=%u at: %u", a, millis());
 	while (true);
 }
 
@@ -184,7 +192,9 @@ void test2()
 	for (int i = 0; i < 10000000; i++)
 	{
 		//mutex_acquire(&m);
-		spinlock_acquire(&s);
+		//spinlock_acquire(&s);
+
+		semaphore_wait(&sem);
 
 		__asm
 		{
@@ -195,12 +205,13 @@ void test2()
 			mov dword ptr[a], eax
 		}
 
-		spinlock_release(&s);
+		semaphore_signal(&sem);
 
+		//spinlock_release(&s);
 		//mutex_release(&m);
 	}
 
-	printfln("test2 a=%u", a);
+	printfln("test2 a=%u at: %u", a, millis());
 
 	while (true);
 }
@@ -222,8 +233,69 @@ void test_print_time()
 
 void idle()
 {
-	printfln("idle executing");
 	while (true) _asm pause;
+}
+
+// opens a file and associates a global file descriptor with it
+uint32 open_file(char* path, uint32* fd)
+{
+	*fd = (uint32)-1;
+	vfs_node* node = 0;
+
+	// vfs find the node requested
+	uint32 error = vfs_root_lookup(path, &node);
+	if (error)
+		return error;
+
+	// create an entry for the global table
+	gfe entry = create_gfe(node);
+	*fd = gft_insert_s(entry);
+
+	return vfs_open_file(node);
+}
+
+uint32 read_file(uint32 fd, uint32 page, virtual_addr buffer)
+{
+	gfe* entry = gft_get(fd);
+	if (!entry || gfe_is_invalid(entry))
+		return -1;
+
+	return vfs_read_file(entry->file_node, page, buffer);
+}
+
+uint32 write_file(uint32 fd, uint32 page, virtual_addr buffer)
+{
+	gfe* entry = gft_get(fd);
+	if (!entry || gfe_is_invalid(entry))
+		return -1;
+
+	return vfs_write_file(entry->file_node, page, buffer);
+}
+
+char ___buffer[4096];
+_pipe pipe;
+uint32 fd[2];
+
+void test3()
+{
+	printfln("Test3 id: %u", thread_get_current()->id);
+	char* message = "Hello from this pipe!\n";
+
+	for (int i = 0; i < strlen(message); i++)
+	{
+		//pipe_write(&pipe, message[i]);
+		write_file(fd[0], 0, (virtual_addr)(message + i));
+		thread_sleep(thread_get_current(), 500);
+	}
+
+	while (true)
+	{
+		/*vfs_node* n = vfs_find_node("sdc_mount/MIC.TXT");
+		vfs_open_file(n);
+
+		vfs_read_file(n, 0, (virtual_addr)(___buffer + 4096));
+		printfln("MIC DATA: %s", ___buffer + 4096);*/
+	}
 }
 
 struct kernel_info
@@ -234,42 +306,199 @@ struct kernel_info
 	idt_entry_t* idt_base;
 };
 
+void create_test_process(int fd)
+{
+	for (uint32 i = 0; i < 1; i++)
+	{
+		uint32 error = read_file(fd, i, (virtual_addr)___buffer);
+		if (error != 0)
+			printfln("read error: %u", error);
+	}
+
+	if (!validate_PE_image(___buffer))
+	{
+		DEBUG("Could not load PE image. Corrupt image or data.");
+		return;
+	}
+
+	IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)___buffer;
+	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)___buffer);
+	IMAGE_SECTION_HEADER* section_0 = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
+
+	/* address space creation goes here. Create a new address space */
+	pdirectory* address_space = vmmngr_get_directory();
+
+	// here we ve got a PE.
+	PCB* proc = process_create(thread_get_current()->parent, address_space, 4 MB, 2 GB);
+
+	uint32 baseText = nt_header->OptionalHeader.BaseOfCode;
+	uint32 sizeText = nt_header->OptionalHeader.SizeOfCode;
+	uint32 baseData = nt_header->OptionalHeader.BaseOfData;
+	uint32 sizeData = nt_header->OptionalHeader.SizeOfInitializedData;
+	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
+	uint32 imageBase = nt_header->OptionalHeader.ImageBase;
+
+	vm_area code = vm_area_create(imageBase + baseText, pmmngr_get_next_align(imageBase + baseText + sizeText), VM_AREA_READ | VM_AREA_EXEC, fd);
+	vm_area stack = vm_area_create(1 GB, 1 GB + 4 KB, VM_AREA_READ | VM_AREA_WRITE | VM_AREA_GROWS_DOWN, -1);
+	vm_area data = vm_area_create(imageBase + baseData, pmmngr_get_next_align(imageBase + baseData + sizeData), VM_AREA_READ | VM_AREA_WRITE, -1);
+
+	vm_contract_add_area(&proc->memory_contract, &code);
+	vm_contract_add_area(&proc->memory_contract, &stack);
+	vm_contract_add_area(&proc->memory_contract, &data);
+
+	memcpy((void*)(imageBase + section_0->VirtualAddress), ___buffer + section_0->PointerToRawData, section_0->SizeOfRawData);
+	section_0++;
+	memcpy((void*)(imageBase + section_0->VirtualAddress), ___buffer + section_0->PointerToRawData, section_0->SizeOfRawData);
+
+	uint32 address = vm_contract_get_area_for_length(&proc->memory_contract, 4096);
+
+	TCB* main = thread_create(proc, entry, stack.end_addr, 4096, 1);
+
+	thread_insert(main);
+	printfln("thread creationg ended");
+}
+
 void proc_init_thread()
 {
-	INT_OFF;
-
 	printfln("executing %s", __FUNCTION__);
 	// start setting up heaps, drivers and everything needed.
-	vm_area a = vm_area_create(3 GB + 10 MB, 3 GB + 11 MB, VM_AREA_WRITE, -1);
+	vm_area a = vm_area_create(3 GB + 10 MB, 3 GB + 12 MB, VM_AREA_WRITE, -1);  // create a 1MB space
 	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
-		PANIC("could not add area");
+		PANIC("could not add area 3GB");
+
+	a = vm_area_create(4 MB, 3 GB, VM_AREA_WRITE | VM_AREA_READ, -1);  // create user process running space
+	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
+		PANIC("could not add area 4MB");
 
 	// create a 16KB heap
-	kernel_heap = heap_create(a.start_addr, 16 KB);
+	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
-	mutex_init(&m);
-	spinlock_init(&s);
+	ClearScreen();
 
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
+	init_vfs();	/* last entry (TestDLL5.exe) does not show up??*/
+
+	uint32 ahci_base = 0x300000;
+	//init_ahci(_abar, ahci_base);
+
+	//vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
+	//vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
+
+	//vfs_add_child(vfs_get_root(), hierarchy);
+
+	//vfs_print_all();
+
+	// initialize the page cache
+
+	page_cache_init(2 GB, 10);
+
+	page_cache_print();
+
+	int test_fd = 0;
+	page_cache_register_file(test_fd);
+
+	page_cache_reserve_buffer(test_fd, 0);
+	page_cache_reserve_buffer(test_fd, 1);
+	page_cache_reserve_buffer(test_fd, 2);
+
+	page_cache_print();
+
+	page_cache_register_file(1);
+
+	page_cache_reserve_buffer(1, 10);
+	page_cache_reserve_buffer(1, 11);
+	page_cache_reserve_buffer(1, 12);
+
+	page_cache_print();
+
+	page_cache_release_buffer(test_fd, 1);
+
+	page_cache_print();
+
+	page_cache_unregister_file(test_fd);
+
+	page_cache_reserve_buffer(1, 13);
+
+	page_cache_print();
+
+	printfln("\nend");
+
+	while (true);
+
+	uint32 error;
+	vfs_node* n;
+
+	init_global_file_table(16);
+
+	if (error = open_file("sdc_mount/FOLDER/TESTDLL.EXE", &fd[0]))
+		printfln("Error opening TestDLL.exe: %u", error);
+
+	INT_OFF;
+
+	if (!error)
+		create_test_process(fd[0]);
+
+	//while (true);
+
+	//mutex_init(&m);
+	//spinlock_init(&s);
+	//semaphore_init(&sem, 1);
+
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
+	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
+	thread_insert(thread);*/
+	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);*/
+
 	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
 	thread_insert(thread);
-	ClearScreen();
+
+	//create_vfs_pipe(___buffer, 512, fd);
+
+	/*if (error = open_file("sdc_mount/MIC.TXT", &fd))
+		printfln("open error code %u", error);
+
+	if (error = read_file(fd, 0, (virtual_addr)___buffer))
+		printfln("read error code %u", error);
+	else
+		printfln("MIC DATA: %s", ___buffer);
+
+	open_file("sdc_mount/MIC.TXT", &fd);
+
+	gft_print();*/
+
+	//ClearScreen();
 	INT_ON;
 
 	while (true)
-		_asm pause
+	{
+		//char c;
+		//uint32 error;
+		//if (error = read_file(fd[0], 0, (virtual_addr)&c))
+		//	printfln("error: %u", error);
+		//else
+		//	printf("%c", c);
+		//thread_sleep(thread_get_current(), 100);
+
+		//char letter = pipe_read(&pipe);
+		//printf("%c at %u \t", letter, pipe.read_pos);
+
+		//vfs_read_file(n, 0, (virtual_addr)___buffer);
+		//printfln("MIC DATA: %s", ___buffer);
+		//thread_sleep(thread_get_current(), 1000);
+	}
 }
+
+extern "C" void test_handle(registers_t* regs);
 
 int kmain(multiboot_info* boot_info, kernel_info* k_info)
 {
-	init_descriptor_tables(k_info->gdt_base, k_info->isr_handlers, k_info->idt_base);
-
 	SetColor(DARK_BLUE, WHITE);
 	ClearScreen();
 
 	INT_OFF;
+	init_descriptor_tables(k_info->gdt_base, k_info->isr_handlers, k_info->idt_base);
+
 	init_pit_timer(50, timer_callback);
 	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);
 	INT_ON;
@@ -311,48 +540,16 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	vmmngr_initialize();
 	pmmngr_paging_enable(true);
 
-	HBA_MEM_t* abar = PCIFindAHCI();
-	serial_printf("Found abar at: %h\n", abar);
+	_abar = PCIFindAHCI();
+
+	serial_printf("Found abar at: %h\n", _abar);
 
 	serial_printf("Virtual manager initialize\n");
-
-	//kernel_heap = heap_create(0x300000, 0x4000);		// initialize the heap. Should be done in threading
 
 	fsysSimpleInitialize();
 	init_keyboard();
 
-	//test_function(15);
-	//PANIC("HERE");
-
-	//init_vfs();
-
-	//uint32 ahci_base = 0x200000;
-	//init_ahci(abar, ahci_base + ahci_base % 1024);	// ahci must be 1K aligned. (otherwise... crash). Should be done in threading
-
-	/*ClearScreen();
-
-	auto disk = vfs_find_child(vfs_get_dev(), "sdc");
-	auto hierarchy = fat_fs_mount("sdc_mount", (mass_storage_info*)disk->deep_md);
-
-	list_insert_back(&vfs_get_root()->children, hierarchy);
-
-	vfs_print_all();
-
-	vfs_node* n = vfs_find_node("sdc_mount/MIC.TXT");
-
-	fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, (mass_storage_info*)disk->deep_md, n);
-	fat_file_layout layout = *(fat_file_layout*)n->deep_md;
-
-	auto l_node = layout.head;
-	printf("clusters for %s: ", n->shallow_md.name);
-
-	while (l_node != 0)
-	{
-		printf("%u ", l_node->data);
-		l_node = l_node->next;
-	}
-
-	page_cache_init(1000);
+	/*page_cache_init(1000);
 
 	_page_cache_file file = page_cache_file_create(n, vfs_find_node("sdc_mount"), vfs_find_child(vfs_get_dev(), "sdc"));
 
@@ -387,45 +584,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	while (true);*/
 
-	/*kernel_heap = heap_create(0x300000, 16 KB);
-
-	//mutex_init(&m);
-	printfln("starting multitasking");
-	init_thread_scheduler();
-
-	PCB* pr = process_create(0, vmmngr_get_directory(), 3 GB, 3 GB + 512 MB);
-
-	extern queue<PCB> process_queue;
-
-	PCB* p = &process_queue.head->data;
-
-	/*uint32 phys = (uint32)pmmngr_alloc_block();
-	vmmngr_map_page(p->page_dir, phys, 0x700000 - 4096, DEFAULT_FLAGS);
-
-	phys = (uint32)pmmngr_alloc_block();
-	vmmngr_map_page(p->page_dir, phys, 0x600000 - 4096, DEFAULT_FLAGS);
-
-	phys = (uint32)pmmngr_alloc_block();
-	vmmngr_map_page(p->page_dir, phys, 0x800000 - 4096, DEFAULT_FLAGS);
-
-	thread_insert(thread_create(p, (uint32)test1, 3 GB + 16 KB, 4096));
-	thread_insert(thread_create(p, (uint32)test2, 3 GB + 12 KB, 4096));		// create test2 task
-	thread_insert(thread_create(p, (uint32)idle, 3 GB + 8 KB, 4096));		// create idle task
-
-	//print_ready_queue();
-
-	TCB* th = ready_queue.head->data;
-
-	INT_OFF;
-	multitasking_start();
-	INT_ON;
-
-	thread_execute(*th);
-
-	while (true);*/
-
-	// create a minimal multitasking environment to begin working with
-	//init_multitasking();
+	// create a minimal multihtreaded environment to work with
 
 	virtual_addr space = pmmngr_get_next_align(0xC0000000 + k_info->kernel_size + 4096);
 	printfln("allocating 4KB at %h", space);
@@ -438,7 +597,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
 	// create process 0 and its only thread
-	PCB* proc = process_create(0, vmmngr_get_directory(), 3 GB, 3 GB + 512 MB);
+	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 4 GB - 4 KB);
 	uint32 thread_stack = (uint32)malloc(4050);		// allocate enough space for page aligned stack
 	// just for this thread, space is not malloc
 	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 1);	// page align stack

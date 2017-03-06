@@ -8,6 +8,10 @@ uint32 port_ok = 0;		// bit significant variable that states if port is ok for u
 
 char buffer[4096];			// TODO: Make one page buffer more lovely
 
+static fs_operations AHCI_fs_operations =
+{
+};
+
 void* ahci_main(uint32 ahci_command, ...)
 {
 	va_list l;
@@ -197,6 +201,28 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 	return AHCI_NO_ERROR;
 }
 
+int ahci_mass_storage_read(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
+{
+	HBA_PORT_t* port = &abar->ports[info->volume_port];
+	BYTE PTR buf = (BYTE PTR)address;
+
+	if (ahci_is_port_ok(info->volume_port) == false)
+		return PORT_NOT_OK;
+
+	return ahci_data_transfer(port, startl, starth, count, buf, true);
+}
+
+int ahci_mass_storage_write(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
+{
+	HBA_PORT_t* port = &abar->ports[info->volume_port];
+	BYTE PTR buf = (BYTE PTR)address;
+
+	if (ahci_is_port_ok(info->volume_port) == false)
+		return PORT_NOT_OK;
+
+	return ahci_data_transfer(port, startl, starth, count, buf, false);
+}
+
 void ahci_callback(registers_t* regs)
 {
 	printfln("sata callback");
@@ -269,7 +295,7 @@ void ahci_setup_vfs_port(uint8 port_num)
 	name[0] = 's'; name[1] = 'd';		// to be safe
 
 	uitoalpha(port_num, name + 2);
-	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, sizeof(ahci_storage_info));
+	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, sizeof(ahci_storage_info), NULL, &AHCI_fs_operations)->deep_md;
 
 	// populate storage struct
 	uint16* ptr = (uint16*)buf;
@@ -279,6 +305,8 @@ void ahci_setup_vfs_port(uint8 port_num)
 	dev_dmd->storage_info.sector_size = 512;
 	dev_dmd->storage_info.entry_point = ahci_main;
 	dev_dmd->volume_port = port_num;
+	dev_dmd->storage_info.read = (mass_read)ahci_mass_storage_read;
+	dev_dmd->storage_info.write = (mass_write)ahci_mass_storage_write;
 }
 
 void ahci_port_rebase(uint8 port_num)

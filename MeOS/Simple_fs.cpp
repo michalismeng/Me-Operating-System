@@ -120,7 +120,7 @@ list<vfs_node*> simple_fs_mount(mass_storage_info* info)
 			if (entry->first_sector == 0)
 				continue;
 
-			nodes[count] = vfs_create_node(entry->name, true, VFS_FILE | VFS_READ | VFS_WRITE, entry->size, sizeof(uint32));
+			nodes[count] = vfs_create_node(entry->name, true, VFS_FILE | VFS_READ | VFS_WRITE, entry->size, sizeof(uint32), NULL, NULL);
 			*(uint32*)nodes[count]->deep_md = entry->first_sector;
 			parents[count] = entry->parent_index;
 			count++;

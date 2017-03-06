@@ -10,15 +10,19 @@ isr_t* interrupt_handlers;
 
 void test_handle(registers_t* regs)
 {
+	printfln("called");
 	printfln("message: %s", regs->ebx);
 }
 
 void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t* idt_base)
 {
+	// GDT and IDT are already setup by kernel loader
 	gdt_entries = gdt_base;
 	interrupt_handlers = isr_base;
 	idt_entries = idt_base;
 
+	// Enrich our IDT with interrupt 0x80 (userspace program services)
+	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 	register_interrupt_handler(0x80, test_handle);
 }
 

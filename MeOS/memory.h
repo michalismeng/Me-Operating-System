@@ -9,7 +9,7 @@ extern "C" {
 
 #include "types.h"
 #include "utility.h"
-	
+
 	// allocates size contiguous memory
 	void* malloc(uint32 size);
 

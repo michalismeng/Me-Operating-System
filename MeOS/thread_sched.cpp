@@ -7,6 +7,10 @@ list<PCB*> procs;
 extern volatile uint32 ticks;
 extern "C" uint32 frequency;
 
+// all thread scheduling methods should never request heap memory, in order for the locking mechanisms to work
+// only thread insert should allocate memory
+// every other action is just a node move between the queues
+
 void thread_execute(TCB t)
 {
 	__asm
@@ -49,16 +53,23 @@ void scheduler_decrease_sleep_time()
 		TCB* thread = ptr->data;
 		if (elapsed > ptr->data->sleep_time)
 		{
+			list_node<TCB*>* node;
 			ptr = ptr->next;
 
+			//if (prev == 0)
+			//	list_remove_front(&SLEEP_QUEUE);
+			//else
+			//	list_remove(&SLEEP_QUEUE, prev); // and delete
+
 			if (prev == 0)
-				list_remove_front(&SLEEP_QUEUE);
+				node = list_remove_front_node(&SLEEP_QUEUE);
 			else
-				list_remove(&SLEEP_QUEUE, prev); // and delete
+				node = list_remove_node(&SLEEP_QUEUE, prev);
 
 			thread->state = THREAD_READY;
 			thread->sleep_time = 0;
-			list_insert_back(&READY_QUEUE(thread->base_priority), thread);
+			//list_insert_back(&READY_QUEUE(thread->base_priority), thread);
+			list_insert_back_node(&READY_QUEUE(thread->base_priority), node);
 		}
 		else
 		{
@@ -249,7 +260,7 @@ __declspec(naked) void thread_block(TCB* thread)
 	if (thread->state != THREAD_STATE::THREAD_RUNNING && thread->state != THREAD_STATE::THREAD_READY)
 	{
 		printfln("thread: %u", thread->state);
-		PANIC("current thread error");  // iretd. Thread is neither running nor ready-waiting
+		PANIC("thread error: thread neither READY nor RUNNING");  // iretd. Thread is neither running nor ready-waiting
 	}
 
 	// if the thread is not running
@@ -328,8 +339,11 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 		{
 			thread->state = THREAD_SLEEP;
 
-			list_remove_front(&READY_QUEUE(thread->base_priority));
-			list_insert_back(&SLEEP_QUEUE, thread);
+			/*list_remove_front(&READY_QUEUE(thread->base_priority));
+			list_insert_back(&SLEEP_QUEUE, thread);*/
+
+			auto node = list_remove_front_node(&READY_QUEUE(thread->base_priority));
+			list_insert_back_node(&SLEEP_QUEUE, node);
 
 			_asm pop ebp  // fix the stack to create the interrupt frame
 
@@ -363,9 +377,13 @@ void thread_notify(TCB* thread)
 		return;
 	}
 
-	list_remove(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
+	/*list_remove(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
 	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back(&READY_QUEUE(thread->base_priority), thread);
+	list_insert_back(&READY_QUEUE(thread->base_priority), thread);*/
+
+	auto node = list_remove_node(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
+	thread->state = THREAD_STATE::THREAD_READY;
+	list_insert_back_node(&READY_QUEUE(thread->base_priority), node);
 
 	INT_ON;
 }

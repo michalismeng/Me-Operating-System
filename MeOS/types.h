@@ -32,6 +32,11 @@ typedef void   VOID;
 #define GB MB*1024
 
 #define PTR *
+#define REF &
+
+#define NULL 0
+
+#define cast(type, param) ((type)param)
 
 typedef uint8* va_list;
 

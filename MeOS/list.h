@@ -87,6 +87,35 @@ bool list_remove(list<T>* l, list_node<T>* prev)
 }
 
 template<class T>
+list_node<T>* list_remove_node(list<T>* l, list_node<T>* prev)
+{
+	if (prev == 0)
+		return false;
+
+	if (l->count == 0)
+		return false;
+
+	if (l->count == 1)		// prev == head
+	{
+		l->count--;
+		l->head = l->tail = 0;
+		return prev;
+	}
+
+	list_node<T>* temp = prev->next;
+	prev->next = temp->next;
+	l->count--;
+
+	if (l->count == 1)
+		l->tail = l->head;
+
+	if (l->count == 0)
+		l->head = l->tail = 0;
+
+	return temp;
+}
+
+template<class T>
 void list_remove_front(list<T>* l)
 {
 	if (l->count == 0)
@@ -99,6 +128,23 @@ void list_remove_front(list<T>* l)
 
 	if (l->count == 0)
 		l->head = l->tail = 0;
+}
+
+template<class T>
+list_node<T>* list_remove_front_node(list<T>* l)
+{
+	if (l->count == 0)
+		return 0;
+
+	list_node<T>* temp = l->head;
+	l->head = l->head->next;
+	l->count--;
+
+	if (l->count == 0)
+		l->head = l->tail = 0;
+
+	temp->next = 0;
+	return temp;
 }
 
 template<class T>
@@ -126,6 +172,20 @@ void list_insert_back(list<T>* l, const T& element)
 	node->next = 0;
 	node->data = element;
 
+	if (l->count == 0)
+		l->head = l->tail = node;
+	else
+	{
+		l->tail->next = node;
+		l->tail = node;
+	}
+
+	l->count++;
+}
+
+template<class T>
+void list_insert_back_node(list<T>* l, list_node<T>* node)
+{
 	if (l->count == 0)
 		l->head = l->tail = node;
 	else
@@ -169,6 +229,14 @@ void list_head_to_tail(list<T>* l)
 	l->tail = l->head;
 	l->head = l->head->next;
 	l->tail->next = 0;
+}
+
+// clears the list
+template<class T>
+void list_clear(list<T>* l)
+{
+	while (l->count > 0)
+		list_remove_front(l);
 }
 
 #endif

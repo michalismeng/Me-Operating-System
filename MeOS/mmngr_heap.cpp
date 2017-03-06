@@ -1,4 +1,5 @@
 #include "mmngr_heap.h"
+#include "spinlock.h"
 
 // private functions
 
