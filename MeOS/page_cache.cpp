@@ -18,7 +18,7 @@ uint32 page_cache_index_by_addr(virtual_addr address)
 
 virtual_addr page_cache_addr_by_index(uint32 index)
 {
-	return index * PAGE_CACHE_SIZE;
+	return (virtual_addr)(page_cache.cache) + index * PAGE_CACHE_SIZE;
 }
 
 virtual_addr page_cache_get_last()
@@ -66,7 +66,7 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 
 // public functions
 
-void page_cache_init(virtual_addr start, uint32 no_buffers)
+void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_count)
 {
 	page_cache.cache_size = no_buffers * PAGE_CACHE_SIZE;		// size entries = size pages
 
@@ -77,7 +77,7 @@ void page_cache_init(virtual_addr start, uint32 no_buffers)
 	//		PANIC("PAGE CACHE ERROR");
 
 	page_cache.cache = (_cache_cell*)start;
-	vector_init(&page_cache.cached_files, 1);
+	vector_init(&page_cache.cached_files, initial_file_count);
 
 	// Here we assume that alloced bitmap fits into just one page buffer. Perhaps change this in the future.
 	// auto reserve the last buffer as this is where the alloced bitmap lives.

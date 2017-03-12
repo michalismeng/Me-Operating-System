@@ -42,7 +42,7 @@ uint32 gft_insert(gfe entry)
 	{
 		vector_insert_back(&gft, entry);
 		index = gft.count - 1;
-		printfln("Expanding gft to: %u", gft.r_size);
+		printfln("Expanding gft to: %u", gft.count);
 	}
 	else
 		gft[index] = entry;

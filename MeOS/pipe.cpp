@@ -24,6 +24,7 @@ _pipe create_pipe(char* buf, uint32 size)
 	return pipe;
 }
 
+// TODO: FIX THAT
 void create_vfs_pipe(char* buf, uint32 size, uint32 fd[2])
 {
 	vfs_node* n = vfs_create_device("pipe", sizeof(_pipe), NULL, &pipe_operations);
@@ -40,20 +41,24 @@ vfs_result pipe_vfs_open(vfs_node* node)
 	return VFS_OK;
 }
 
-vfs_result pipe_vfs_read(vfs_node* file, uint32 page, virtual_addr address)
+vfs_result pipe_vfs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	_pipe* p = (_pipe*)file->deep_md;
-	char read = pipe_read(p);
-	*(char*)(address) = read;
+	char* buffer = (char*)address;
+
+	for (uint32 i = 0; i < count; i++)
+		buffer[i] = pipe_read(p);
 
 	return VFS_ERROR::VFS_OK;
 }
 
-vfs_result pipe_vfs_write(vfs_node* file, uint32 page, virtual_addr address)
+vfs_result pipe_vfs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	_pipe* p = (_pipe*)file->deep_md;
-	char write = *(char*)(address);
-	pipe_write(p, write);
+	char* buffer = (char*)address;
+
+	for (uint32 i = 0; i < count; i++)
+		pipe_write(p, buffer[i]);
 
 	return VFS_ERROR::VFS_OK;
 }

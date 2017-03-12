@@ -29,7 +29,9 @@ enum VFS_ERROR
 	VFS_PATH_NOT_FOUND,
 	VFS_PAGE_NOT_FOUND,
 	VFS_READ_ERROR,
-	VFS_FILE_NOT_OPEN
+	VFS_FILE_NOT_OPEN,
+	VFS_CACHE_FULL,
+	VFS_BAD_ARGUMENTS
 };
 
 // vfs node structures
@@ -40,10 +42,11 @@ typedef char* deep_metadata;
 
 struct fs_operations
 {
-	vfs_result(*fs_read)(vfs_node* file, uint32 page, virtual_addr address);
-	vfs_result(*fs_write)(vfs_node* file, uint32 page, virtual_addr address);
+	vfs_result(*fs_read)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+	vfs_result(*fs_write)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 	vfs_result(*fs_open)(vfs_node* node);
 	vfs_result(*fs_close)();
+	vfs_result(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);			// page end is end or past end?
 	vfs_result(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
 	vfs_result(*fs_ioctl)(uint32 command, ...);
 };
@@ -57,7 +60,7 @@ struct vfs_node
 	uint32 attributes;				// file attributes
 	uint32 file_length;				// file length (bytes)
 	vfs_node* tag;					// data node associated with this node
-	bool is_open;					// sets wether this file is open or closed
+	bool is_open;					// sets whether this file is open or closed
 
 	fs_operations* fs_ops;			// file basic operations
 	list<vfs_node*> children;		// children list
@@ -97,13 +100,16 @@ vfs_node* vfs_find_node(char* path);
 void init_vfs();
 
 // include read and write to and from page-cache functions
-vfs_result vfs_read_file(vfs_node* node, uint32 page, virtual_addr address);
+vfs_result vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
 
 // opens a file for operations. (Loads its drive layout)
 vfs_result vfs_open_file(vfs_node* node);
 
 // writes to an opened file
-vfs_result vfs_write_file(vfs_node* node, uint32 page, virtual_addr address);
+vfs_result vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+
+// syncs the in memory changes to the underlying drive
+vfs_result vfs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
 
 // looks down the path from parent until found or returns failure
 vfs_result vfs_lookup(vfs_node* parent, char* path, vfs_node** result);

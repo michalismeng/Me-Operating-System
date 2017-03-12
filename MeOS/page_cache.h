@@ -35,7 +35,7 @@ struct _page_cache
 };
 
 // initialize the page cache
-void page_cache_init(virtual_addr start, uint32 no_buffers);
+void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_count);
 
 // returns the virtual address of the buffer assigned to the given page in the given file.
 virtual_addr page_cache_get_buffer(int gfd, uint32 page);

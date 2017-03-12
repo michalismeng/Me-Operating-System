@@ -30,6 +30,8 @@
 
 #include "pipe.h"
 
+#include "Debugger.h"
+
 extern "C" uint8 canOutput = 1;
 
 heap* kernel_heap = 0;
@@ -237,9 +239,9 @@ void idle()
 }
 
 // opens a file and associates a global file descriptor with it
-uint32 open_file(char* path, uint32* fd)
+uint32 open_file(char* path, int* fd)
 {
-	*fd = (uint32)-1;
+	*fd = -1;
 	vfs_node* node = 0;
 
 	// vfs find the node requested
@@ -251,40 +253,52 @@ uint32 open_file(char* path, uint32* fd)
 	gfe entry = create_gfe(node);
 	*fd = gft_insert_s(entry);
 
+	page_cache_register_file(*fd);
+
 	return vfs_open_file(node);
 }
 
-uint32 read_file(uint32 fd, uint32 page, virtual_addr buffer)
+uint32 read_file(int fd, uint32 start, uint32 count, virtual_addr buffer)
 {
 	gfe* entry = gft_get(fd);
 	if (!entry || gfe_is_invalid(entry))
 		return -1;
 
-	return vfs_read_file(entry->file_node, page, buffer);
+	return vfs_read_file(fd, entry->file_node, start, count, buffer);
 }
 
-uint32 write_file(uint32 fd, uint32 page, virtual_addr buffer)
+uint32 write_file(int fd, uint32 start, uint32 count, virtual_addr buffer)
 {
 	gfe* entry = gft_get(fd);
 	if (!entry || gfe_is_invalid(entry))
 		return -1;
 
-	return vfs_write_file(entry->file_node, page, buffer);
+	return vfs_write_file(fd, entry->file_node, start, count, buffer);
 }
 
-char ___buffer[4096];
+uint32 sync_file(int fd, uint32 start_page, uint32 end_page)
+{
+	gfe* entry = gft_get(fd);
+	if (!entry || gfe_is_invalid(entry))
+		return -1;
+
+	return vfs_sync(fd, entry->file_node, start_page, end_page);
+}
+
+char ___buffer[5000];
 _pipe pipe;
-uint32 fd[2];
+int fd[2];
 
 void test3()
 {
 	printfln("Test3 id: %u", thread_get_current()->id);
 	char* message = "Hello from this pipe!\n";
+	printfln("I will print through the pipe");
 
-	for (int i = 0; i < strlen(message); i++)
+	for (int i = 0; i < strlen(message); i += 2)
 	{
 		//pipe_write(&pipe, message[i]);
-		write_file(fd[0], 0, (virtual_addr)(message + i));
+		write_file(fd[0], 0, 2, (virtual_addr)(message + i));
 		thread_sleep(thread_get_current(), 500);
 	}
 
@@ -310,7 +324,7 @@ void create_test_process(int fd)
 {
 	for (uint32 i = 0; i < 1; i++)
 	{
-		uint32 error = read_file(fd, i, (virtual_addr)___buffer);
+		uint32 error = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
 		if (error != 0)
 			printfln("read error: %u", error);
 	}
@@ -379,22 +393,24 @@ void proc_init_thread()
 	init_vfs();	/* last entry (TestDLL5.exe) does not show up??*/
 
 	uint32 ahci_base = 0x300000;
-	//init_ahci(_abar, ahci_base);
+	init_ahci(_abar, ahci_base);
 
-	//vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
-	//vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
+	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
+	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
-	//vfs_add_child(vfs_get_root(), hierarchy);
+	vfs_add_child(vfs_get_root(), hierarchy);
 
 	//vfs_print_all();
 
 	// initialize the page cache
 
-	page_cache_init(2 GB, 10);
+	page_cache_init(2 GB, 10, 16);
 
 	page_cache_print();
 
-	int test_fd = 0;
+	INT_OFF;
+
+	/*int test_fd = 0;
 	page_cache_register_file(test_fd);
 
 	page_cache_reserve_buffer(test_fd, 0);
@@ -419,11 +435,11 @@ void proc_init_thread()
 
 	page_cache_reserve_buffer(1, 13);
 
-	page_cache_print();
+	page_cache_print();*/
 
 	printfln("\nend");
 
-	while (true);
+	//while (true);
 
 	uint32 error;
 	vfs_node* n;
@@ -448,45 +464,54 @@ void proc_init_thread()
 	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
 	thread_insert(thread);*/
-	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);*/
-
-	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
-	thread_insert(thread);
+	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
+	thread_insert(thread); */
+	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
+	thread_insert(thread);*/
 
 	//create_vfs_pipe(___buffer, 512, fd);
 
-	/*if (error = open_file("sdc_mount/MIC.TXT", &fd))
-		printfln("open error code %u", error);
+	ClearScreen();
 
-	if (error = read_file(fd, 0, (virtual_addr)___buffer))
-		printfln("read error code %u", error);
-	else
-		printfln("MIC DATA: %s", ___buffer);
+	//int fd;
 
-	open_file("sdc_mount/MIC.TXT", &fd);
+	//___buffer[0] = '!';
+	//___buffer[1] = '@';
+	//___buffer[2] = '#';
 
-	gft_print();*/
+	//if (error = open_file("sdc_mount/BEST.TXT", &fd))
+	//	printfln("open error code %u", error);
 
-	//ClearScreen();
+	//if (error = read_file(fd, 4090, 20, (virtual_addr)___buffer))
+	//	printfln("read error code %u", error);
+	//else
+	//	printfln("MIC DATA: %s.", ___buffer);
+
+	//*if (error = sync_file(fd, -1, 0))
+	//	printfln("sync error: %u", error);*/
+
+	//page_cache_print();
+
+	//gft_print();
+
+	//debugf("this is a new message: %u %h", 10, ___buffer);
+
+	//printfln("end");
+
+	while (true);
+
+	ClearScreen();
 	INT_ON;
 
-	while (true)
+	/*while (true)
 	{
-		//char c;
-		//uint32 error;
-		//if (error = read_file(fd[0], 0, (virtual_addr)&c))
-		//	printfln("error: %u", error);
-		//else
-		//	printf("%c", c);
-		//thread_sleep(thread_get_current(), 100);
-
-		//char letter = pipe_read(&pipe);
-		//printf("%c at %u \t", letter, pipe.read_pos);
-
-		//vfs_read_file(n, 0, (virtual_addr)___buffer);
-		//printfln("MIC DATA: %s", ___buffer);
-		//thread_sleep(thread_get_current(), 1000);
-	}
+		char c;
+		uint32 error;
+		if (error = read_file(fd, 0, 1, (virtual_addr)&c))
+			printfln("error: %u", error);
+		else
+			printf("%c", c);
+	}*/
 }
 
 extern "C" void test_handle(registers_t* regs);
@@ -548,15 +573,6 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	fsysSimpleInitialize();
 	init_keyboard();
-
-	/*page_cache_init(1000);
-
-	_page_cache_file file = page_cache_file_create(n, vfs_find_node("sdc_mount"), vfs_find_child(vfs_get_dev(), "sdc"));
-
-	virtual_addr r = page_cache_read(&file, 0);
-	print((char*)r);
-
-	while (true);		// block multi-tasking for VFS establishment*/
 
 	ClearScreen();
 

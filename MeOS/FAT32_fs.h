@@ -5,6 +5,7 @@
 #include "vfs.h"
 #include "MassStorageDefinitions.h"
 #include "vector.h"
+#include "page_cache.h"
 
 #define FAT_EOF	0x0FFFFFF8
 

@@ -1,41 +1,138 @@
 #include "FAT32_fs.h"
 
-vfs_result fat_fs_read(vfs_node* file, uint32 page, virtual_addr address);
+vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 vfs_result fat_fs_open(vfs_node* node);
-vfs_result fat_fs_write(vfs_node* file, uint32 page, virtual_addr address);
+vfs_result fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
 
 static fs_operations fat_fs_operations =
 {
 	fat_fs_read,		// read
 	fat_fs_write,		// write
-	fat_fs_open			// open
-						// close
+	fat_fs_open,		// open
+	NULL,				// close
+	fat_fs_sync			// sync
 						// lookup
 						// ioctl?
 };
 
-vfs_result fat_fs_read(vfs_node* file, uint32 page, virtual_addr address)
+vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+{
+	vfs_node* mount_point = file->tag;
+	vfs_node* device = file->tag->tag;
+
+	virtual_addr cache = page_cache_get_buffer(fd, page);
+	uint32 error;
+
+	if (cache == 0)
+	{
+		cache = page_cache_reserve_buffer(fd, page);
+		if (cache == 0)
+			return VFS_CACHE_FULL;
+
+		vmmngr_alloc_page(cache);
+
+		if ((error = fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, page, cache, true)) != VFS_OK)
+		{
+			page_cache_release_buffer(fd, page);
+			return error;
+		}
+	}
+
+	*_cache = cache;
+
+	return VFS_OK;
+}
+
+//TODO: Do more testing with larger files...
+vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!file->tag->tag)
 		return VFS_ERROR::VFS_INVALID_NODE_STRUCTURE;
 
 	// TODO: filesystem read permission
-	vfs_node* mount_point = file->tag;
-	vfs_node* device = file->tag->tag;
 
-	return fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, page, address, true);
+	uint32 start_pg = start / PAGE_SIZE;
+	uint32 current_pg = start_pg;
+	uint32 read = 0;
+
+	virtual_addr cache;
+	uint32 error;
+
+	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		return error;
+
+	// copy perhaps partial data to user buffer
+	memcpy((void*)address, (void*)(cache + start % PAGE_SIZE), min(count, PAGE_SIZE - start % PAGE_SIZE));
+	read += min(count, PAGE_SIZE - start % PAGE_SIZE);
+	current_pg++;
+
+	// retrieve and read foreach intermediate page
+	for (uint32 pg = 1; pg < count / PAGE_SIZE; pg++, current_pg++)
+	{
+		if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+			return error;
+
+		read += 4096;
+		memcpy((void*)(address + read), (void*)cache, 4096);
+	}
+
+	if (read == count)
+		return VFS_OK;
+
+	// now read the last page
+	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		return error;
+
+	memcpy((void*)(address + read), (void*)cache, count - read);
+
+	return VFS_OK;
 }
 
-vfs_result fat_fs_write(vfs_node* file, uint32 page, virtual_addr address)
+//TODO: Do more testing with larger files...
+vfs_result fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!file->tag->tag)
 		return VFS_ERROR::VFS_INVALID_NODE_STRUCTURE;
 
 	// TODO: filesystem write permission
-	vfs_node* mount_point = file->tag;
-	vfs_node* device = file->tag->tag;
 
-	return fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, page, address, false);
+	uint32 start_pg = start / PAGE_SIZE;
+	uint32 current_pg = start_pg;
+	uint32 read = 0;
+
+	virtual_addr cache;
+	uint32 error;
+
+	// ensure page cache is read
+	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		return error;
+
+	// copy perhaps partial data from user buffer to cache buffer
+	memcpy((void*)(cache + start % PAGE_SIZE), (void*)address, min(count, PAGE_SIZE - start % PAGE_SIZE));
+	read += min(count, PAGE_SIZE - start % PAGE_SIZE);
+	current_pg++;
+
+	// retrieve and read foreach intermediate page
+	for (uint32 pg = 1; pg < count / PAGE_SIZE; pg++, current_pg++)
+	{
+		if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+			return error;
+
+		read += 4096;
+		memcpy((void*)cache, (void*)(address + read), 4096);
+	}
+
+	if (read == count)
+		return VFS_OK;
+
+	// now read the last page
+	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		return error;
+
+	memcpy((void*)cache, (void*)(address + read), count - read);
+
+	return VFS_OK;
 }
 
 vfs_result fat_fs_open(vfs_node* node)
@@ -48,6 +145,34 @@ vfs_result fat_fs_open(vfs_node* node)
 	vfs_node* device = node->tag->tag;
 
 	return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, (mass_storage_info*)device->deep_md, node);
+}
+
+vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
+{
+	vfs_node* mount_point = file->tag;
+	vfs_node* device = file->tag->tag;
+
+	// convention, sync the whole file
+	if (page_start > page_end)
+	{
+		fat_file_layout* layout = (fat_file_layout*)file->deep_md;
+		page_start = 0;
+		page_end = layout->count - 1;
+	}
+
+	for (uint32 pg = page_start; pg <= page_end; pg++)
+	{
+		uint32 error;
+		virtual_addr cache = page_cache_get_buffer(fd, pg);
+
+		if (cache == 0)
+			continue;
+
+		if ((error = fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, pg, cache, false)) != VFS_OK)
+			return error;
+	}
+
+	return VFS_OK;
 }
 
 // returns the next cluster to read based on the current cluster and the first FAT
@@ -322,25 +447,12 @@ vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info
 	return VFS_ERROR::VFS_OK;
 }
 
-vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
-	uint32 file_page, virtual_addr address, bool read)
+vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node, uint32 file_page, virtual_addr address, bool read)
 {
 	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
 	fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
 
-	if (layout->count == 0)
-		return VFS_ERROR::VFS_PAGE_NOT_FOUND;
-
-	// search for the page   THIS IS A LIST IMPLEMENTATION
-	/*auto l = layout->head;
-	for (int i = 0; i < file_page; i++)
-	{
-	if (l == 0)
-	return VFS_ERROR::VFS_PAGE_NOT_FOUND;
-	l = l->next;
-	}*/
-
-	if (file_page >= layout->count)
+	if (layout->count == 0 || file_page >= layout->count)
 		return VFS_ERROR::VFS_PAGE_NOT_FOUND;
 
 	//int result = storage_info->read(storage_info, mount_info->cluster_lba + (l->data - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));  LIST IMPLEMENTATION
