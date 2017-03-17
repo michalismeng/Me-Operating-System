@@ -7,6 +7,8 @@
 #include "vm_contract.h"
 #include "open_file_table.h"
 
+#include "Debugger.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -123,6 +125,8 @@ _asm	mov esp, 0x90000
 	uint32 process_create_s(char* app_name);
 	PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 high_address);
 	TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority);
+
+	uint32* thread_get_error(TCB* thread);
 
 	bool validate_PE_image(void* image);
 

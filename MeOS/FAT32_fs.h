@@ -6,6 +6,9 @@
 #include "MassStorageDefinitions.h"
 #include "vector.h"
 #include "page_cache.h"
+#include "open_file_table.h"
+#include "file.h"
+#include "error.h"
 
 #define FAT_EOF	0x0FFFFFF8
 
@@ -119,6 +122,7 @@ typedef vector<uint32> fat_file_layout;
 
 struct fat_mount_data
 {
+	fat_file_layout layout;
 	uint32 partition_offset;			// start of the FAT partition where the volume ID is located
 	uint32 fat_lba;
 	uint32 cluster_lba;

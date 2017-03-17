@@ -29,7 +29,7 @@
 #include "thread_sched.h"
 
 #include "pipe.h"
-
+#include "file.h"
 #include "Debugger.h"
 
 extern "C" uint8 canOutput = 1;
@@ -238,51 +238,25 @@ void idle()
 	while (true) _asm pause;
 }
 
-// opens a file and associates a global file descriptor with it
-uint32 open_file(char* path, int* fd)
+void keyboard_fancy_function()
 {
-	*fd = -1;
-	vfs_node* node = 0;
+	while (true)
+	{
+		KEYCODE c = getch();
 
-	// vfs find the node requested
-	uint32 error = vfs_root_lookup(path, &node);
-	if (error)
-		return error;
-
-	// create an entry for the global table
-	gfe entry = create_gfe(node);
-	*fd = gft_insert_s(entry);
-
-	page_cache_register_file(*fd);
-
-	return vfs_open_file(node);
-}
-
-uint32 read_file(int fd, uint32 start, uint32 count, virtual_addr buffer)
-{
-	gfe* entry = gft_get(fd);
-	if (!entry || gfe_is_invalid(entry))
-		return -1;
-
-	return vfs_read_file(fd, entry->file_node, start, count, buffer);
-}
-
-uint32 write_file(int fd, uint32 start, uint32 count, virtual_addr buffer)
-{
-	gfe* entry = gft_get(fd);
-	if (!entry || gfe_is_invalid(entry))
-		return -1;
-
-	return vfs_write_file(fd, entry->file_node, start, count, buffer);
-}
-
-uint32 sync_file(int fd, uint32 start_page, uint32 end_page)
-{
-	gfe* entry = gft_get(fd);
-	if (!entry || gfe_is_invalid(entry))
-		return -1;
-
-	return vfs_sync(fd, entry->file_node, start_page, end_page);
+		if (c == KEYCODE::KEY_R)
+		{
+			printf("reseting system");
+			sleep(500);
+			printf(".");
+			sleep(500);
+			printf(".");
+			sleep(500);
+			printf(".");
+			sleep(500);
+			kybrd_reset_system();
+		}
+	}
 }
 
 char ___buffer[5000];
@@ -395,16 +369,17 @@ void proc_init_thread()
 	uint32 ahci_base = 0x300000;
 	init_ahci(_abar, ahci_base);
 
+	page_cache_init(2 GB, 20, 16);
+	init_global_file_table(16);
+
 	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
 	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
 	vfs_add_child(vfs_get_root(), hierarchy);
 
-	//vfs_print_all();
+	vfs_print_all();
 
 	// initialize the page cache
-
-	page_cache_init(2 GB, 10, 16);
 
 	page_cache_print();
 
@@ -444,22 +419,21 @@ void proc_init_thread()
 	uint32 error;
 	vfs_node* n;
 
-	init_global_file_table(16);
-
-	if (error = open_file("sdc_mount/FOLDER/TESTDLL.EXE", &fd[0]))
+	/*if (error = open_file("sdc_mount/FOLDER/TESTDLL.EXE", &fd[0]))
 		printfln("Error opening TestDLL.exe: %u", error);
 
 	INT_OFF;
 
 	if (!error)
-		create_test_process(fd[0]);
+		create_test_process(fd[0]);*/
 
-	//while (true);
+		//while (true);
 
-	//mutex_init(&m);
-	//spinlock_init(&s);
-	//semaphore_init(&sem, 1);
+		//mutex_init(&m);
+		//spinlock_init(&s);
+		//semaphore_init(&sem, 1);
 
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
 	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
@@ -473,30 +447,45 @@ void proc_init_thread()
 
 	ClearScreen();
 
-	//int fd;
+	INT_ON;
 
-	//___buffer[0] = '!';
-	//___buffer[1] = '@';
-	//___buffer[2] = '#';
+	int fd;
 
-	//if (error = open_file("sdc_mount/BEST.TXT", &fd))
-	//	printfln("open error code %u", error);
+	if (error = open_file("sdc_mount/MIC.TXT", &fd))
+		printfln("open error code %u", error);
 
-	//if (error = read_file(fd, 4090, 20, (virtual_addr)___buffer))
-	//	printfln("read error code %u", error);
-	//else
-	//	printfln("MIC DATA: %s.", ___buffer);
+	vfs_node* node = gft_get(fd)->file_node;
 
-	//*if (error = sync_file(fd, -1, 0))
-	//	printfln("sync error: %u", error);*/
+	/*node->name = "MIC     TXT";
+	node->name_length = 12;*/
 
-	//page_cache_print();
+	/*node->fs_ops->fs_ioctl(node, 0);
 
-	//gft_print();
+	if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, 0, 0))
+		printfln("sync error: %u", error);*/
 
-	//debugf("this is a new message: %u %h", 10, ___buffer);
+	printfln("end");
 
-	//printfln("end");
+	while (true);
+
+	if (error = read_file(fd, 1, 10, (virtual_addr)___buffer))
+		printfln("read error code %u", get_last_error());
+	else
+		printfln("MIC DATA: %s.", ___buffer);
+
+	/*if (error = write_file(fd, gft_get(fd)->file_node->file_length, 2000, (virtual_addr)___buffer))
+		printfln("write error code %u", get_last_error());
+	else
+		printfln("wrote at: %u till %u", gft_get(fd)->file_node->file_length, gft_get(fd)->file_node->file_length + 2000);*/
+
+		/*if (error = sync_file(fd, -1, 0))
+			printfln("sync error: %u", error);*/
+
+	page_cache_print();
+
+	gft_print();
+
+	printfln("end");
 
 	while (true);
 
@@ -528,9 +517,9 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);
 	INT_ON;
 
-	init_serial();
-
 	printf("Welcome to ME Operating System\n");
+
+	init_serial();
 
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
 	pmmngr_init(memoryKB, 0xC0000000 + k_info->kernel_size);

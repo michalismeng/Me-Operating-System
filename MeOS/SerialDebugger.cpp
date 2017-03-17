@@ -20,7 +20,7 @@ void init_serial()
 	outportb(PORT + 1, 0x00);    //                  (hi byte)
 	outportb(PORT + 3, 0x03);    // 8 bits, no parity, one stop bit
 	outportb(PORT + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
-	outportb(PORT + 4, 0x0B);    // IRQs enabled, RTS/DSR se
+	outportb(PORT + 4, 0x0B);    // IRQs enabled, RTS/DSR set
 }
 
 int is_transmit_empty()

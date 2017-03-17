@@ -4,8 +4,8 @@
 
 vfs_node* root;
 
-vfs_result vfs_default_read(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
-vfs_result vfs_default_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+uint32 vfs_default_read(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+uint32 vfs_default_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
 vfs_result vfs_default_sync(int fd, vfs_node* node, uint32 start_page, uint32 end_page);
 vfs_result vfs_default_open(vfs_node* node);
 vfs_result vfs_default_lookup(vfs_node* parent, char* path, vfs_node** result);
@@ -38,7 +38,7 @@ vfs_node* vfs_find_child(vfs_node* node, char* name)
 
 // fs default operations functions
 
-vfs_result vfs_default_read(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+uint32 vfs_default_read(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!node->tag)
 		return VFS_INVALID_NODE_STRUCTURE;
@@ -47,7 +47,7 @@ vfs_result vfs_default_read(int fd, vfs_node* node, uint32 start, uint32 count, 
 	return node->tag->fs_ops->fs_read(fd, node, start, count, address);
 }
 
-vfs_result vfs_default_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+uint32 vfs_default_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!node->tag)
 		return VFS_INVALID_NODE_STRUCTURE;
@@ -108,7 +108,7 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 
 	n->attributes = attributes;
 	n->file_length = file_length;
-	n->is_open = false;										// by default file is closed and no operations can be done upon it
+	//n->is_open = false;										// by default file is closed and no operations can be done upon it
 
 	return n;
 }
@@ -233,10 +233,10 @@ vfs_result vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, vir
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;
+	/*if (node->is_open == false)
+		return VFS_FILE_NOT_OPEN;*/
 
-	// TODO: Check read permissions
+		// TODO: Check read permissions
 	return node->fs_ops->fs_read(fd, node, start, count, address);
 }
 
@@ -245,10 +245,10 @@ vfs_result vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, vi
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;
+	/*if (node->is_open == false)
+		return VFS_FILE_NOT_OPEN;*/
 
-	// TODO: Check read permissions
+		// TODO: Check read permissions
 	return node->fs_ops->fs_write(fd, node, start, count, address);
 }
 
@@ -257,10 +257,10 @@ vfs_result vfs_sync(int fd, vfs_node* node, uint32 page_start, uint32 page_end)
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;
+	/*if (node->is_open == false)
+		return VFS_FILE_NOT_OPEN;*/
 
-	// TODO: Check read permissions
+		// TODO: Check read permissions
 	return node->fs_ops->fs_sync(fd, node, page_start, page_end);
 }
 
@@ -269,10 +269,10 @@ vfs_result vfs_open_file(vfs_node* node)
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	if (node->is_open == true)
+	/*if (node->is_open == true)
 		return VFS_OK;
 
-	node->is_open = true;
+	node->is_open = true;*/
 	return node->fs_ops->fs_open(node);
 }
 

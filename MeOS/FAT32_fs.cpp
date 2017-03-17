@@ -1,9 +1,13 @@
 #include "FAT32_fs.h"
 
-vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 vfs_result fat_fs_open(vfs_node* node);
-vfs_result fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
+vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...);
+
+uint32 fat_node_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+//vfs_result fat_node_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
 
 static fs_operations fat_fs_operations =
 {
@@ -11,10 +15,69 @@ static fs_operations fat_fs_operations =
 	fat_fs_write,		// write
 	fat_fs_open,		// open
 	NULL,				// close
-	fat_fs_sync			// sync
-						// lookup
-						// ioctl?
+	fat_fs_sync,		// sync
+	NULL,				// lookup
+	fat_fs_ioctl		// ioctl?
 };
+
+static fs_operations fat_node_operations =
+{
+	NULL,
+	fat_node_write,
+	NULL,				// open
+	NULL,				// close
+	fat_fs_sync,		// sync
+	NULL,				// lookup
+	NULL				// ioctl?
+};
+
+uint32 fat_node_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+{
+	uint32 page = node->data >> 12;
+	uint32 offset = node->data & 0xFFF;
+
+	fat_dir_entry_short* entry = (fat_dir_entry_short*)(page_cache_get_buffer(fd, page) + offset);
+	entry->file_size = node->file_length;
+
+	//memcpy(entry->name, node->name, min(node->name_length, 12)); TODO: fix that
+
+	return VFS_OK;
+}
+
+//vfs_result fat_node_sync(int fd, vfs_node* mount, uint32 page_start, uint32 page_end)
+//{
+//	vfs_node* device = mount->tag;
+//	mass_storage_info* storage_info = (mass_storage_info*)device->deep_md;
+//	fat_mount_data* mount_info = (fat_mount_data*)mount->deep_md;
+//
+//	for (uint32 pg = page_start; pg <= page_end; pg++)
+//	{
+//		uint32 error;
+//		virtual_addr cache = page_cache_get_buffer(fd, pg);
+//
+//		if (cache == 0)
+//			continue;
+//
+//		uint32 result = storage_info->write(storage_info, mount_info->cluster_lba + (pg - 2) * 8, 0, 8, vmmngr_get_phys_addr(cache));
+//
+//		if (result != 0)
+//			return result;
+//	}
+//
+//	return VFS_OK;
+//}
+
+vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
+{
+	if (command == 0)	// invalidate
+	{
+		// mount point data is the file descriptor for the root directory "file"
+		vfs_node* mount = node->tag;
+		mount->fs_ops->fs_write(mount->data, node, 0, 0, 0);
+	}
+
+	return VFS_OK;
+}
 
 vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
 {
@@ -28,13 +91,15 @@ vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_add
 	{
 		cache = page_cache_reserve_buffer(fd, page);
 		if (cache == 0)
+		{
+			set_last_error(VFS_CACHE_FULL);
 			return VFS_CACHE_FULL;
-
-		vmmngr_alloc_page(cache);
+		}
 
 		if ((error = fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, page, cache, true)) != VFS_OK)
 		{
 			page_cache_release_buffer(fd, page);
+			set_last_error(error);
 			return error;
 		}
 	}
@@ -45,10 +110,12 @@ vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_add
 }
 
 //TODO: Do more testing with larger files...
-vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!file->tag->tag)
+	{
 		return VFS_ERROR::VFS_INVALID_NODE_STRUCTURE;
+	}
 
 	// TODO: filesystem read permission
 
@@ -71,7 +138,10 @@ vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtu
 	for (uint32 pg = 1; pg < count / PAGE_SIZE; pg++, current_pg++)
 	{
 		if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		{
+			set_last_error(error);
 			return error;
+		}
 
 		read += 4096;
 		memcpy((void*)(address + read), (void*)cache, 4096);
@@ -82,7 +152,10 @@ vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtu
 
 	// now read the last page
 	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+	{
+		set_last_error(error);
 		return error;
+	}
 
 	memcpy((void*)(address + read), (void*)cache, count - read);
 
@@ -90,7 +163,7 @@ vfs_result fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtu
 }
 
 //TODO: Do more testing with larger files...
-vfs_result fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!file->tag->tag)
 		return VFS_ERROR::VFS_INVALID_NODE_STRUCTURE;
@@ -149,8 +222,19 @@ vfs_result fat_fs_open(vfs_node* node)
 
 vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
 {
-	vfs_node* mount_point = file->tag;
-	vfs_node* device = file->tag->tag;
+	vfs_node* mount_point;
+	vfs_node* device;
+
+	if ((file->attributes & 0x7) == VFS_FILE)
+	{
+		mount_point = file->tag;
+		device = file->tag->tag;
+	}
+	else if ((file->attributes & 0x7) == VFS_MOUNT_PT)
+	{
+		mount_point = file;
+		device = file->tag;
+	}
 
 	// convention, sync the whole file
 	if (page_start > page_end)
@@ -299,11 +383,26 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 
 	while (true)
 	{
-		fat_dir_entry_short* entry = (fat_dir_entry_short*)mass_storage_read(info, cluster_lba + (offset - 2) * 8, 0, 8, 0);
-		// replaces: info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
+		virtual_addr address;
+		if (!(address = page_cache_reserve_buffer(mount_point->data, ((vector<uint32>*)mount_point->deep_md)->count)))
+		{
+			debugf("problem: %h", address);
+			return list<vfs_node*>();
+		}
+
+		fat_dir_entry_short* entry = (fat_dir_entry_short*)address;
+		uint32 result = info->read(info, cluster_lba + (offset - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));
+
+		vector_insert_back((vector<uint32>*)mount_point->deep_md, offset);
+
+		if (result != 0)
+		{
+			debugf("problem: %h", result);
+			return list<vfs_node*>();
+		}
 
 		// read all directory entries of this cluster. There are 16 entries as each is 32 bytes long
-		for (uint8 i = 0; i < 16; i++)
+		for (uint8 i = 0; i < 128; i++)
 		{
 			if (entry[i].name[0] == 0)			// end
 			{
@@ -340,7 +439,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 					// This is a directory. It contains files and directories so read them all
 					uint32 clus = fat_fs_get_entry_cluster(entry + i);
 					children = fat_fs_read_directory(mount_point, info, fat_lba, cluster_lba, clus);		// TODO: rethink this with buffers
-					mass_storage_read(info, cluster_lba + current_cluster - 2, 0, 8, 0);	// restore entry context.
+					//mass_storage_read(info, cluster_lba + current_cluster - 2, 0, 8, 0);	// restore entry context.
 					//replaces: info->entry_point(0, info, cluster_lba + current_cluster - 2, 0, 8);
 				}
 				else  // dot and dotdot directories are registered as links
@@ -364,14 +463,12 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 				attrs |= VFS_ATTRIBUTES::VFS_WRITE;
 			}
 
-			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_file_layout), mount_point, NULL);
+			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_file_layout), mount_point, &fat_fs_operations);
+
+			node->data = (((vector<uint32>*)mount_point->deep_md)->count - 1) + (i & 0xFFF) * 32;
 
 			// setup layout list and add the starting cluster
 			fat_file_layout* layout = (fat_file_layout*)node->deep_md;
-
-			// LIST IMPLEMENTATION
-			//list_init(layout);
-			//list_insert_back(layout, fat_fs_get_entry_cluster(entry + i));
 
 			vector_init(layout, ceil_division(entry[i].file_size, 4096));
 			vector_insert_back(layout, fat_fs_get_entry_cluster(entry + i));
@@ -411,8 +508,13 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	uint32 root_dir_first_cluster = volume->extended.root_cluster_lba;
 
 	// create the vfs mount point node and get the mount data pointer
-	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, &fat_fs_operations);
+	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, &fat_node_operations);
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
+	vector_init(&mount_data->layout, 1);
+
+	// create the mount point file (root directory)
+	mount_point->data = gft_insert_s(create_gfe(mount_point));
+	page_cache_register_file(mount_point->data);		// should de-init somewhen
 
 	// read root directory along with each sub directory
 	list<vfs_node*> hierarchy = fat_fs_read_directory(mount_point, info, fat_lba, cluster_lba, root_dir_first_cluster);
@@ -452,10 +554,9 @@ vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storag
 	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
 	fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
 
-	if (layout->count == 0 || file_page >= layout->count)
+	if (file_page >= layout->count)
 		return VFS_ERROR::VFS_PAGE_NOT_FOUND;
 
-	//int result = storage_info->read(storage_info, mount_info->cluster_lba + (l->data - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));  LIST IMPLEMENTATION
 	int result;
 
 	if (read)

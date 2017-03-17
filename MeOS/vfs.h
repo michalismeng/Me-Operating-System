@@ -42,13 +42,13 @@ typedef char* deep_metadata;
 
 struct fs_operations
 {
-	vfs_result(*fs_read)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-	vfs_result(*fs_write)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+	uint32(*fs_read)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+	uint32(*fs_write)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 	vfs_result(*fs_open)(vfs_node* node);
 	vfs_result(*fs_close)();
 	vfs_result(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);			// page end is end or past end?
 	vfs_result(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
-	vfs_result(*fs_ioctl)(uint32 command, ...);
+	vfs_result(*fs_ioctl)(vfs_node* node, uint32 command, ...);
 };
 
 struct vfs_node
@@ -59,8 +59,8 @@ struct vfs_node
 	uint32 name_length;				// name length
 	uint32 attributes;				// file attributes
 	uint32 file_length;				// file length (bytes)
-	vfs_node* tag;					// data node associated with this node
-	bool is_open;					// sets whether this file is open or closed
+	vfs_node* tag;					// tag node associated with this node
+	uint32 data;					// custom data associated with this node
 
 	fs_operations* fs_ops;			// file basic operations
 	list<vfs_node*> children;		// children list

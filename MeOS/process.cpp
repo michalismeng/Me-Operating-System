@@ -11,10 +11,9 @@ void thread_setup_stack(TCB* t, uint32 entry, uint32 esp, uint32 stack_size)
 	if (esp % vmmngr_get_page_size() != 0)
 		PANIC("stack must be page-aligned");
 
-	printfln("creating htread stack at: %h", esp);
-
 	trap_frame* f;
 	esp -= sizeof(trap_frame);		// prepare esp for manual data push
+	esp -= 4;						// this goes for the thread error variable
 	f = (trap_frame*)esp;
 
 	/* manual setup of the thread's stack */
@@ -33,6 +32,9 @@ void thread_setup_stack(TCB* t, uint32 entry, uint32 esp, uint32 stack_size)
 	f->esp = 0;
 	f->fs = 0x10;
 	f->gs = 0x10;
+
+	// init the first 4 bytes of the stack -- the thread last error
+	*((char*)f + sizeof(trap_frame)) = 0;
 
 	t->ss = 0x10;
 	t->esp = esp;
@@ -190,6 +192,11 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
 
 	return t;
+}
+
+uint32* thread_get_error(TCB* thread)
+{
+	return (uint32*)((char*)thread->stack_base - 4);
 }
 
 bool validate_PE_image(void* image)

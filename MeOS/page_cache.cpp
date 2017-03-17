@@ -130,7 +130,10 @@ virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
 	_page_cache_file_info finfo = page_cache_file_info_create(page, free_buf);
 	list_insert_back(&page_cache.cached_files[gfd].pages, finfo);
 
-	return page_cache_addr_by_index(free_buf);
+	virtual_addr address = page_cache_addr_by_index(free_buf);
+	vmmngr_alloc_page(address);
+
+	return address;
 }
 
 void page_cache_release_buffer(int gfd, uint32 page)
