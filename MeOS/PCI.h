@@ -2,6 +2,7 @@
 #define PCI_H
 
 #include "AHCI.h"		// we do not need everything to be extern C
+#include "i217.h"
 
 #ifdef __cplusplus
 extern "C" {

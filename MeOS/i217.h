@@ -136,7 +136,9 @@ struct e1000
 	uint16 tx_cur;
 };
 
-//void e1000_write_command(e1000* dev, uint16 addr, uint32 value);
-//uint32 e1000_read_command(e1000* dev, uint16 addr);
+void e1000_write_command(e1000* dev, uint16 addr, uint32 value);
+uint32 e1000_read_command(e1000* dev, uint16 addr);
+bool e1000_detect_eeprom(e1000* dev);
+uint32 e1000_eeprom_read(e1000* dev, uint8 addr);
 
 #endif

@@ -22,7 +22,7 @@ extern "C" {
 		I86_PDE_4MB = 0x80,
 		I86_PDE_CPU_GLOBAL = 0x100,
 		I86_PDE_LV4_GLOBAL = 0x200,
-		I86_PDE_FRAME = 0x7FFFF000
+		I86_PDE_FRAME = 0xFFFFF000		// here the first digit was 7 instead of F (0x7FFF) by brokenthorn...
 	};
 
 	typedef uint32 pd_entry;

@@ -70,12 +70,6 @@ void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_
 {
 	page_cache.cache_size = no_buffers * PAGE_CACHE_SIZE;		// size entries = size pages
 
-	//// naive setup of memory for page cache
-	//uint32 page = 0x80000000;
-	//for (uint32 i = 0; i < size; i++, page += 4096)
-	//	if (!vmmngr_alloc_page(page))
-	//		PANIC("PAGE CACHE ERROR");
-
 	page_cache.cache = (_cache_cell*)start;
 	vector_init(&page_cache.cached_files, initial_file_count);
 
@@ -131,7 +125,12 @@ virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
 	list_insert_back(&page_cache.cached_files[gfd].pages, finfo);
 
 	virtual_addr address = page_cache_addr_by_index(free_buf);
-	vmmngr_alloc_page(address);
+
+	// Pages are not freed so always check to see if they are already present
+	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
+		vmmngr_alloc_page(address);
+
+		// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
 
 	return address;
 }
@@ -142,8 +141,8 @@ void page_cache_release_buffer(int gfd, uint32 page)
 	uint32 index = page_cache_index_by_addr(buffer);
 
 	// remove index from page list
-	auto list = page_cache.cached_files[gfd].pages;
-	auto prev = list.head;
+	auto list = &page_cache.cached_files[gfd].pages;
+	auto prev = list->head;
 
 	if (prev == 0)
 	{
@@ -151,21 +150,35 @@ void page_cache_release_buffer(int gfd, uint32 page)
 		return;
 	}
 
+	bool found = false;
+
 	if (prev->data.page == page)
-		list_remove_front(&list);
-
-	while (prev->next != 0)
 	{
-		if (prev->next->data.page == page)
-		{
-			list_remove(&list, prev);
-			break;
-		}
-		prev = prev->next;
+		list_remove_front(list);
+		found = true;
 	}
-
+	else
+	{
+		while (prev->next != 0)
+		{
+			if (prev->next->data.page == page)
+			{
+				list_remove(list, prev);
+				found = true;
+				break;
+			}
+			prev = prev->next;
+		}
+	}
+	
+	if (!found)
+	{
+		DEBUG("Pag enot found to release");
+		return;
+	}
 	// release from page cache
 	page_cache_index_release_buffer(index);
+	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
 }
 
 void page_cache_register_file(int gfd)

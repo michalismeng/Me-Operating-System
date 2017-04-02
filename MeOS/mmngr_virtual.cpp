@@ -20,7 +20,15 @@ void page_fault(registers_struct* regs)
 	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u", addr, current_thread->id);
 
 	if (addr > 0xF0000000)		// auto allocate space for MMIO
+	{
+		if ((addr &(~0xfff)) == 0xf0404000)
+			printfln("mapping abar");
+
+		addr &= ~0xfff;
 		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
+
+		printfln("mapped: %h %h", addr, vmmngr_get_phys_addr(addr));
+	}
 	else
 	{
 		if (vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr) == 0)
@@ -46,12 +54,13 @@ void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uin
 	ptable* table = (ptable*)pd_entry_get_frame(*e);
 	pt_entry* page = vmmngr_ptable_lookup_entry(table, virt);	// we have the page
 
+	
 	*page = 0;												// delete possible previous information (pt_entry is just a uint32)
 	*page |= flags;											// and reset
 	pt_entry_set_frame(page, phys);
 }
 
-void vmmngr_initialize()
+void vmmngr_initialize(uint32 kernel_pages)
 {
 	pdirectory* pdir = (pdirectory*)pmmngr_alloc_block();
 	kernel_directory = pdir;
@@ -68,7 +77,7 @@ void vmmngr_initialize()
 	phys = 0x100000;
 	virtual_addr virt = 0xC0000000;
 
-	for (uint32 i = 0; i < 1024; i++, virt += 4096, phys += 4096)
+	for (uint32 i = 0; i < kernel_pages; i++, virt += 4096, phys += 4096)
 		vmmngr_map_page(pdir, phys, virt, DEFAULT_FLAGS);
 
 	vmmngr_switch_directory(pdir, (physical_addr)&pdir->entries);
@@ -88,11 +97,16 @@ bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags)
 
 	serial_printf("Mapping virtual address: %h - %h\n", base, base + 4095);
 
-	if (base < 0xF0000000)		// memory mapped IO above 3GB
-		addr = (physical_addr)pmmngr_alloc_block();
+	if (vmmngr_is_page_present(base))
+		addr = vmmngr_get_phys_addr(base);
+	else
+	{
+		if (base < 0xF0000000)		// memory mapped IO above 3GB
+			addr = (physical_addr)pmmngr_alloc_block();
 
-	if (!addr)
-		return false;
+		if (!addr)
+			return false;
+	}
 
 	vmmngr_map_page(vmmngr_get_directory(), addr, base, DEFAULT_FLAGS);
 	return true;
@@ -208,6 +222,15 @@ physical_addr vmmngr_get_phys_addr(virtual_addr addr)
 
 	p_addr += (addr & 0xfff);		// add in-page offset
 	return p_addr;
+}
+
+void vmmngr_free_page_addr(virtual_addr addr)
+{
+	pd_entry* e = vmmngr_pdirectory_lookup_entry(vmmngr_get_directory(), addr);
+	ptable* table = (ptable*)pd_entry_get_frame(*e);
+	pt_entry* page = vmmngr_ptable_lookup_entry(table, addr);
+
+	vmmngr_free_page(page);
 }
 
 bool vmmngr_is_page_present(virtual_addr addr)

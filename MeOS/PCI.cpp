@@ -36,82 +36,35 @@ int CheckAHCIType(HBA_MEM_t* _abar)
 }
 
 /* Fast network card detection due to high enthusiasm. this section is to be moved to the proper driver */
-uint32 mem_base;
-bool eerprom_exists = false;
-#define REG_EEPROM      0x0014
-uint32 mac[6];
-
-void writeCommand(uint16 p_address, uint32 p_value)
-{
-	*(uint32*)(mem_base + p_address) = p_value;
-}
-
-uint32 readCommand(uint16 p_address)
-{
-	return *(uint32*)(mem_base + p_address);
-}
-
-bool detectEEProm()
-{
-	uint32 val = 0;
-	writeCommand(REG_EEPROM, 0x1);
-
-	for (int i = 0; i < 1000 && !eerprom_exists; i++)
-	{
-		val = readCommand(REG_EEPROM);
-		if (val & 0x10)
-			eerprom_exists = true;
-		else
-			eerprom_exists = false;
-	}
-	return eerprom_exists;
-}
-
-uint32 eepromRead(uint8 addr)
-{
-	uint16 data = 0;
-	uint32 tmp = 0;
-	if (eerprom_exists)
-	{
-		writeCommand(REG_EEPROM, (1) | ((uint32)(addr) << 8));
-		while (!((tmp = readCommand(REG_EEPROM)) & (1 << 4)));
-	}
-	else
-	{
-		writeCommand(REG_EEPROM, (1) | ((uint32)(addr) << 2));
-		while (!((tmp = readCommand(REG_EEPROM)) & (1 << 1)));
-	}
-	data = (uint16)((tmp >> 16) & 0xFFFF);
-	return data;
-}
+e1000 dev;
 
 bool readMACAddress()
 {
-	if (eerprom_exists)
+	if (dev.eeprom_exists)
 	{
 		printfln("EEprom exists");
 		uint32 temp;
-		temp = eepromRead(0);
-		mac[0] = temp & 0xff;
-		mac[1] = temp >> 8;
-		temp = eepromRead(1);
-		mac[2] = temp & 0xff;
-		mac[3] = temp >> 8;
-		temp = eepromRead(2);
-		mac[4] = temp & 0xff;
-		mac[5] = temp >> 8;
+		temp = e1000_eeprom_read(&dev, 0);
+		dev.mac[0] = temp & 0xff;
+		dev.mac[1] = temp >> 8;
+		temp = e1000_eeprom_read(&dev, 1);
+		dev.mac[2] = temp & 0xff;
+		dev.mac[3] = temp >> 8;
+		temp = e1000_eeprom_read(&dev, 2);
+		dev.mac[4] = temp & 0xff;
+		dev.mac[5] = temp >> 8;
 	}
 	else
 	{
 		printfln("EEprom does not exist exists");
 
-		uint8* mem_base_mac_8 = (uint8 *)(mem_base + 0x5400);
-		uint32* mem_base_mac_32 = (uint32 *)(mem_base + 0x5400);
+		uint8* mem_base_mac_8 = (uint8 *)(dev.mem_base + 0x5400);
+		uint32* mem_base_mac_32 = (uint32 *)(dev.mem_base + 0x5400);
 		if (mem_base_mac_32[0] != 0)
 		{
 			for (int i = 0; i < 6; i++)
 			{
-				mac[i] = mem_base_mac_8[i];
+				dev.mac[i] = mem_base_mac_8[i];
 			}
 		}
 		else return false;
@@ -161,11 +114,16 @@ int check(uint8 bus, uint8 device, uint8 function)
 			PCIReadRegister(bus, device, function, 0) & 0xFFFF,
 			PCIReadRegister(bus, device, function, 0) & 0xFFFF0000);
 
-		mem_base = PCIReadRegister(bus, device, function, 0x10) & 0xFFFFFFF0;
-		detectEEProm();
+		dev.mem_base = PCIReadRegister(bus, device, function, 0x10) & 0xFFFFFFF0;
+		e1000_detect_eeprom(&dev);
 		if (!readMACAddress()) PANIC("Could not read MAC address");
 
-		printfln("MAC address: %x %x %x %x %x %x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+		printfln("MAC address: %x %x %x %x %x %x", dev.mac[0], dev.mac[1], dev.mac[2], dev.mac[3], dev.mac[4], dev.mac[5]);
+	}
+	else if (cls == 0x7)
+	{
+		printfln("found serial line with interrupt at: %u and command: %h", PCIReadRegister(bus, device, function, 0x3C) & 0xff, PCIReadRegister(bus, device, function, 0x04) & 0xff);
+		debugf("");
 	}
 	else
 		return 0;

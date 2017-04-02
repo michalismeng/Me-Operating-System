@@ -183,14 +183,15 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	t->state = THREAD_STATE::THREAD_READY;
 	t->base_priority = priority;
 
+	printfln("here");
 	// TODO: Replace the directory switches by a simple kernel page map
 	pdirectory* old_dir = vmmngr_get_directory();
 	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
-
+	printfln("sqitched old dir");
 	thread_setup_stack(t, entry, esp, stack_size);
-
+	printfln("stack setup");
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
-
+	printfln("returning");
 	return t;
 }
 

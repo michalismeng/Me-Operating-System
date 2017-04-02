@@ -256,10 +256,23 @@ void keyboard_fancy_function()
 			sleep(500);
 			kybrd_reset_system();
 		}
+		else if (c == KEYCODE::KEY_V)
+		{
+			ClearScreen();
+			vfs_print_all();
+		}
+		else if (c == KEYCODE::KEY_P)
+		{
+			uint32 port = 0x3f8;
+			printfln("reading port 0x3f8 %h %h", *((uint32*)port), inportb(port));
+
+			outportb(PORT + 7, 0x30);   
+			printfln("scratch pad reg: %h", inportb(PORT + 7));
+		}
 	}
 }
 
-char ___buffer[5000];
+char* ___buffer;
 _pipe pipe;
 int fd[2];
 
@@ -362,9 +375,52 @@ void proc_init_thread()
 	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
+	___buffer = (char*)(3 GB + 10 MB + 10 KB);
+
+
 	ClearScreen();
 
-	init_vfs();	/* last entry (TestDLL5.exe) does not show up??*/
+	// check of list implementation
+	list<int> test;
+	list_init(&test);
+
+	list_insert_back(&test, 1);
+	list_insert_back(&test, 2);
+	list_insert_back(&test, 3);
+
+	auto list = &test;
+
+	printfln("inserted. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
+
+	list_remove_front(list);
+
+	printfln("removed front. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
+
+	list_insert_back(list, 4);
+
+	printfln("inserted front. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
+
+	auto temp = list->head;
+	while (temp->next != 0)
+	{
+		if (temp->next->data == 4)
+		{
+			list_remove(list, temp);
+			printfln("removed custom. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
+
+			break;
+		}
+
+		temp = temp->next;
+	}
+
+	//while (true);
+
+	ClearScreen();
+
+	INT_OFF;
+
+	init_vfs();
 
 	uint32 ahci_base = 0x300000;
 	init_ahci(_abar, ahci_base);
@@ -375,14 +431,23 @@ void proc_init_thread()
 	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
 	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
+
+	vfs_node* folder = 0;
+
+	//debugf("");
+
+	if (vfs_lookup(hierarchy, "FOLDER", &folder) != 0)
+		printfln("ERROR");
+	else
+		printfln("folder: %h", folder->attributes);
+
 	vfs_add_child(vfs_get_root(), hierarchy);
 
 	vfs_print_all();
 
 	// initialize the page cache
-
 	page_cache_print();
-
+	//debugf("");
 	INT_OFF;
 
 	/*int test_fd = 0;
@@ -412,8 +477,6 @@ void proc_init_thread()
 
 	page_cache_print();*/
 
-	printfln("\nend");
-
 	//while (true);
 
 	uint32 error;
@@ -434,6 +497,7 @@ void proc_init_thread()
 		//semaphore_init(&sem, 1);
 
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 1));
+	printfln("new insertion");
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
 	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
@@ -451,35 +515,63 @@ void proc_init_thread()
 
 	int fd;
 
-	if (error = open_file("sdc_mount/MIC.TXT", &fd))
+	for (int i = 0; i < 10000; i++)
+		___buffer[i] = 0;
+
+	if (error = open_file("sdc_mount/BEST.TXT", &fd))
 		printfln("open error code %u", error);
 
-	vfs_node* node = gft_get(fd)->file_node;
+	if (read_file(fd, 25000, 10, (virtual_addr)___buffer) != 10)
+		printfln("read error code %u", get_last_error());
+	else
+		printfln("buffer: %s", ___buffer);
 
-	/*node->name = "MIC     TXT";
-	node->name_length = 12;*/
+	for (int i = 0; i < 5; i++)
+		___buffer[i] = 'c';
+
+	/*if (write_file(fd, 5, 5, (virtual_addr)___buffer) != 5)
+		printfln("write error code %u", get_last_error());*/
+
+	/*if (error = sync_file(fd, -1, 0))
+		printfln("sync error: %u", error);*/
+
+	/*if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, -1, 0))
+		printfln("sync error: %u", error);*/
+
+	/*vfs_node* node = gft_get(fd)->file_node;
+
+	printfln("node: %u %h", node->data >> 12, node->data & 0xFFF);
+
+	node = vfs_find_node("sdc_mount/FOLDER");
+
+	printfln("node: %u %h", node->data >> 12, node->data & 0xFFF);*/
+	page_cache_print();
+	debugf("");
+
+	/*vfs_node* node = gft_get(fd)->file_node;
+	node->name = "NEW.TXT";
+	node->name_length = strlen("NEW.TXT");*/
+
+	//node->file_length = 50;
 
 	/*node->fs_ops->fs_ioctl(node, 0);
 
-	if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, 0, 0))
+	if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, -1, 0))
 		printfln("sync error: %u", error);*/
 
-	printfln("end");
+		/*if (read_file(fd, 5000, 20, (virtual_addr)___buffer) != 20)
+			printfln("read error code %u", get_last_error());
+		else
+			printfln("MIC DATA: %s.", ___buffer);*/
 
-	while (true);
+			/*if (write_file(fd, 10, 10, (virtual_addr)___buffer) != 10)
+				printfln("write error code %u", get_last_error());
 
-	if (error = read_file(fd, 1, 10, (virtual_addr)___buffer))
-		printfln("read error code %u", get_last_error());
-	else
-		printfln("MIC DATA: %s.", ___buffer);
+			if (error = sync_file(fd, -1, 0))
+				printfln("sync error: %u", error);
 
-	/*if (error = write_file(fd, gft_get(fd)->file_node->file_length, 2000, (virtual_addr)___buffer))
-		printfln("write error code %u", get_last_error());
-	else
-		printfln("wrote at: %u till %u", gft_get(fd)->file_node->file_length, gft_get(fd)->file_node->file_length + 2000);*/
-
-		/*if (error = sync_file(fd, -1, 0))
-			printfln("sync error: %u", error);*/
+			if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, -1, 0))
+				printfln("sync error: %u", error);*/
 
 	page_cache_print();
 
@@ -551,8 +643,13 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	GetMemoryStats();
 
-	vmmngr_initialize();
+	vmmngr_initialize(pmmngr_get_next_align(k_info->kernel_size + 1) / 4096);
 	pmmngr_paging_enable(true);
+
+	/*printfln("testing");
+	int x = *(uint32*)(0xF0404000);
+
+	printfln("found: %h", x);*/
 
 	_abar = PCIFindAHCI();
 
@@ -594,8 +691,15 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	virtual_addr space = pmmngr_get_next_align(0xC0000000 + k_info->kernel_size + 4096);
 	printfln("allocating 4KB at %h", space);
 
-	if (!vmmngr_alloc_page(space) || !vmmngr_alloc_page(space + 4096))
+	if (vmmngr_is_page_present(space))
+		printfln("space: %h alloced", space);
+
+	if (!vmmngr_alloc_page(space))
 		PANIC("cannot allocate for mini heap");
+
+	if(!vmmngr_alloc_page(space + 4096))
+		PANIC("cannot allocate for mini heap");
+
 
 	// setup a dummy kernel heap for process 0 initialization
 	kernel_heap = heap_create(space, 0x2000);

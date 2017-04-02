@@ -7,6 +7,9 @@
 
 /* The error lives in the thread stack so it is accessible from user-land */
 
+// creates an error based on the given values
+uint32 error_create(uint32 value);
+
 // sets the most recent error for the currently executing thread
 void set_last_error(uint32 error);
 

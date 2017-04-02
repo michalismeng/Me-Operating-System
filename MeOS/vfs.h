@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "list.h"
 #include "MassStorageDefinitions.h"
+#include "Debugger.h"
 
 enum VFS_ATTRIBUTES
 {
@@ -100,13 +101,13 @@ vfs_node* vfs_find_node(char* path);
 void init_vfs();
 
 // include read and write to and from page-cache functions
-vfs_result vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+uint32 vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
 
 // opens a file for operations. (Loads its drive layout)
 vfs_result vfs_open_file(vfs_node* node);
 
 // writes to an opened file
-vfs_result vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+uint32 vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
 
 // syncs the in memory changes to the underlying drive
 vfs_result vfs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);

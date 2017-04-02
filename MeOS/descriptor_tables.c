@@ -8,6 +8,15 @@ idt_ptr_t 	idt_ptr;
 
 isr_t* interrupt_handlers;
 
+void InvalidOp(registers_t* regs)
+{
+	char str[30] = "Invalid Opcode at: ";
+	uitoa(regs->eip, str + 19, 16);
+	SetForegroundColor(RED);
+	SetCursor(0, 0);
+	PANIC(str);
+}
+
 void test_handle(registers_t* regs)
 {
 	printfln("called");
@@ -24,6 +33,7 @@ void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t*
 	// Enrich our IDT with interrupt 0x80 (userspace program services)
 	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 	register_interrupt_handler(0x80, test_handle);
+	register_interrupt_handler(6, InvalidOp);
 }
 
 void init_gdt()

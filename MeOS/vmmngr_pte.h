@@ -22,7 +22,7 @@ extern "C" {
 		I86_PTE_PAT = 0x80,
 		I86_PTE_CPU_GLOBAL = 0x100,
 		I86_PTE_LV4_GLOBAL = 0x200,
-		I86_PTE_FRAME = 0x7FFFF000
+		I86_PTE_FRAME = 0xFFFFF000		// here the first digit was 7 instead of F (0x7FFF) by brokenthorn...
 	};
 
 	typedef uint32 pt_entry;		// every page table entry is 32 bit wide

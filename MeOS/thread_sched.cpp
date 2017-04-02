@@ -203,6 +203,7 @@ void thread_insert(TCB* thread)
 	//TODO: if current thread's priority is lees than the new one's, the current should be pre-empted (except if it is non preemptible)
 	thread->state = THREAD_STATE::THREAD_READY;
 	list_insert_back(&READY_QUEUE(thread->base_priority), thread);
+	printfln("inserted");
 }
 
 // TODO: Search all the queues for the thread

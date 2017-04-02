@@ -74,6 +74,9 @@ bool list_remove(list<T>* l, list_node<T>* prev)
 
 	prev->next = temp->next;
 
+	if (temp == l->tail)
+		l->tail = prev;
+
 	delete temp;
 	l->count--;
 
@@ -103,6 +106,10 @@ list_node<T>* list_remove_node(list<T>* l, list_node<T>* prev)
 	}
 
 	list_node<T>* temp = prev->next;
+
+	if (temp == l->tail)
+		l->tail = prev;
+
 	prev->next = temp->next;
 	l->count--;
 

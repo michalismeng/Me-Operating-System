@@ -46,7 +46,7 @@ struct pdirectory
 void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags);
 
 // initializes the virtual memory manager
-void vmmngr_initialize();
+void vmmngr_initialize(uint32 kernel_pages);
 
 // allocates a virtual page with the default flags
 bool vmmngr_alloc_page(virtual_addr base);
@@ -56,6 +56,9 @@ bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags);
 
 // frees a virtual page
 void vmmngr_free_page(pt_entry* entry);
+
+// frees a virtual page using a virtual address
+void vmmngr_free_page_addr(virtual_addr addr);
 
 // switch page directory
 bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr);

@@ -1,6 +1,8 @@
 #ifndef FAT32_FS_H_01102016
 #define FAT32_FS_H_01102016
 
+// TODO: The whole FAT driver needs checking with bigger files. Operations are not granted to work for any input file given.
+
 #include "types.h"
 #include "vfs.h"
 #include "MassStorageDefinitions.h"
@@ -11,6 +13,7 @@
 #include "error.h"
 
 #define FAT_EOF	0x0FFFFFF8
+#define GFD_FAT_SPECIAL 0
 
 #pragma pack(push, 1)
 
@@ -139,5 +142,9 @@ vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info
 // transfers a file page (4KB) to or from the file
 vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
 	uint32 file_page, virtual_addr address, bool read);
+
+uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster);
+
+uint32 fat_fs_get_free_cluster(vfs_node* mount_point);
 
 #endif

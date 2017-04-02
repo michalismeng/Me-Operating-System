@@ -228,28 +228,30 @@ void vfs_print_all()
 	print_vfs(root, 0);
 }
 
-vfs_result vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+uint32 vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	/*if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;*/
-
-		// TODO: Check read permissions
+	// TODO: Check read permissions
 	return node->fs_ops->fs_read(fd, node, start, count, address);
 }
 
-vfs_result vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+uint32 vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	/*if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;*/
+	// TODO: Check read permissions
+	uint32 written = node->fs_ops->fs_write(fd, node, start, count, address);
+	if (start + written > node->file_length)
+	{
+		printfln("new length: %u", start + written);
+		node->file_length = start + written;
+		node->fs_ops->fs_ioctl(node, 0);
+	}
 
-		// TODO: Check read permissions
-	return node->fs_ops->fs_write(fd, node, start, count, address);
+	return written;
 }
 
 vfs_result vfs_sync(int fd, vfs_node* node, uint32 page_start, uint32 page_end)
@@ -257,10 +259,7 @@ vfs_result vfs_sync(int fd, vfs_node* node, uint32 page_start, uint32 page_end)
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	/*if (node->is_open == false)
-		return VFS_FILE_NOT_OPEN;*/
-
-		// TODO: Check read permissions
+	// TODO: Check read permissions
 	return node->fs_ops->fs_sync(fd, node, page_start, page_end);
 }
 
@@ -269,10 +268,6 @@ vfs_result vfs_open_file(vfs_node* node)
 	if (!node)
 		return VFS_INVALID_NODE;
 
-	/*if (node->is_open == true)
-		return VFS_OK;
-
-	node->is_open = true;*/
 	return node->fs_ops->fs_open(node);
 }
 
@@ -280,6 +275,9 @@ vfs_result vfs_lookup(vfs_node* parent, char* path, vfs_node** result)
 {
 	if (!parent)
 		return VFS_INVALID_NODE;
+
+	if (parent->fs_ops->fs_lookup == 0)
+		return vfs_default_lookup(parent, path, result);
 
 	return parent->fs_ops->fs_lookup(parent, path, result);
 }
