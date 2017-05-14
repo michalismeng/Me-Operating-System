@@ -6,9 +6,14 @@ uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_
 vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
 vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...);
 
-uint32 fat_node_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+#define STORAGE_INFO(mp) ((mass_storage_info*)mp->tag->deep_md)
+#define MOUNT_DATA(mp) ((fat_mount_data*)mp->deep_md)
+#define NODE_DATA(n) ((fat_node_data*)n->deep_md)
+#define LAYOUT(n) ((fat_file_layout*)n->deep_md)
 
-void fat_fs_generate_short_name(vfs_node* node, char name[12]);
+vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache);
+bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
+uint32 fat_node_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 
 // file operations
 static fs_operations fat_fs_operations =
@@ -23,10 +28,10 @@ static fs_operations fat_fs_operations =
 };
 
 // mount point operations
-static fs_operations fat_node_operations =
+static fs_operations fat_mount_operations =
 {
-	NULL,
-	fat_node_write,
+	NULL,				// read
+	fat_node_write,		// write
 	NULL,				// open
 	NULL,				// close
 	fat_fs_sync,		// sync
@@ -34,62 +39,127 @@ static fs_operations fat_node_operations =
 	NULL				// ioctl?
 };
 
-uint32 fat_node_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+#pragma region Private Functions
+
+VFS_ATTRIBUTES fat_to_vfs_attributes(uint32 fat_attrs)
 {
-	uint32 page = node->data >> 12;
-	uint32 offset = node->data & 0xFFF;
+	uint32 attrs = VFS_ATTRIBUTES::VFS_READ;
 
-	fat_dir_entry_short* entry = (fat_dir_entry_short*)(page_cache_get_buffer(fd, page) + offset);
-	entry->file_size = node->file_length;
+	if ((fat_attrs & FAT_READ_ONLY) != FAT_READ_ONLY)
+		attrs |= VFS_ATTRIBUTES::VFS_WRITE;
 
-	char buffer[12];
-	fat_fs_generate_short_name(node, buffer);
-	memcpy(entry->name, buffer, 11);
+	if ((fat_attrs & FAT_HIDDEN) == FAT_HIDDEN)
+		attrs |= VFS_ATTRIBUTES::VFS_HIDDEN;
 
-	return sizeof(fat_dir_entry_short);
+	if ((fat_attrs & FAT_DIRECTORY) == FAT_DIRECTORY)
+		attrs |= VFS_ATTRIBUTES::VFS_DIRECTORY;
+	else
+		attrs |= VFS_ATTRIBUTES::VFS_FILE;
+
+	return (VFS_ATTRIBUTES)attrs;
 }
 
-vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
+FAT_DIR_ATTRIBUTES vfs_to_fat_attributes(uint32 vfs_attrs)
 {
-	if (command == 0)	// invalidate
+	uint32 attrs = 0;
+
+	switch (vfs_attrs & 7)
 	{
-		// mount point data is the file descriptor for the root directory "file"
-		vfs_node* mount = node->tag;
-		mount->fs_ops->fs_write(mount->data, node, 0, 0, 0);
+		//case VFS_FILE:		attrs |= FAT_ARCHIVE;	break; FAT_ARCHIVE is used for backup utilities to track changes in files. Not to mark files!
+	case VFS_DIRECTORY: attrs |= FAT_DIRECTORY; break;
+	case VFS_LINK:		attrs |= FAT_DIRECTORY; break;
+	default:			attrs = 0;				break;
 	}
 
-	return VFS_OK;
+	if ((vfs_attrs & VFS_WRITE) != VFS_WRITE)
+		attrs |= FAT_READ_ONLY;
+
+	if ((vfs_attrs & VFS_HIDDEN) == VFS_HIDDEN)
+		attrs |= FAT_HIDDEN;
+
+	return (FAT_DIR_ATTRIBUTES)attrs;
 }
 
-vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+// returns a compressed 8.3 (max 13 characters) with ALL spaces killed
+void fat_fs_retrieve_short_name(fat_dir_entry_short* entry, char buffer[13])
 {
-	vfs_node* mount_point = file->tag;
-	vfs_node* device = file->tag->tag;
+	buffer[12] = 0;
+	uint8 name_index = 0;
 
-	virtual_addr cache = page_cache_get_buffer(fd, page);
-	uint32 error;
+	for (uint8 i = 0; i < 8; i++)
+		if (entry->name[i] != ' ')
+			buffer[name_index++] = entry->name[i];
 
-	if (cache == 0)
+	buffer[name_index++] = '.';
+	uint8 prev_index = name_index;
+
+	for (uint8 i = 0; i < 3; i++)
+		if (entry->extension[i] != ' ')
+			buffer[name_index++] = entry->extension[i];
+
+	if (name_index == prev_index)		// all three extension chars were spaces so delete . as this is (perhaps) a folder
+		buffer[--name_index] = 0;
+}
+
+// generates a valid FAT32 name from a vfs node name
+void fat_fs_generate_short_name(vfs_node* node, char name[12])
+{
+	if (node->name_length > 12)
+		return;
+
+	for (uint8 j = 0; j < 11; j++)
+		name[j] = ' ';
+
+	uint8 i = 0;
+	uint8 dot_index = 0;
+	for (; i < 8 && i < node->name_length; i++)
 	{
-		cache = page_cache_reserve_buffer(fd, page);
-		if (cache == 0)
+		if (node->name[i] == '.')
 		{
-			set_last_error(VFS_CACHE_FULL);
-			return VFS_CACHE_FULL;
+			dot_index = i;
+			while (i < 8)
+				name[i++] = ' ';
+
+			break;
 		}
 
-		if ((error = fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, page, cache, true)) != VFS_OK)
-		{
-			page_cache_release_buffer(fd, page);
-			set_last_error(error);
-			return error;
-		}
+		name[i] = node->name[i];
 	}
 
-	*_cache = cache;
+	if (dot_index == 0)
+		return;
 
-	return VFS_OK;
+	for (uint8 j = 0; j < 3 && dot_index + j + 1 < node->name_length; j++, i++)
+		name[i] = node->name[dot_index + j + 1];
 }
+
+bool fat_fs_validate_83_name(char* name, uint32 length)
+{
+	if (length > 11)
+		return false;
+
+	/*0x2E, (this is the '.')*/
+	uint8 bad_values[] = { 0x22, 0x2A, 0x2B, 0x2C,  0x2F, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x5B, 0x5C, 0x5D, 0x7C };
+
+	for (uint32 i = 0; i < length; i++)
+	{
+		if (i != 0 && name[i] < 0x20)
+			return false;
+
+		if (i == 0 && name[i] < 0x20 && name[i] != 0x05)
+			return false;
+
+		for (uint8 j = 0; j < 16; j++)
+			if (name[i] == bad_values[j])
+				return false;
+	}
+
+	return true;
+}
+
+#pragma endregion
+
+#pragma region VFS API Implementation
 
 //TODO: Do more testing with larger files...
 uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
@@ -128,7 +198,7 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 			set_last_error(error);
 			return read;
 		}
-		
+
 		read += 4096;
 		memcpy((void*)(address + read), (void*)cache, 4096);
 	}
@@ -213,17 +283,17 @@ vfs_result fat_fs_open(vfs_node* node)
 
 	// TODO: filesystem open permission
 	vfs_node* mount_point = node->tag;
-	vfs_node* device = node->tag->tag;
 
-	return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, (mass_storage_info*)device->deep_md, node);
+	return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, node);
 }
 
+// TODO: When a page is outside the layout of a file (the file has been extended due to new data), reserve a new sector for it.
 vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
 {
 	vfs_node* mount_point;
 	vfs_node* device;
 
-	if ((file->attributes & 0x7) == VFS_FILE)
+	if ((file->attributes & 0x7) == VFS_FILE || (file->attributes & 0x7) == VFS_DIRECTORY)
 	{
 		mount_point = file->tag;
 		device = file->tag->tag;
@@ -233,6 +303,8 @@ vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_en
 		mount_point = file;
 		device = file->tag;
 	}
+	else
+		return VFS_ERROR::VFS_BAD_ARGUMENTS;
 
 	// convention, sync the whole file
 	if (page_start > page_end)
@@ -246,32 +318,185 @@ vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_en
 	{
 		uint32 error;
 		virtual_addr cache = page_cache_get_buffer(fd, pg);
-
+		
 		if (cache == 0)
 			continue;
 
-		if ((error = fat_fs_data_transfer(mount_point, (mass_storage_info*)device->deep_md, file, pg, cache, false)) != VFS_OK)
-			return error;
+		if(fat_fs_write_by_page(mount_point, file, pg, cache) == false)
+			return VFS_ERROR::VFS_GENERAL_ERROR;
 	}
 
 	return VFS_OK;
 }
 
-// returns the FAT cluster read
-uint32 fat_fs_read_cluster(virtual_addr buffer, uint32 index)
+vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
+{
+	if (command == 0)	// invalidate
+	{
+		// mount point data is the file descriptor for the root directory "file"
+		vfs_node* mount = node->tag;
+		mount->fs_ops->fs_write(MOUNT_DATA(mount)->fd, node, 0, 0, 0);
+	}
+	
+	return VFS_OK;
+}
+
+#pragma endregion
+
+#pragma region Sector Access Functions
+
+// reads a 4KB data region starting at the given linear block address. This is the lowest level data exchange function.
+bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
+{
+	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT ||
+		MOUNT_DATA(mount_point) == 0 || STORAGE_INFO(mount_point) == 0)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	uint32 result;
+	if ((result = STORAGE_INFO(mount_point)->read(STORAGE_INFO(mount_point), lba, 0, 8, vmmngr_get_phys_addr(address))) != 0)
+	{
+		set_last_error(result);
+		return false;
+	}
+
+	return true;
+}
+
+// writes a 4KB data region starting at the given linear block address. This is the lowest level data exchange function.
+bool fat_fs_write_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
+{
+	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT ||
+		MOUNT_DATA(mount_point) == 0 || STORAGE_INFO(mount_point) == 0)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	uint32 result;
+	if ((result = STORAGE_INFO(mount_point)->write(STORAGE_INFO(mount_point), lba, 0, 8, vmmngr_get_phys_addr(address))) != 0)
+	{
+		set_last_error(result);
+		return false;
+	}
+
+	return true;
+}
+
+// reads a 4KB data region that corresponds to the given data cluster, starting at the volume's cluster lba. 
+bool fat_fs_read_by_data_cluster(vfs_node* mount_point, uint32 cluster, virtual_addr address)
+{
+	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT || MOUNT_DATA(mount_point) == 0)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	return fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->cluster_lba + (cluster - 2) * 8, address);
+}
+
+// writes a 4KB data region that corresponds to the given data cluster, starting at the volume's cluster lba. 
+bool fat_fs_write_by_data_cluster(vfs_node* mount_point, uint32 cluster, virtual_addr address)
+{
+	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT || MOUNT_DATA(mount_point) == 0)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	return fat_fs_write_by_lba(mount_point, MOUNT_DATA(mount_point)->cluster_lba + (cluster - 2) * 8, address);
+}
+
+// reads a 4KB data region that corresponds to the given node file_page data cluster.
+bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address)
+{
+	fat_file_layout* layout = LAYOUT(node);
+
+	if (layout == 0 || file_page >= layout->count)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	return fat_fs_read_by_data_cluster(mount_point, vector_at(layout, file_page), vmmngr_get_phys_addr(address));
+}
+
+// write a 4KB data region that corresponds to the given node file_page data cluster.
+bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address)
+{
+	fat_file_layout* layout = LAYOUT(node);
+
+	if (layout == 0 || file_page >= layout->count)
+	{
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return false;
+	}
+
+	return fat_fs_write_by_lba(mount_point, vector_at(layout, file_page), vmmngr_get_phys_addr(address));
+}
+
+#pragma endregion
+
+
+/* Read short entry and FAT values */
+
+// given a buffer of FAT entries returns the FAT value at the given index
+// actually returning the next data cluster in the chain to read
+uint32 fat_fs_read_fat_value(virtual_addr buffer, uint32 index)
 {
 	return ((uint32*)buffer)[index] & 0x0FFFFFFF;
 }
 
-// returns the next cluster to read based on the current cluster and the first FAT
-uint32 fat_fs_get_next_cluster(mass_storage_info* info, uint32 fat_lba, uint32 current_cluster)
+// returns the entry's first data cluster, by combining the low and high values.
+uint32 fat_fs_get_entry_data_cluster(fat_dir_entry_short* e)
 {
-	// each 512 byte sector has 128 fat entries. We need to find out which part of FAT to load
-	uint32 fat_offset = current_cluster / 128;
-	uint32* buffer = (uint32*)mass_storage_read(info, fat_lba + fat_offset, 0, 8, 0);		// read FAT portion(address does nothing)
-																							// replaces: info->entry_point(0, info, fat_lba + fat_offset, 0, 8);
+	return e->cluster_low + ((uint32)e->cluster_high & 0x0FFFFFFF);
+}
 
-	return buffer[current_cluster] & 0x0FFFFFFF;		// clear 4 top most bits as they are reserved (FAT28 as we implement)
+/*************************************************************************************/
+
+
+uint32 fat_node_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+{
+	uint32 page = NODE_DATA(node)->metadata_cluster;
+	uint32 offset = NODE_DATA(node)->metadata_index;
+
+	fat_dir_entry_short* entry = (fat_dir_entry_short*)(page_cache_get_buffer(fd, page) + offset);
+	entry->file_size = node->file_length;
+
+	char buffer[12];
+	fat_fs_generate_short_name(node, buffer);
+	memcpy(entry->name, buffer, 11);
+
+	return sizeof(fat_dir_entry_short);
+}
+
+int fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+{
+	vfs_node* mount_point = file->tag;
+	virtual_addr cache = page_cache_get_buffer(fd, page);
+	// if page is not found then allocate a new one to hold the required data.
+	if (cache == 0)
+	{
+		cache = page_cache_reserve_buffer(fd, page);
+		if (cache == 0)
+		{
+			set_last_error(VFS_CACHE_FULL);
+			return VFS_CACHE_FULL;
+		}
+
+		if(fat_fs_read_by_page(mount_point, file, page, cache) == false)
+		{
+			page_cache_release_buffer(fd, page);
+			*_cache = 0;
+			return 1;
+		}
+	}
+
+	*_cache = cache;
+	return VFS_OK;
 }
 
 // returns the next cluster to read based on the current cluster and the first FAT
@@ -280,201 +505,100 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
 	uint32 fat_offset = current_cluster / 128;
 	uint32 address;
-	if (!(address = page_cache_reserve_buffer(mount_point->data, GFD_FAT_SPECIAL)))
+	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
 	{
 		DEBUG("error smoething went wrong");
 		return 0;
 	}
 
-	mass_storage_info* info = (mass_storage_info*)mount_point->tag->deep_md;
-	fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
-
-	int result;
-	if ((result = info->read(info, mount_info->fat_lba + fat_offset, 0, 8, vmmngr_get_phys_addr((virtual_addr)address))) != VFS_OK)
+	// Load desired FAT cluster
+	if(fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
 	{
 		DEBUG("error reading smoething went wrong");
 
-		page_cache_release_buffer(mount_point->data, GFD_FAT_SPECIAL);
+		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
 		return 0;
 	}
 
-	uint32 res = fat_fs_read_cluster(address, current_cluster);
-	page_cache_release_buffer(mount_point->data, GFD_FAT_SPECIAL);
+	// Get the next data cluster to read based on the current data cluster. (Follow the chain)
+	uint32 res = fat_fs_read_fat_value(address, current_cluster);
+	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
 
 	return res;
 }
 
-// returns the first free cluster based on the first FAT values
-uint32 fat_fs_get_free_cluster(vfs_node* mount_point)
+// returns the first free cluster and marks it with the next_cluster value
+uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 {
 	uint32 address;
-	if (!(address = page_cache_reserve_buffer(mount_point->data, GFD_FAT_SPECIAL)))
+	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
 		return 0;
 
 	uint32 fat_lba_index = 0;
-	// TODO: Find a true limit
+	// TODO: Find a true limit. Perhaps cluster LBA?
 	while (true)
 	{
-		mass_storage_info* info = (mass_storage_info*)mount_point->tag->deep_md;
-		fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
-
-		int result;
-		if ((result = info->read(info, mount_info->fat_lba + fat_lba_index * 8, 0, 8, vmmngr_get_phys_addr(address))) != VFS_OK)
+		// Read the FAT cluster indicated by fat_lba_index
+		if(fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_lba_index * 8, address) == false)
 		{
-			page_cache_release_buffer(mount_point->data, GFD_FAT_SPECIAL);
+			page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
 			return 0;
 		}
 
-		// 128 entries per 4KB clusters
+		// lopp through all 128 entries per 4KB clusters
 		for (uint32 i = 0; i < 128; i++)
 		{
-			if (fat_fs_read_cluster(address, i) == 0)		// this is a free cluster
+			if (fat_fs_read_fat_value(address, i) == 0)		// this is a free cluster
 			{
-				page_cache_release_buffer(mount_point->data, GFD_FAT_SPECIAL);
+				((uint32*)address)[i] = next_cluster & 0x0FFFFFFF;	// reserve the cluster with the value given
+
+				// write back the reuslts
+				if (fat_fs_write_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_lba_index * 8, address) == false)
+				{
+					page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+					return 0;
+				}
+
+				page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
 				return fat_lba_index * 128 + i;
 			}
 		}
 
 		fat_lba_index++;
 	}
-}
-
-// returns a compressed 8.3 (max 13 characters) with ALL spaces killed
-void fat_fs_retrieve_short_name(fat_dir_entry_short* entry, char buffer[13])
-{
-	buffer[12] = 0;
-	uint8 name_index = 0;
-
-	for (uint8 i = 0; i < 8; i++)
-		if (entry->name[i] != ' ')
-			buffer[name_index++] = entry->name[i];
-
-	buffer[name_index++] = '.';
-	uint8 prev_index = name_index;
-
-	for (uint8 i = 0; i < 3; i++)
-		if (entry->extension[i] != ' ')
-			buffer[name_index++] = entry->extension[i];
-
-	if (name_index == prev_index)		// all three extension chars were spaces so delete . as this is (perhaps) a folder
-		buffer[--name_index] = 0;
-}
-
-// generates a valid FAT32 name from a vfs node name
-void fat_fs_generate_short_name(vfs_node* node, char name[12])
-{
-	if (node->name_length > 12)
-		return;
-
-	for (uint8 j = 0; j < 11; j++)
-		name[j] = ' ';
-
-	uint8 i = 0;
-	uint8 dot_index = 0;
-	for (; i < 8 && i < node->name_length; i++)
-	{
-		if (node->name[i] == '.')
-		{
-			dot_index = i;
-			while (i < 8)
-				name[i++] = ' ';
-
-			break;
-		}
-
-		name[i] = node->name[i];
-	}
-
-	if (dot_index == 0)
-		return;
-
-	for (uint8 j = 0; j < 3 && dot_index + j + 1 < node->name_length; j++, i++)
-		name[i] = node->name[dot_index + j + 1];
-}
-
-// TODO: FIX THAAAAT
-void fat_fs_retrieve_long_name(fat_dir_entry_long* entry, char name[256])
-{
-	uint8 index = entry->order & ~0x40 - 1;		// all entry orders start at 1
-	bool name_end = false;						// detects a null terminator
-
-	for (uint8 i = 0; i < 5 && !name_end; i++)
-	{
-		if (entry->name1_5[i * 2] == 0)				// name is over so copy the last null termination and mark the end
-			name_end = true;
-
-		name[index * 13 + i] = entry->name1_5[i * 2];
-	}
-
-	for (uint8 i = 0; i < 6 && !name_end; i++)
-	{
-		if (entry->name6_11[i * 2] == 0)			// name is over so copy the last null termination and mark the end
-			name_end = true;
-
-		name[5 + index * 13 + i] = entry->name6_11[i * 2];
-	}
-
-	for (uint8 i = 0; i < 2 && !name_end; i++)
-	{
-		if (entry->name12_13[i * 2] == 0)			// name is over so copy the last null termination and mark the end
-			name_end = true;
-
-		name[index * 13 + i] = entry->name12_13[i * 2];
-	}
-
-	// if this is the last order entry and
-	// the name length is a multiple of 13 then there is no null paddind so we need to add it ourselves
-	if ((entry->order & 0x40) == 0x40 && !name_end)
-		name[index * 13 + 13] = 0;
-}
-
-inline uint32 fat_fs_get_entry_cluster(fat_dir_entry_short* e)
-{
-	return e->cluster_low + ((uint32)e->cluster_high & 0x0FFFFFFF);
-}
-
-vfs_node* fat_fs_read_long_directory(mass_storage_info* info, uint32 fat_lba, uint32 cluster_lba,
-	uint32 current_cluster, fat_dir_entry_long* buffer_base, uint8& index)
-{
-	PANIC("Read long directory! Not implemented correctly");
-	// we take the base buffer so that index can be used.
-	bool over = false;
-	char name[256] = { 0 };
-
-	uint32 offset = current_cluster;
-
-	while (true)
-	{
-		for (uint8 i = index; i < 16; i++)
-		{
-			fat_dir_entry_long* entry = buffer_base + i;
-
-			if ((entry->attributes & FAT_LFN) != FAT_LFN)		// this is a short entry so we are finished
-			{
-				index = i;
-
-				fat_dir_entry_short* s_entry = (fat_dir_entry_short*)entry;
-
-				//return vfs_create_node(name, true,  );
-			}
-
-			fat_fs_retrieve_long_name(entry, name);
-		}
-
-		//offset = fat_fs_get_next_cluster(info, fat_lba, offset);
-		//offset = fat_fs_find_next_cluster(,);
-		if (offset >= FAT_EOF)		// test for end of file marker
-			break;
-
-		buffer_base = (fat_dir_entry_long*)mass_storage_read(info, cluster_lba + (offset - 2) * 8, 0, 8, 0);
-		// replaces: info->entry_point(0, info, cluster_lba + (offset - 2) * 8, 0, 8);
-	}
 
 	return 0;
 }
 
-// starting at current_cluster reads directories and files. Perhaps they will span more than one cluster.
-list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* info, uint32 fat_lba, uint32 cluster_lba, uint32 current_cluster)
+// marks the given cluster with the given value and returns its previous value
+uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value)
+{
+	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
+	uint32 fat_offset = fat_index / 128;
+	uint32 address;
+	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+	{
+		DEBUG("error smoething went wrong");
+		return 0;
+	}
+
+	// Load desired FAT cluster
+	if (fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
+	{
+		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		return 0;
+	}
+
+	uint32 last_value = fat_fs_read_fat_value(address, fat_index % 128);
+	((uint32*)address)[fat_index % 128] = value & 0x0FFFFFFF;
+
+	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+
+	return last_value;
+}
+
+// starting at current_cluster recursively reads directories and files. Perhaps they will span more than one cluster.
+list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_cluster)
 {
 	list<vfs_node*> l;
 	list_init(&l);
@@ -482,17 +606,17 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 	// used to follow the cluster chain for directories
 	uint32 offset = current_cluster;
 
-	while (true)
+	while (offset < FAT_EOF)
 	{
 		virtual_addr cache;
 
-		if (page_cache_get_buffer(mount_point->data, offset) != 0)
+		if (page_cache_get_buffer(MOUNT_DATA(mount_point)->fd, offset) != 0)
 		{
 			printf("page %h", offset);
 			DEBUG(" already is cached");
 		}
 
-		if (!(cache = page_cache_reserve_buffer(mount_point->data, offset)))
+		if (!(cache = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, offset)))
 		{
 			printfln("cache problem: %h %h", offset, cache);
 			debugf("");
@@ -500,15 +624,15 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 		}
 
 		fat_dir_entry_short* entry = (fat_dir_entry_short*)cache;
-		uint32 result = info->read(info, cluster_lba + (offset - 2) * 8, 0, 8, vmmngr_get_phys_addr(cache));
 
-		if (result != 0)
+		if (fat_fs_read_by_data_cluster(mount_point, offset, cache) == false)
 		{
-			printfln("read problem: %h reading: %h at %h", result, offset, cache);
+			printfln("read problem %h reading: %h at %h", get_last_error(), offset, cache);
 			debugf("");
 			return list<vfs_node*>();
 		}
-		vector_insert_back((vector<uint32>*)mount_point->deep_md, (uint32)offset);
+
+		//vector_insert_back(&MOUNT_DATA(mount_point)->layout, (uint32)offset);	//TODO: What is that??
 
 		// read all directory entries of this cluster. There are 128 entries as each is 32 bytes long
 		for (uint8 i = 0; i < 128; i++)
@@ -525,62 +649,36 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, mass_storage_info* 
 			char name[13] = { 0 };
 			fat_fs_retrieve_short_name(entry + i, name);
 
-			uint32 attrs = 0;
 			list<vfs_node*> children;
 			list_init(&children);
 
-			if ((entry[i].attributes & FAT_DIRECTORY) == FAT_DIRECTORY)
+			if (name[0] != '.' && (entry[i].attributes & FAT_DIRECTORY) == FAT_DIRECTORY)
 			{
-				// prevent infinite loop as '.' represents this directory
-				if (name[0] != '.')
-				{
-					attrs |= VFS_ATTRIBUTES::VFS_DIRECTORY;
-
-					// This is a directory. It contains files and directories so read them all
-					uint32 clus = fat_fs_get_entry_cluster(entry + i);
-					children = fat_fs_read_directory(mount_point, info, fat_lba, cluster_lba, clus);
-				}
-				else  // dot and dotdot directories are registered as links
-				{
-					// TODO: set the tag for these two dot and dot dot links
-					attrs |= VFS_ATTRIBUTES::VFS_LINK;
-				}
-			}
-			else
-				attrs |= VFS_ATTRIBUTES::VFS_FILE;
-
-			// TODO: Add vfs hidden
-			if ((entry[i].attributes & FAT_HIDDEN) == FAT_HIDDEN)
-				attrs |= VFS_ATTRIBUTES::VFS_HIDDEN;
-
-			if ((entry[i].attributes & FAT_READ_ONLY) == FAT_READ_ONLY)
-				attrs |= VFS_ATTRIBUTES::VFS_READ;
-			else
-			{
-				attrs |= VFS_ATTRIBUTES::VFS_READ;
-				attrs |= VFS_ATTRIBUTES::VFS_WRITE;
+				// This is a directory (and not a recursive directory . or ..). 
+				// It contains files and directories so read them all
+				uint32 clus = fat_fs_get_entry_data_cluster(entry + i);
+				children = fat_fs_read_directory(mount_point, clus);
 			}
 
-			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_file_layout), mount_point, &fat_fs_operations);
-			node->data = (offset << 8) + i;
+			uint32 attrs = fat_to_vfs_attributes(entry[i].attributes);
+
+			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_node_data), mount_point, &fat_fs_operations);
+			NODE_DATA(node)->metadata_cluster = offset;
+			NODE_DATA(node)->metadata_index = i;
 
 			// setup layout list and add the starting cluster
-			fat_file_layout* layout = (fat_file_layout*)node->deep_md;
+			fat_file_layout* layout = &NODE_DATA(node)->layout;
 
 			vector_init(layout, ceil_division(entry[i].file_size, 4096));
-			vector_insert_back(layout, fat_fs_get_entry_cluster(entry + i));
+			vector_insert_back(layout, fat_fs_get_entry_data_cluster(entry + i));
 
 			node->children = children;
 			list_insert_back(&l, node);
 		}
 
-		uint32 temp_offset = offset;									// prevent the compiler from thoring away the temp_offset variable (var substitution)
-		offset = fat_fs_find_next_cluster(mount_point, offset);			// first find the next offset which requires the page locked
-		page_cache_release_buffer(mount_point->data, temp_offset);		// then release the page
-
-		//offset = fat_fs_get_next_cluster(info, fat_lba, offset);
-		if (offset >= FAT_EOF)		// test for end of file marker
-			break;
+		uint32 temp_offset = offset;
+		offset = fat_fs_find_next_cluster(mount_point, offset);						// first find the next offset (requires the page still be locked)
+		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, temp_offset);		// then release the page
 	}
 
 	return l;
@@ -608,13 +706,14 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	uint32 root_dir_first_cluster = volume->extended.root_cluster_lba;
 
 	// create the vfs mount point node and get the mount data pointer
-	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, &fat_node_operations);
+	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, &fat_mount_operations);
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
 	vector_init(&mount_data->layout, 1);
 
 	// create the mount point file (root directory)
-	mount_point->data = gft_insert_s(create_gfe(mount_point));
-	page_cache_register_file(mount_point->data);		// should de-init somewhen
+
+	MOUNT_DATA(mount_point)->fd = gft_insert_s(create_gfe(mount_point));
+	page_cache_register_file(MOUNT_DATA(mount_point)->fd);
 
 	// load the data at the mount point
 	mount_data->cluster_lba = cluster_lba;
@@ -623,18 +722,25 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	mount_data->root_dir_first_cluster = root_dir_first_cluster;
 
 	// read root directory along with each sub directory
-	mount_point->children = fat_fs_read_directory(mount_point, info, fat_lba, cluster_lba, root_dir_first_cluster);
+	mount_point->children = fat_fs_read_directory(mount_point, root_dir_first_cluster);
 	return mount_point;
 }
 
-vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node)
+vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node)
 {
 	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
 
 	while (true)
 	{
-		//uint32 next_cluster = fat_fs_get_next_cluster(storgae_info, mount_info->fat_lba, vector_at(layout, layout->count - 1));
-		uint32 next_cluster = fat_fs_find_next_cluster(node->tag, vector_at(layout, layout->count - 1));
+		uint32 next_cluster = fat_fs_find_next_cluster(node->tag, vector_at(layout, layout->count - 1));	
+		// TODO: Consider speed up by one time cache reservation.
+		
+		/*if (next_cluster == 0)  This is not needed. Only lowest level functions set errors. All other functions return them.
+		{
+			set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+			return VFS_ERROR::VFS_BAD_ARGUMENTS;
+		}*/
+		
 		if (next_cluster >= FAT_EOF)
 			break;
 
@@ -644,23 +750,245 @@ vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info
 	return VFS_ERROR::VFS_OK;
 }
 
-vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node, uint32 file_page, virtual_addr address, bool read)
+int fat_fs_create_short_entry_from_node(fat_dir_entry_short* entry, vfs_node* node)
 {
-	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
-	fat_mount_data* mount_info = (fat_mount_data*)mount_point->deep_md;
+	if (LAYOUT(node)->count == 0)
+	{
+		DEBUG("cannot create fat entry from bad node");
+		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		return -1;
+	}
 
-	if (file_page >= layout->count)
-		return VFS_ERROR::VFS_PAGE_NOT_FOUND;
+	uint32 first_cluster = vector_at(LAYOUT(node), 0);
 
-	int result;
+	entry->attributes = vfs_to_fat_attributes(node->attributes);
+	fat_fs_generate_short_name(node, (char*)entry->name);
+	entry->file_size = 0;
 
-	if (read)
-		result = storage_info->read(storage_info, mount_info->cluster_lba + (vector_at(layout, file_page) - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));
-	else
-		result = storage_info->write(storage_info, mount_info->cluster_lba + (vector_at(layout, file_page) - 2) * 8, 0, 8, vmmngr_get_phys_addr(address));
+	// TODO: Fix dates
+	entry->created_date = 8225;
+	entry->created_time = 2082;
+	entry->created_time_10 = 0;
 
-	if (result == 0)
-		return VFS_ERROR::VFS_OK;
+	entry->last_accessed_date = 8225;
+	entry->last_modified_date = 8225;
+	entry->last_modified_time = 2082;
+	///////////////////////////////////
 
-	return VFS_ERROR::VFS_READ_ERROR;
+	entry->cluster_low = (uint16)first_cluster;
+	entry->cluster_high = (uint16)(first_cluster >> 16) & 0x0FFF;
+
+	entry->resv0 = 0;
+	return 0;
+}
+
+// initializes a directory with the '.' and '..' entries as the first entries in the buffer.
+void fat_fs_initialize_directory(uint32 parent_cluster, fat_dir_entry_short* new_dir, char* buffer)
+{
+	fat_dir_entry_short* dot = (fat_dir_entry_short*)buffer;
+
+	memcpy(dot, new_dir, sizeof(fat_dir_entry_short));		// greedy copy of new_dir data over dot
+	memcpy((char*)dot->name, ".          ", 11);			// fix dot name
+
+	printfln("new_dir attributes: %h", new_dir->attributes);
+	printfln("dot attributes: %h", dot->attributes);
+
+	fat_dir_entry_short* dotdot = dot + 1;
+
+	memcpy(dotdot, new_dir, sizeof(fat_dir_entry_short));
+	memcpy((char*)dotdot->name, "..         ", 11);			
+
+	dotdot->cluster_low = (uint16)parent_cluster;
+	dotdot->cluster_high = (uint16)((parent_cluster >> 16) & 0x00FF);
+}
+
+// ioctl functions
+
+// TODO: Do some testing...
+vfs_result fat_fs_delete_file(vfs_node* mount_point, vfs_node* node)
+{
+	uint32 cache;
+	if (!(cache = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+	{
+		DEBUG("delete file could not reserve buffer");
+		return -1;
+	}
+
+	uint32 cluster = NODE_DATA(node)->metadata_cluster;		// file metadata cluster
+	uint32 index = NODE_DATA(node)->metadata_index;
+
+	// read the metadata cluster
+	if (fat_fs_read_by_data_cluster(mount_point, cluster, cache) == false)
+	{
+		DEBUG("Could not read cluster");
+		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		return -1;
+	}
+
+	fat_dir_entry_short* entry = ((fat_dir_entry_short*)cache) + index;
+
+	uint32 value = 0xE5;
+	if (index < 127 && (entry + 1)->name[0] == 0)		// if the next entry is mark as last entry then mark this one as the last.
+		value = 0;
+
+	entry->name[0] = value;		// mark the file as deleted
+
+	if (fat_fs_write_by_data_cluster(mount_point, cluster, cache) == false)
+	{
+		DEBUG("Could not write cluster");
+		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		return -1;
+	}
+
+	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+
+	// delete FAT chain
+
+	uint32 next_cluster = vector_at(LAYOUT(node), 0);
+	while (next_cluster >= FAT_EOF)
+	{
+		next_cluster = fat_fs_mark_cluster(mount_point, next_cluster, 0);
+		if (next_cluster == 0)
+		{
+			DEBUG("Delete file error in deleting chains");
+			page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+bool fat_fs_initialize_file_cluster(vfs_node* mount_point, vfs_node* new_node, vfs_node* directory, fat_dir_entry_short* entry, virtual_addr cache)
+{
+	uint32 free_cluster = fat_fs_get_entry_data_cluster(entry);
+
+	if (fat_fs_read_by_data_cluster(mount_point, free_cluster, cache) == false)
+		return false;
+
+	memset((void*)cache, 0, 4096);	// erase all data as specified in the documentation
+
+	if ((new_node->attributes & 7) == VFS_DIRECTORY)
+	{
+		fat_fs_initialize_directory(vector_at(LAYOUT(directory), 0), entry, (char*)cache);
+
+		//TODO: add . and .. in the new_node children.
+		list_insert_back(&directory->children, vfs_create_node(".          ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, &fat_fs_operations));
+		list_insert_back(&directory->children, vfs_create_node("..         ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, &fat_fs_operations));
+	}
+
+	// finally write the first cluster data back to the disk
+	if (fat_fs_write_by_data_cluster(mount_point, free_cluster, cache) == false)
+		return false;
+}
+
+vfs_node* fat_fs_create_file(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes)
+{
+	if (mount_point == 0 || directory == 0 ||
+		(mount_point->attributes & 7) != VFS_MOUNT_PT || (directory->attributes & 7) != VFS_DIRECTORY ||
+		MOUNT_DATA(mount_point) == 0)
+	{
+		set_last_error(VFS_BAD_ARGUMENTS);
+		return 0;
+	}
+
+	if (fat_fs_validate_83_name(name, strlen(name)) == false)
+	{
+		set_last_error(VFS_BAD_ARGUMENTS);
+		return 0;
+	}
+
+	int fd;
+	// TODO: This may cause problems if the directory is being used elsewhere.
+	if (open_file_by_node(directory, &fd) != VFS_OK)		// TODO: Close file
+	{
+		DEBUG("create file could not open directory file");
+		return 0;
+	}
+
+	uint32 cache;
+	if (!(cache = page_cache_reserve_buffer(fd, 0)))
+	{
+		DEBUG("create file could not reserve buffer");
+		return 0;
+	}
+
+	// foreach metadata cluster in the chain loaded
+	auto layout = LAYOUT(directory);
+	for (uint32 i = 0; i < layout->count; i++)
+	{
+		printfln("cluster of directory: %u", vector_at(layout, i));
+		// load the actual cluster data
+		if (fat_fs_read_by_data_cluster(mount_point, vector_at(layout, i), cache) == false)
+		{
+			page_cache_release_buffer(fd, 0);
+			return 0;
+		}
+
+		// iterate through the 128 possible entries to find the first free one
+		fat_dir_entry_short* file_entry = (fat_dir_entry_short*)cache;
+		for (uint32 j = 0; j < 128; j++)
+		{
+			if (file_entry[j].name[0] == 0xE5 || file_entry[j].name[0] == 0)		// this is a free entry
+			{
+				printfln("found empty entry at: %u", j);
+				debugf("");
+				file_entry = file_entry + j;
+
+				/* Create the new file entry and reserve a sector for it */
+
+				uint32 free_cluster = fat_fs_reserve_first_cluster(mount_point, FAT_EOF);
+				if (free_cluster == 0)
+				{
+					DEBUG("FAT32: create new file failed. No more empty clusters");
+					page_cache_release_buffer(fd, 0);
+					return 0;
+				}
+
+				vfs_node* new_node = vfs_create_node(name, true, vfs_attributes, 0, sizeof(fat_node_data), mount_point, &fat_fs_operations);
+				NODE_DATA(new_node)->metadata_cluster = vector_at(layout, i);
+				NODE_DATA(new_node)->metadata_index = j;
+
+				vector_init(LAYOUT(new_node), 1);
+				vector_insert_back(LAYOUT(new_node), free_cluster);
+
+				if (fat_fs_create_short_entry_from_node(file_entry, new_node) != 0)
+				{
+					page_cache_release_buffer(fd, 0);
+					delete new_node;
+					return 0;
+				}
+				////////////////////////////////////////////
+
+				debugf("ready to write");
+
+				/* save the new entry metadata */
+				if (fat_fs_write_by_data_cluster(mount_point, vector_at(layout, i), cache) == false)
+				{
+					page_cache_release_buffer(fd, 0);
+					delete new_node;
+					return 0;
+				}
+
+				/* The file's metadata stuff have been created. Now we deal with the file's first cluster */
+
+				// save the created entry for further use as the cache is re-used
+				fat_dir_entry_short temp_entry = *file_entry;
+
+				if (fat_fs_initialize_file_cluster(mount_point, new_node, directory, &temp_entry, cache) == false)
+				{
+					page_cache_release_buffer(fd, 0);
+					delete new_node;
+					return 0;
+				}
+
+				page_cache_release_buffer(fd, 0);
+				return new_node;
+			}
+		}
+	}
+
+	// TODO: Add new cluster to the chain and continue
+	DEBUG("No empty cluster found!");
+	return 0;
 }

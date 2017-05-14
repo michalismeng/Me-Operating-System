@@ -359,6 +359,8 @@ void create_test_process(int fd)
 	printfln("thread creationg ended");
 }
 
+uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value);
+
 void proc_init_thread()
 {
 	printfln("executing %s", __FUNCTION__);
@@ -376,45 +378,6 @@ void proc_init_thread()
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
-
-
-	ClearScreen();
-
-	// check of list implementation
-	list<int> test;
-	list_init(&test);
-
-	list_insert_back(&test, 1);
-	list_insert_back(&test, 2);
-	list_insert_back(&test, 3);
-
-	auto list = &test;
-
-	printfln("inserted. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
-
-	list_remove_front(list);
-
-	printfln("removed front. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
-
-	list_insert_back(list, 4);
-
-	printfln("inserted front. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
-
-	auto temp = list->head;
-	while (temp->next != 0)
-	{
-		if (temp->next->data == 4)
-		{
-			list_remove(list, temp);
-			printfln("removed custom. Head: %u Tail %u count %u next %h", test.head->data, test.tail->data, test.count, test.tail->next);
-
-			break;
-		}
-
-		temp = temp->next;
-	}
-
-	//while (true);
 
 	ClearScreen();
 
@@ -436,14 +399,91 @@ void proc_init_thread()
 
 	//debugf("");
 
+	vfs_add_child(vfs_get_root(), hierarchy);
+
 	if (vfs_lookup(hierarchy, "FOLDER", &folder) != 0)
 		printfln("ERROR");
 	else
-		printfln("folder: %h", folder->attributes);
+	{
+		if (vfs_open_file(folder) != VFS_OK)
+			DEBUG("error");
+		/*if (fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, folder) != VFS_OK)
+			printfln("error reading FOLDEr layout");*/
 
-	vfs_add_child(vfs_get_root(), hierarchy);
+		auto layout = &((fat_node_data*)folder->deep_md)->layout;
+		printf("folder clusters ");
+		for (int i = 0; i < layout->count; i++)
+			printf("%u ", vector_at(layout, i));
+	}
+	//while (true);
+	ClearScreen();
 
-	vfs_print_all();
+	//print_vfs(hierarchy, 0);
+
+	//while (true);
+
+	vfs_node* file;
+	printfln("reading clusters for FOLDER/MIC.TXT");
+
+	if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &file) != 0)
+		printfln("ERROR");
+	else
+	{
+		uint32 err;
+		int f_desc;
+		if (err = open_file("sdc_mount/FOLDER/MIC.TXT", &f_desc))
+			printfln("Error opening mic.TXT: %u", err);
+
+		if ((file = fat_fs_create_file(hierarchy, folder, "DIR_H", VFS_DIRECTORY | VFS_READ | VFS_WRITE)) == 0)
+			printfln("error creating file %u", get_last_error());
+		else
+			printfln("mica.txt file created");
+
+		if (err = read_file(f_desc, 0, 10, (virtual_addr)___buffer) != 10)
+			printfln("Could not read file: %u", err);
+		else
+			printfln("read:   %s", ___buffer);
+
+		while (true);
+
+		/*fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, (mass_storage_info*)hierarchy->tag->deep_md, file);
+		auto head = (fat_file_layout*)file->deep_md;
+		printf("clusters: ");
+		for (int i = 0; i < head->count; i++)
+			printf("%u ", vector_at(head, i));*/
+	}
+
+	printfln("folder first cluster: %u", ((fat_node_data*)folder->deep_md)->metadata_cluster);
+
+	printf("mnt: ");
+	for (int i = 0; i < ((fat_mount_data*)hierarchy->deep_md)->layout.count; i++)
+		printf("%u ", vector_at(&((fat_mount_data*)hierarchy->deep_md)->layout, i));
+	page_cache_print();
+
+	while (true);
+
+	ClearScreen();
+
+	print_vfs(folder, 0);
+
+	/*printfln("deleting dire");
+	if (vfs_lookup(hierarchy, "FOLDER/TEST.TXT", &file) == 0)
+	{
+		if (fat_fs_delete_file(hierarchy, file) != 0)
+			printfln("ERROR");
+	}
+	else
+		printfln("Could not locate DIRE");*/
+
+	/*printfln("creating file NEW.TXT");
+	if ((file = fat_fs_create_file(hierarchy, folder, "NEW.TXT", VFS_READ | VFS_WRITE)) == 0)
+		printfln("error creating file");
+	else
+		printfln("NEW.txt file created");*/
+
+	//list_insert_back(&folder->children, file);
+
+	while (true);
 
 	// initialize the page cache
 	page_cache_print();
@@ -512,6 +552,9 @@ void proc_init_thread()
 	ClearScreen();
 
 	INT_ON;
+
+	printfln("here end");
+	while (true);
 
 	int fd;
 

@@ -32,7 +32,8 @@ enum VFS_ERROR
 	VFS_READ_ERROR,
 	VFS_FILE_NOT_OPEN,
 	VFS_CACHE_FULL,
-	VFS_BAD_ARGUMENTS
+	VFS_BAD_ARGUMENTS,
+	VFS_GENERAL_ERROR
 };
 
 // vfs node structures
@@ -61,7 +62,6 @@ struct vfs_node
 	uint32 attributes;				// file attributes
 	uint32 file_length;				// file length (bytes)
 	vfs_node* tag;					// tag node associated with this node
-	uint32 data;					// custom data associated with this node
 
 	fs_operations* fs_ops;			// file basic operations
 	list<vfs_node*> children;		// children list

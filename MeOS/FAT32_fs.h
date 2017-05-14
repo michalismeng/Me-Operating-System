@@ -80,18 +80,18 @@ struct fat_volume_id
 
 struct fat_dir_entry_short
 {
-	uint8 name[8];
-	uint8 extension[3];			// 8.3 name
+	uint8 name[8];				// 8.3 name
+	uint8 extension[3];			// 8.3 extension
 	uint8 attributes;
 	uint8 resv0;
 	uint8 created_time_10;		// created time in thenths of a second
 	uint16 created_time;		// created time following special format
 	uint16 created_date;		// created date following special format
 	uint16 last_accessed_date;
-	uint16 cluster_high;		// first cluster high bits (mask 4 top bits)
+	uint16 cluster_high;		// first data cluster high bits (mask 4 top bits) for this file
 	uint16 last_modified_time;
 	uint16 last_modified_date;
-	uint16 cluster_low;			// first cluster low bits
+	uint16 cluster_low;			// first data cluster low bits for this file
 	uint32 file_size;			// file size
 };
 
@@ -120,16 +120,31 @@ enum FAT_DIR_ATTRIBUTES
 
 #pragma pack(pop, 1)
 
-//typedef list<uint32> fat_file_layout;
+enum FAT_IOCTL_COMMANDS
+{
+	FAT_CREATE_FILE,
+	FAT_DELETE_FILE,
+	FAT_COPY_FILE,
+	FAT_CUT_FILE
+};
+
 typedef vector<uint32> fat_file_layout;
+
+struct fat_node_data
+{
+	fat_file_layout layout;		// the file layout on the FAT image.
+	uint32 metadata_cluster;	// the cluster where this file's metadata are located.
+	uint32 metadata_index;		// the index in the cluster (0-127) where this file's metadata are located.
+};
 
 struct fat_mount_data
 {
 	fat_file_layout layout;
 	uint32 partition_offset;			// start of the FAT partition where the volume ID is located
-	uint32 fat_lba;
-	uint32 cluster_lba;
-	uint32 root_dir_first_cluster;
+	uint32 fat_lba;						// linear block addr of the FAT for this volume.
+	uint32 cluster_lba;					// linear block addr of the first data cluster.
+	uint32 root_dir_first_cluster;		// root directory first cluster.
+	uint32 fd;							// file descriptor used when caching general FAT clusters in page cache.
 };
 
 // mount the FAT32 filesystem using the 'mount_name'.
@@ -137,14 +152,21 @@ struct fat_mount_data
 vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node);
 
 // loads the file's, pointed by 'node', cluster chain
-vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, mass_storage_info* storgae_info, vfs_node* node);
+vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node);
 
-// transfers a file page (4KB) to or from the file
-vfs_result fat_fs_data_transfer(vfs_node* mount_point, mass_storage_info* storage_info, vfs_node* node,
-	uint32 file_page, virtual_addr address, bool read);
 
 uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster);
 
-uint32 fat_fs_get_free_cluster(vfs_node* mount_point);
+// reserves the first free cluster assigning it 'next_cluster' value and returns its index.
+uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster);
+
+VFS_ATTRIBUTES fat_to_vfs_attributes(uint32 attrs);
+FAT_DIR_ATTRIBUTES vfs_to_fat_attributes(uint32 attrs);
+
+void fat_fs_generate_short_name(vfs_node* node, char name[12]);
+
+vfs_node* fat_fs_create_file(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes);
+
+vfs_result fat_fs_delete_file(vfs_node* mount_point, vfs_node* node);
 
 #endif

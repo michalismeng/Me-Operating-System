@@ -184,7 +184,7 @@ void vfs_add_child(vfs_node* parent, vfs_node* child)
 void init_vfs()
 {
 	// create root - /dev
-	root = vfs_create_node("root", false, 0, 0, 0, NULL, NULL);
+	root = vfs_create_node("root", false, VFS_DIRECTORY, 0, 0, NULL, NULL);
 	vfs_add_child(root, vfs_create_node("dev", false, 0, 0, 0, NULL, NULL));
 }
 
@@ -213,6 +213,41 @@ void print_vfs(vfs_node* node, int level)
 	}
 }
 
+// returns a string representation of the given attributes. Max string length is 6 (F, DIR, L, DEV, MNT, P, R, W, H)
+void vfs_attributes_to_string(uint32 attrs, char str[11])
+{
+	int pos = 0;
+
+	switch (attrs & 7)
+	{
+	case VFS_FILE:		strcpy(str + pos, "F ");	pos += 2; break;
+	case VFS_DIRECTORY: strcpy(str + pos, "DIR ");	pos += 4; break;
+	case VFS_LINK:		strcpy(str + pos, "L ");	pos += 2; break;
+	case VFS_DEVICE:	strcpy(str + pos, "DEV ");	pos += 4; break;
+	case VFS_MOUNT_PT:	strcpy(str + pos, "MNT ");	pos += 4; break;
+	case VFS_PIPE:		strcpy(str + pos, "P ");	pos += 2; break;
+	default:			strcpy(str + pos, "U ");	pos += 2; break;
+	}
+
+	if ((attrs & VFS_READ) == VFS_READ)
+	{
+		strcpy(str + pos, "R ");
+		pos += 2;
+	}
+
+	if ((attrs & VFS_WRITE) == VFS_WRITE)
+	{
+		strcpy(str + pos, "W ");
+		pos += 2;
+	}
+
+	if ((attrs & VFS_HIDDEN) == VFS_HIDDEN)
+	{
+		strcpy(str + pos, "H ");
+		pos += 2;
+	}
+}
+
 void vfs_print_node(vfs_node* node)
 {
 	if (node == 0)
@@ -220,7 +255,11 @@ void vfs_print_node(vfs_node* node)
 		printf("null node");
 		return;
 	}
-	printf("%s\t%u bytes, attribute: %h", node->name, node->file_length, node->attributes);
+
+	char attrs_str[11] = { 0 };
+	vfs_attributes_to_string(node->attributes, attrs_str);
+
+	printf("%s\t%u bytes, attribute: %h %s", node->name, node->file_length, node->attributes, attrs_str);
 }
 
 void vfs_print_all()

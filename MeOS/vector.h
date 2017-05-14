@@ -22,6 +22,12 @@ T& vector_at(vector<T>* v, uint32 pos)
 }
 
 template<class T>
+T& vector_front(vector<T>* v)
+{
+	return v->data[0];
+}
+
+template<class T>
 void vector_init(vector<T>* v, uint32 initial_length)
 {
 	if (initial_length == 0)

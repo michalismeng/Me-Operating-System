@@ -1,6 +1,6 @@
 #include "file.h"
 
-uint32 open_file(char * path, int * fd)
+uint32 open_file(char* path, int* fd)
 {
 	*fd = -1;
 	vfs_node* node = 0;
@@ -10,7 +10,12 @@ uint32 open_file(char * path, int * fd)
 	if (error)
 		return error;
 
-	// create an entry for the global table
+	return open_file_by_node(node, fd);
+}
+
+uint32 open_file_by_node(vfs_node* node, int* fd)
+{
+	*fd = -1;
 	gfe entry = create_gfe(node);
 	*fd = gft_insert_s(entry);
 
