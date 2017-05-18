@@ -165,8 +165,10 @@ FAT_DIR_ATTRIBUTES vfs_to_fat_attributes(uint32 attrs);
 
 void fat_fs_generate_short_name(vfs_node* node, char name[12]);
 
-vfs_node* fat_fs_create_file(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes);
+vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes);
 
-vfs_result fat_fs_delete_file(vfs_node* mount_point, vfs_node* node);
+vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node);
+
+vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory);
 
 #endif

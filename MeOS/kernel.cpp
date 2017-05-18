@@ -359,8 +359,6 @@ void create_test_process(int fd)
 	printfln("thread creationg ended");
 }
 
-uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value);
-
 void proc_init_thread()
 {
 	printfln("executing %s", __FUNCTION__);
@@ -394,10 +392,7 @@ void proc_init_thread()
 	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
 	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
-
 	vfs_node* folder = 0;
-
-	//debugf("");
 
 	vfs_add_child(vfs_get_root(), hierarchy);
 
@@ -407,8 +402,6 @@ void proc_init_thread()
 	{
 		if (vfs_open_file(folder) != VFS_OK)
 			DEBUG("error");
-		/*if (fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, folder) != VFS_OK)
-			printfln("error reading FOLDEr layout");*/
 
 		auto layout = &((fat_node_data*)folder->deep_md)->layout;
 		printf("folder clusters ");
@@ -434,10 +427,26 @@ void proc_init_thread()
 		if (err = open_file("sdc_mount/FOLDER/MIC.TXT", &f_desc))
 			printfln("Error opening mic.TXT: %u", err);
 
-		if ((file = fat_fs_create_file(hierarchy, folder, "DIR_H", VFS_DIRECTORY | VFS_READ | VFS_WRITE)) == 0)
+		printfln("creating new node");
+		/*if ((file = fat_fs_create_node(hierarchy, folder, "new_fe.txt", VFS_READ | VFS_WRITE)) == 0)
 			printfln("error creating file %u", get_last_error());
 		else
-			printfln("mica.txt file created");
+			printfln("mica.txt file created");*/
+
+		vfs_node* mic, *newdir;
+		if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &mic) != 0 || vfs_lookup(hierarchy, "FOLDER/NEW_DIR", &newdir) != 0)
+			printfln("Error looking up names: %h %h", mic, newdir);
+
+		printfln("moving mic.txt from folder to new_dir");
+		if (fat_fs_move_node(hierarchy, mic, newdir) != VFS_OK)
+		{
+			printfln("error when moving file: %u", get_last_error());
+		}
+
+		while (true);
+
+		if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &file) != 0)
+			printfln("lookup error");
 
 		if (err = read_file(f_desc, 0, 10, (virtual_addr)___buffer) != 10)
 			printfln("Could not read file: %u", err);

@@ -62,6 +62,7 @@ struct vfs_node
 	uint32 attributes;				// file attributes
 	uint32 file_length;				// file length (bytes)
 	vfs_node* tag;					// tag node associated with this node
+	vfs_node* parent;				// the parent node
 
 	fs_operations* fs_ops;			// file basic operations
 	list<vfs_node*> children;		// children list
@@ -90,6 +91,12 @@ vfs_node* vfs_get_dev();
 
 // get the root (/) folder
 vfs_node* vfs_get_root();
+
+// returns the closest mount point that is above node
+vfs_node* vfs_get_mount_point(vfs_node* node);
+
+// returns the parent of the given node
+vfs_node* vfs_get_parent(vfs_node* node);
 
 // search for a node starting at 'start' node and going down. Path should not contain leading slash
 vfs_node* vfs_find_relative_node(vfs_node* start, char* path);

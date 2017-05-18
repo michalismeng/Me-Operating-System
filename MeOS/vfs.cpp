@@ -123,6 +123,20 @@ vfs_node* vfs_get_root()
 	return root;
 }
 
+// TODO: WRITE THESE TWO NOBLE FUNCTIONS!!!
+
+vfs_node* vfs_get_mount_point(vfs_node* node)
+{
+	return nullptr;
+}
+
+vfs_node* vfs_get_parent(vfs_node* node)
+{
+	return nullptr; //node->tag;
+}
+
+/**********************************************/
+
 vfs_node* vfs_find_relative_node(vfs_node* start, char* path)
 {
 	//expected path: something/folder/another_folder/file.txt  (or just something till a folder level). No leading slash
