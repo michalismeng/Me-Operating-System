@@ -75,7 +75,8 @@ struct vfs_node
 // vfs node list definitions
 
 // create a virtual file system node. Parameter name should be null terminated.
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, fs_operations* file_fncs);
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
+							vfs_node* parent, fs_operations* file_fncs);
 
 // create a virtual file system device node and return it's deep metadata ptr
 vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs);

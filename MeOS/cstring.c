@@ -52,3 +52,16 @@ char* strchr(const char* str, int c)
 
 	return 0;		// entry not found
 }
+
+char* strupper(char* str)
+{
+	char* temp = str;
+
+	while (*str != 0)
+	{
+		*str = toupper(*str);
+		str++;
+	}
+
+	return temp;
+}

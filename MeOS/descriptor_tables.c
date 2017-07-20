@@ -30,10 +30,13 @@ void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t*
 	interrupt_handlers = isr_base;
 	idt_entries = idt_base;
 
+	init_idt();
+
 	// Enrich our IDT with interrupt 0x80 (userspace program services)
 	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 	register_interrupt_handler(0x80, test_handle);
 	register_interrupt_handler(6, InvalidOp);
+
 }
 
 void init_gdt()
@@ -55,9 +58,9 @@ void init_idt()
 	idt_ptr.base = (uint32)&idt_entries;
 	idt_ptr.limit = 256 * sizeof(idt_entry_t) - 1;
 
-	init_pic();
+	//init_pic();
 
-	memset(&idt_entries, 0x0, 256 * sizeof(idt_entry_t));
+	//memset(&idt_entries, 0x0, 256 * sizeof(idt_entry_t));
 
 	idt_set_gate(0, (uint32)isr0, 0x08, 0x8E);
 	idt_set_gate(1, (uint32)isr1, 0x08, 0x8E);
@@ -111,7 +114,7 @@ void init_idt()
 	idt_set_gate(46, (uint32)irq14, 0x08, 0x8E);
 	idt_set_gate(47, (uint32)irq15, 0x08, 0x8E);
 
-	flush_idt((uint32)&idt_ptr);
+	//flush_idt((uint32)idt_ptr);
 }
 
 void gdt_set_gate(uint16 num, uint32 base, uint32 limit, uint8 access, uint8 gran)

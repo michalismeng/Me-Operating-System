@@ -50,7 +50,7 @@ FILE fsysSimpleDirectory(const char* dir_name)
 
 void fsysSimpleMount()
 {
-	serial_printf("Attempt to mount\n");
+	//serial_printf("Attempt to mount\n");
 }
 
 void fsysSimpleRead(PFILE file, uint8* buffer, uint32 length)
@@ -65,12 +65,12 @@ void fsysSimpleRead(PFILE file, uint8* buffer, uint32 length)
 
 void fsysSimpleClose(PFILE file)
 {
-	serial_printf("Attempt to close file: %h\n", file);
+	//serial_printf("Attempt to close file: %h\n", file);
 }
 
 FILE fsysSimpleOpen(const char* filename)
 {
-	serial_printf("Attempt to open filename: %s\n", filename);
+	//serial_printf("Attempt to open filename: %s\n", filename);
 
 	FILE invl_file;
 	invl_file.flags = FS_INVALID;
@@ -120,7 +120,7 @@ list<vfs_node*> simple_fs_mount(mass_storage_info* info)
 			if (entry->first_sector == 0)
 				continue;
 
-			nodes[count] = vfs_create_node(entry->name, true, VFS_FILE | VFS_READ | VFS_WRITE, entry->size, sizeof(uint32), NULL, NULL);
+			nodes[count] = vfs_create_node(entry->name, true, VFS_FILE | VFS_READ | VFS_WRITE, entry->size, sizeof(uint32), NULL, NULL, NULL);
 			*(uint32*)nodes[count]->deep_md = entry->first_sector;
 			parents[count] = entry->parent_index;
 			count++;

@@ -18,6 +18,8 @@ extern "C" {
 	void serial_printf(char* fmt, ...);
 	void serial_dump_mem(char* base, uint32 length);
 
+	uint8 serial_read();
+
 #ifdef __cplusplus
 }
 #endif

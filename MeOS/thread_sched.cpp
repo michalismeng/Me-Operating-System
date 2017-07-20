@@ -69,7 +69,7 @@ void scheduler_decrease_sleep_time()
 			thread->state = THREAD_READY;
 			thread->sleep_time = 0;
 			//list_insert_back(&READY_QUEUE(thread->base_priority), thread);
-			list_insert_back_node(&READY_QUEUE(thread->base_priority), node);
+			list_insert_back_node(&READY_QUEUE(thread_get_priority(thread) /*thread->base_priority*/), node);
 		}
 		else
 		{
@@ -168,7 +168,7 @@ void scheduler_thread_switch()
 	if (current_thread->state == THREAD_STATE::THREAD_RUNNING)
 	{
 		current_thread->state = THREAD_STATE::THREAD_READY;
-		list_head_to_tail(&READY_QUEUE(current_thread->base_priority));
+		list_head_to_tail(&READY_QUEUE(thread_get_priority(current_thread)/*current_thread->base_priority*/));
 	}
 
 	// find the first thread that can be run
@@ -202,7 +202,7 @@ void thread_insert(TCB* thread)
 {
 	//TODO: if current thread's priority is lees than the new one's, the current should be pre-empted (except if it is non preemptible)
 	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back(&READY_QUEUE(thread->base_priority), thread);
+	list_insert_back(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread);
 	printfln("inserted");
 }
 
@@ -270,8 +270,11 @@ __declspec(naked) void thread_block(TCB* thread)
 	{
 		thread->state = THREAD_BLOCK;
 
-		if (list_remove(&scheduler.thread_queues[thread->base_priority], list_get_prev(&scheduler.thread_queues[thread->base_priority], thread)))
-			list_insert_back(&scheduler.block_queue, thread);
+		/*if (list_remove(&scheduler.thread_queues[thread->base_priority], list_get_prev(&scheduler.thread_queues[thread->base_priority], thread)))
+			list_insert_back(&scheduler.block_queue, thread);*/
+
+		auto node = list_remove_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), list_get_prev(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread));
+		list_insert_back_node(&BLOCK_QUEUE, node);
 
 		_asm pop ebp
 	}
@@ -281,8 +284,11 @@ __declspec(naked) void thread_block(TCB* thread)
 
 		if (thread == current_thread)
 		{
-			list_remove_front(&scheduler.thread_queues[thread->base_priority]);
-			list_insert_back(&scheduler.block_queue, thread);
+			/*list_remove_front(&scheduler.thread_queues[thread->base_priority]);
+			list_insert_back(&scheduler.block_queue, thread);*/
+
+			auto node = list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/));
+			list_insert_back_node(&BLOCK_QUEUE, node);
 
 			_asm pop ebp
 
@@ -329,8 +335,11 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 	{
 		thread->state = THREAD_SLEEP;
 
-		if (list_remove(&READY_QUEUE(thread->base_priority), list_get_prev(&READY_QUEUE(thread->base_priority), thread)))
-			list_insert_back(&SLEEP_QUEUE, thread);
+		/*if (list_remove(&READY_QUEUE(thread->base_priority), list_get_prev(&READY_QUEUE(thread->base_priority), thread)))
+			list_insert_back(&SLEEP_QUEUE, thread);*/
+
+		auto node = list_remove_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), list_get_prev(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread));
+		list_insert_back_node(&SLEEP_QUEUE, node);
 
 		_asm pop ebp
 	}
@@ -343,7 +352,7 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 			/*list_remove_front(&READY_QUEUE(thread->base_priority));
 			list_insert_back(&SLEEP_QUEUE, thread);*/
 
-			auto node = list_remove_front_node(&READY_QUEUE(thread->base_priority));
+			auto node = list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/));
 			list_insert_back_node(&SLEEP_QUEUE, node);
 
 			_asm pop ebp  // fix the stack to create the interrupt frame
@@ -384,7 +393,7 @@ void thread_notify(TCB* thread)
 
 	auto node = list_remove_node(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
 	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back_node(&READY_QUEUE(thread->base_priority), node);
+	list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), node);
 
 	INT_ON;
 }

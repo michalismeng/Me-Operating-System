@@ -89,7 +89,7 @@ int check(uint8 bus, uint8 device, uint8 function)
 	uint8 subcls = (reg >> 16) & 0xFF;
 	uint8 progif = (reg >> 8) & 0xFF;
 
-	serial_printf("found: cls %u subcls %u progif %u\n", cls, subcls, progif);
+	//serial_printf("found: cls %u subcls %u progif %u\n", cls, subcls, progif);
 
 	if (cls == 0x1 && subcls == 0x6 && progif == 0x1)	// SATA AHCI
 	{
@@ -122,7 +122,7 @@ int check(uint8 bus, uint8 device, uint8 function)
 	}
 	else if (cls == 0x7)
 	{
-		printfln("found serial line with interrupt at: %u and command: %h", PCIReadRegister(bus, device, function, 0x3C) & 0xff, PCIReadRegister(bus, device, function, 0x04) & 0xff);
+		//printfln("found serial line with interrupt at: %u and command: %h", PCIReadRegister(bus, device, function, 0x3C) & 0xff, PCIReadRegister(bus, device, function, 0x04) & 0xff);
 		debugf("");
 	}
 	else

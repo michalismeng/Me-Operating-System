@@ -4,13 +4,17 @@
 
 bool _serial_port_found = false;
 
+void serial_print(const char* str);
+
 void init_serial()
 {
-	if (*(uint8*)PORT == 0)				// communication failed
-	{
-		DEBUG("COM port not found");
+	volatile uint8 value = 87;					// random value to check against
+
+	// Scratch register test
+	outportb(PORT + 7, value);
+
+	if (inportb(PORT + 7) != value)
 		return;
-	}
 
 	_serial_port_found = true;
 
@@ -26,6 +30,21 @@ void init_serial()
 int is_transmit_empty()
 {
 	return inportb(PORT + 5) & 0x20;
+}
+
+int is_receive_ready()
+{
+	return inportb(PORT + 5) & 0x1;
+}
+
+uint8 serial_read()
+{
+	if (!_serial_port_found)
+		return 0;
+
+	while (is_receive_ready() == 0);
+
+	return inportb(PORT);
 }
 
 void serial_printch(char a)

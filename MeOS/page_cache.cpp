@@ -73,7 +73,8 @@ void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_
 	page_cache.cache = (_cache_cell*)start;
 	vector_init(&page_cache.cached_files, initial_file_count);
 
-	// Here we assume that alloced bitmap fits into just one page buffer. Perhaps change this in the future.
+	// Here we assume that alloced bitmap fits into just one page buffer. 
+	// TODO: Perhaps change this in the future.
 	// auto reserve the last buffer as this is where the alloced bitmap lives.
 
 	virtual_addr last_buffer = page_cache_get_last();
@@ -103,7 +104,7 @@ virtual_addr page_cache_get_buffer(int gfd, uint32 page)
 	return (virtual_addr)(page_cache.cache + temp->data.buffer_index);
 }
 
-virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
+virtual_addr page_cache_reserve_anonymous()
 {
 	// find the first free buffer index
 	uint32 free_buf = page_cache_index_free_buffer();
@@ -117,6 +118,32 @@ virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
 
 	// reserve the found buffer
 	page_cache_index_reserve_buffer(free_buf);
+	virtual_addr address = page_cache_addr_by_index(free_buf);
+	
+	// Pages are not freed so always check to see if they are already present
+	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
+	vmmngr_alloc_page(address);
+
+	// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
+
+	return address;
+}
+
+void page_cache_release_anonymous(virtual_addr address)
+{
+	uint32 index = page_cache_index_by_addr(address);
+	page_cache_index_release_buffer(index);
+	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
+}
+
+virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
+{
+	virtual_addr address = page_cache_reserve_anonymous();
+
+	if (address == 0)
+		return 0;
+
+	uint32 free_buf = page_cache_index_by_addr(address);
 
 	// associate the buffer with the given gfd + page
 	// assume gfd entry exists but file info doesn't
@@ -124,17 +151,10 @@ virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
 	_page_cache_file_info finfo = page_cache_file_info_create(page, free_buf);
 	list_insert_back(&page_cache.cached_files[gfd].pages, finfo);
 
-	virtual_addr address = page_cache_addr_by_index(free_buf);
-
-	// Pages are not freed so always check to see if they are already present
-	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
-	vmmngr_alloc_page(address);
-
-		// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
-
 	return address;
 }
 
+// TODO: Replace common functionality with release anonymous
 void page_cache_release_buffer(int gfd, uint32 page)
 {
 	virtual_addr buffer = page_cache_get_buffer(gfd, page);

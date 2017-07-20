@@ -6,21 +6,23 @@
 #include "open_file_table.h"
 #include "page_cache.h"
 
-/* Defines the standard file io API */
+#define INVALID_FD -1
 
-// opens a file and associates a global file descriptor with it
-uint32 open_file(char* path, int* fd);
+	/* Defines the standard file io API */
 
-// opens a file indicated by the given node and associates a global file descriptor with it
-uint32 open_file_by_node(vfs_node* node, int* fd);
+	// opens a file and associates a global file descriptor with it
+	uint32 open_file(char* path, int* fd);
 
-// reads the file, given its global file descriptor, to the given buffer
-uint32 read_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
+	// opens a file indicated by the given node and associates a global file descriptor with it
+	uint32 open_file_by_node(vfs_node* node, int* fd);
 
-// writes to the file, given its global file descriptor, from the given buffer
-uint32 write_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
+	// reads the file, given its global file descriptor, to the given buffer
+	uint32 read_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
 
-// syncs the file, given its global file descriptor
-uint32 sync_file(int fd, uint32 start_page, uint32 end_page);
+	// writes to the file, given its global file descriptor, from the given buffer
+	uint32 write_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
+
+	// syncs the file, given its global file descriptor
+	uint32 sync_file(int fd, uint32 start_page, uint32 end_page);
 
 #endif

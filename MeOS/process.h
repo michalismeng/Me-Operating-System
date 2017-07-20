@@ -95,8 +95,8 @@ _asm	mov esp, 0x90000
 
 		uint32 id;						// thread unique id
 
-		uint32 plus_priority;			// priority gained due to different factors such as waiting in the queues
-		uint32 base_priority;			// base priority given at the thread creation time
+		int32 plus_priority;			// priority gained due to different factors such as waiting in the queues
+		int32 base_priority;			// base priority given at the thread creation time
 
 		void* stack_base;				// address of the base of the thread's stack
 		void* stack_limit;				// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
@@ -125,6 +125,8 @@ _asm	mov esp, 0x90000
 	uint32 process_create_s(char* app_name);
 	PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 high_address);
 	TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority);
+
+	int32 thread_get_priority(TCB* thread);
 
 	uint32* thread_get_error(TCB* thread);
 

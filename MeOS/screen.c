@@ -83,6 +83,12 @@ void SetCursor(uint16 x, uint16 y)
 	UpdateCursor();
 }
 
+void SetPointer(uint16 x, uint16 y)
+{
+	cursorX = x;
+	cursorY = y;
+}
+
 void ClearScreen()
 {
 	ClearLine(0, SCREEN_HEIGHT - 1);

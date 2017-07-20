@@ -22,7 +22,7 @@ void page_fault(registers_struct* regs)
 	if (addr > 0xF0000000)		// auto allocate space for MMIO
 	{
 		if ((addr &(~0xfff)) == 0xf0404000)
-			printfln("mapping abar");
+			printfln("mapping abar"); 
 
 		addr &= ~0xfff;
 		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
@@ -95,7 +95,7 @@ bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags)
 	//TODO: fix this function
 	physical_addr addr = base;
 
-	serial_printf("Mapping virtual address: %h - %h\n", base, base + 4095);
+	//serial_printf("Mapping virtual address: %h - %h\n", base, base + 4095);
 
 	if (vmmngr_is_page_present(base))
 		addr = vmmngr_get_phys_addr(base);

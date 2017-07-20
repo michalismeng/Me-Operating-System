@@ -165,7 +165,7 @@ isr_common_stub:
 
   popad
   add esp, 8
-  ;sti
+
   iretd        ; pop CS, EIP, EFLAGS, SS, and ESP
 
 irq_common_stub:
@@ -180,7 +180,6 @@ irq_common_stub:
   mov fs, ax
   mov gs, ax
 
- 
   call irq_handler
 
   pop eax

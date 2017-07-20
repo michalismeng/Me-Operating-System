@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "types.h"
+#include "utility.h"
 
 	// get the length of a string
 	uint16 strlen(const char* ch);
@@ -24,6 +25,9 @@ extern "C" {
 
 	// returns a pointer to the first occurence of the 'c' character given
 	char* strchr(const char* str, int c);
+
+	// transforms a string to uppercase and returns it
+	char* strupper(char* str);
 
 #ifdef __cplusplus
 }

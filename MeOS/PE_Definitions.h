@@ -45,13 +45,13 @@ typedef struct _IMAGE_DOS_HEADER
 
 typedef struct _IMAGE_FILE_HEADER
 {
-	uint16  Machine;
+	uint16 Machine;
 	uint16 NumberOfSections;
 	uint32 TimeDateStamp;
 	uint32 PointerToSymbolTable;
 	uint32 NumberOfSymbols;
-	uint16  SizeOfOptionalHeader;
-	uint16  Characteristics;
+	uint16 SizeOfOptionalHeader;
+	uint16 Characteristics;
 } IMAGE_FILE_HEADER,
 *PIMAGE_FILE_HEADER;
 

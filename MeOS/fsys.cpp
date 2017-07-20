@@ -26,7 +26,7 @@ FILE volOpenFile(const char* filename)
 		}
 	}
 
-	serial_printf("Failed to open %s\n", filename);
+	//serial_printf("Failed to open %s\n", filename);
 
 	FILE invl_file;
 	invl_file.flags = FS_INVALID;
@@ -61,7 +61,7 @@ void volRegisterFileSystem(PFILESYSTEM fsys, unsigned int deviceID)
 	if (fsys && deviceID < DEVICE_MAX)
 	{
 		_FileSystems[deviceID] = fsys;
-		serial_printf("Registered filesystem: %s, at device: %u\n", fsys->name, deviceID);
+		//serial_printf("Registered filesystem: %s, at device: %u\n", fsys->name, deviceID);
 	}
 }
 

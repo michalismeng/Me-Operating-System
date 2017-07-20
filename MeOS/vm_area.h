@@ -27,6 +27,7 @@ struct vm_area
 	uint32 end_addr;			// area exclusive end address (last valid address + 1)
 	uint32 flags;				// area flags used to determine page fault action
 	uint32 fd;					// the global file descriptor connected with this area
+	uint32 offset;				// the offset withing the file of the mapping
 
 	bool operator< (const vm_area& other);		// necessary c++ functions for keeping order
 	bool operator> (const vm_area& other);
@@ -36,7 +37,7 @@ struct vm_area
 void vm_area_init(vm_area* area);
 
 // creates a vm area
-vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd);
+vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32 offset);
 
 // sets the boundaries of the vm_area. Arguments must be page-aligned
 bool vm_area_set_bounds(vm_area* area, uint32 start, uint32 length);

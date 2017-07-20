@@ -27,6 +27,8 @@ typedef uint32 DWORD;
 typedef uint64 QWORD;
 typedef void   VOID;
 
+#define CHK_BIT(x, bit) ( ( (x) & (bit) ) == (bit) )
+
 #define KB *1024
 #define MB KB*1024
 #define GB MB*1024

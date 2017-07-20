@@ -40,6 +40,12 @@ void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_
 // returns the virtual address of the buffer assigned to the given page in the given file.
 virtual_addr page_cache_get_buffer(int gfd, uint32 page);
 
+// reserves a buffer without associating it with any file descriptor. Returns its virtual address.
+virtual_addr page_cache_reserve_anonymous();
+
+// releases the buffer indicated by address.
+void page_cache_release_anonymous(virtual_addr address);
+
 // reserves a buffer and associates it with the given file descriptor and file page. Returns its virtual address.
 virtual_addr page_cache_reserve_buffer(int gfd, uint32 page);
 

@@ -505,7 +505,8 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
 	uint32 fat_offset = current_cluster / 128;
 	uint32 address;
-	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+
+	if (!(address = page_cache_reserve_anonymous()))
 	{
 		DEBUG("error smoething went wrong");
 		return 0;
@@ -516,13 +517,13 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 	{
 		DEBUG("error reading smoething went wrong");
 
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		page_cache_release_anonymous(address);
 		return 0;
 	}
 
 	// Get the next data cluster to read based on the current data cluster. (Follow the chain)
 	uint32 res = fat_fs_read_fat_value(address, current_cluster);
-	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+	page_cache_release_anonymous(address);
 
 	return res;
 }
@@ -530,18 +531,18 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 // returns the first free cluster and marks it with the next_cluster value
 uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 {
-	uint32 address;
-	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+	uint32 address;	
+	if (!(address = page_cache_reserve_anonymous()))
 		return 0;
 
 	uint32 fat_lba_index = 0;
-	// TODO: Find a true limit. Perhaps cluster LBA?
+	// TODO: Find a true limit. Perhaps index < cluster LBA?
 	while (true)
 	{
 		// Read the FAT cluster indicated by fat_lba_index
 		if(fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_lba_index * 8, address) == false)
 		{
-			page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+			page_cache_release_anonymous(address);
 			return 0;
 		}
 
@@ -555,11 +556,11 @@ uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 				// write back the reuslts
 				if (fat_fs_write_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_lba_index * 8, address) == false)
 				{
-					page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+					page_cache_release_anonymous(address);
 					return 0;
 				}
 
-				page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+				page_cache_release_anonymous(address);
 				return fat_lba_index * 128 + i;
 			}
 		}
@@ -567,6 +568,8 @@ uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 		fat_lba_index++;
 	}
 
+	// we should never reach here
+	DEBUG("ERROR");
 	return 0;
 }
 
@@ -576,7 +579,7 @@ uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value
 	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
 	uint32 fat_offset = fat_index / 128;
 	uint32 address;
-	if (!(address = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+	if (!(address = page_cache_reserve_anonymous()))
 	{
 		DEBUG("error smoething went wrong");
 		return 0;
@@ -585,7 +588,7 @@ uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value
 	// Load desired FAT cluster
 	if (fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
 	{
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		page_cache_release_anonymous(address);
 		return 0;
 	}
 
@@ -594,16 +597,16 @@ uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value
 
 	if (fat_fs_write_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
 	{
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		page_cache_release_anonymous(address);
 		return 0;
 	}
 
-	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+	page_cache_release_anonymous(address);
 	return last_value;
 }
 
 // starting at current_cluster recursively reads directories and files. Perhaps they will span more than one cluster.
-list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_cluster)
+list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_cluster, vfs_node* parent)
 {
 	list<vfs_node*> l;
 	list_init(&l);
@@ -614,14 +617,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 	while (offset < FAT_EOF)
 	{
 		virtual_addr cache;
-
-		if (page_cache_get_buffer(MOUNT_DATA(mount_point)->fd, offset) != 0)
-		{
-			printf("page %h", offset);
-			DEBUG(" already is cached");
-		}
-
-		if (!(cache = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, offset)))
+		if (!(cache = page_cache_reserve_anonymous()))
 		{
 			printfln("cache problem: %h %h", offset, cache);
 			debugf("");
@@ -657,19 +653,19 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 			list<vfs_node*> children;
 			list_init(&children);
 
+			uint32 attrs = fat_to_vfs_attributes(entry[i].attributes);
+
+			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
+			NODE_DATA(node)->metadata_cluster = offset;
+			NODE_DATA(node)->metadata_index = i;
+
 			if (name[0] != '.' && (entry[i].attributes & FAT_DIRECTORY) == FAT_DIRECTORY)
 			{
 				// This is a directory (and not a recursive directory . or ..). 
 				// It contains files and directories so read them all
 				uint32 clus = fat_fs_get_entry_data_cluster(entry + i);
-				children = fat_fs_read_directory(mount_point, clus);
+				children = fat_fs_read_directory(mount_point, clus, node);
 			}
-
-			uint32 attrs = fat_to_vfs_attributes(entry[i].attributes);
-
-			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_node_data), mount_point, &fat_fs_operations);
-			NODE_DATA(node)->metadata_cluster = offset;
-			NODE_DATA(node)->metadata_index = i;
 
 			// setup layout list and add the starting cluster
 			fat_file_layout* layout = &NODE_DATA(node)->layout;
@@ -683,7 +679,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 
 		uint32 temp_offset = offset;
 		offset = fat_fs_find_next_cluster(mount_point, offset);						// first find the next offset (requires the page still be locked)
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, temp_offset);		// then release the page
+		page_cache_release_anonymous(cache);
 	}
 
 	return l;
@@ -711,7 +707,7 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	uint32 root_dir_first_cluster = volume->extended.root_cluster_lba;
 
 	// create the vfs mount point node and get the mount data pointer
-	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, &fat_mount_operations);
+	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, NULL, &fat_mount_operations);
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
 	vector_init(&mount_data->layout, 1);
 
@@ -727,7 +723,7 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	mount_data->root_dir_first_cluster = root_dir_first_cluster;
 
 	// read root directory along with each sub directory
-	mount_point->children = fat_fs_read_directory(mount_point, root_dir_first_cluster);
+	mount_point->children = fat_fs_read_directory(mount_point, root_dir_first_cluster, mount_point);
 	return mount_point;
 }
 
@@ -820,7 +816,7 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 	}
 
 	uint32 cache;
-	if (!(cache = page_cache_reserve_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL)))
+	if (!(cache = page_cache_reserve_anonymous()))
 	{
 		DEBUG("delete file could not reserve buffer");
 		return -1;
@@ -833,7 +829,7 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 	if (fat_fs_read_by_data_cluster(mount_point, cluster, cache) == false)
 	{
 		DEBUG("Could not read cluster");
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		page_cache_release_anonymous(cache);
 		return -1;
 	}
 
@@ -848,11 +844,12 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 	if (fat_fs_write_by_data_cluster(mount_point, cluster, cache) == false)
 	{
 		DEBUG("Could not write cluster");
-		page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+		page_cache_release_anonymous(cache);
 		return -1;
 	}
 
-	page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
+	// release the cache buffer as it is not used any longer.
+	page_cache_release_anonymous(cache);
 
 	// delete FAT chain
 
@@ -867,7 +864,6 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 		if (next_cluster == 0)
 		{
 			DEBUG("Delete file error in deleting chains");
-			page_cache_release_buffer(MOUNT_DATA(mount_point)->fd, GFD_FAT_SPECIAL);
 			return -1;
 		}
 	}
@@ -910,6 +906,7 @@ bool fat_fs_find_empty_entry(vfs_node* mount_point, vfs_node* directory, virtual
 }
 
 // move a node under the given directory which must be within the same filesystem
+// TODO: eliminate bad cache claiming
 vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory)
 {
 	if (mount_point == 0 || node == 0 || directory == 0 ||
@@ -967,7 +964,7 @@ vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* dir
 	if (fat_fs_find_empty_entry(mount_point, directory, cache, &metadata_cluster, &metadata_index))
 	{
 		/* copy data over to the empty entry and write results back to disk */
-		*((fat_dir_entry_short*)cache + metadata_index) = entry;		
+		*((fat_dir_entry_short*)cache + metadata_index) = entry;
 
 		if (fat_fs_write_by_data_cluster(mount_point, metadata_cluster, cache) == false)
 		{
@@ -1002,9 +999,8 @@ bool fat_fs_initialize_node_cluster(vfs_node* mount_point, vfs_node* new_node, v
 	{
 		fat_fs_initialize_directory(vector_at(LAYOUT(directory), 0), entry, (char*)cache);
 
-		//TODO: add . and .. in the new_node children.
-		list_insert_back(&directory->children, vfs_create_node(".          ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, &fat_fs_operations));
-		list_insert_back(&directory->children, vfs_create_node("..         ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, &fat_fs_operations));
+		vfs_add_child(directory, vfs_create_node(".          ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, directory, &fat_fs_operations));
+		vfs_add_child(directory, vfs_create_node("..         ", false, VFS_DIRECTORY | VFS_READ | VFS_WRITE, 0, 0, mount_point, directory, &fat_fs_operations));
 	}
 
 	// finally write the first cluster data back to the disk
@@ -1012,7 +1008,8 @@ bool fat_fs_initialize_node_cluster(vfs_node* mount_point, vfs_node* new_node, v
 		return false;
 }
 
-// Create a new node under the given directory
+// Create a new node under the given directory 
+// TODO: eliminate bad cache claiming
 vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes)
 {
 	if (mount_point == 0 || directory == 0 ||
@@ -1049,6 +1046,7 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 	// try to find an empty entry under the directory clusters.
 	if (fat_fs_find_empty_entry(mount_point, directory, cache, &metadata_cluster, &metadata_index))
 	{
+	file_creation:
 		printfln("found empty entry at: %u %u", metadata_cluster, metadata_index);
 		debugf("");
 		// when found, the cluster is already loaded into the cache
@@ -1063,7 +1061,7 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 		}
 
 		// create the new node for the vfs tree
-		vfs_node* new_node = vfs_create_node(name, true, vfs_attributes, 0, sizeof(fat_node_data), mount_point, &fat_fs_operations);
+		vfs_node* new_node = vfs_create_node(name, true, vfs_attributes, 0, sizeof(fat_node_data), mount_point, directory, &fat_fs_operations);
 		NODE_DATA(new_node)->metadata_cluster = metadata_cluster;
 		NODE_DATA(new_node)->metadata_index = metadata_index;
 
@@ -1105,8 +1103,27 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 	}
 	else
 	{
-		// TODO: Add new cluster to the chain and continue
-		// reserve a new cluster for the directory.
+		/* reserve a new cluster for the directory and run the algorithm again */
+
+		// TODO: Test this!!
+		uint32 free_cluster = fat_fs_reserve_first_cluster(mount_point, FAT_EOF);
+		if (free_cluster == 0)
+		{
+			DEBUG("FAT32: create new file failed. No more empty clusters");
+			page_cache_release_buffer(fd, 0);
+			return 0;
+		}
+
+		/* Append the cluster to the FAT cluster-chain */
+		fat_fs_mark_cluster(mount_point, vector_at(LAYOUT(directory), LAYOUT(directory)->count - 1), free_cluster);
+		vector_insert_back(LAYOUT(directory), free_cluster);
+
+		// re-run the function but now we know where the empty entry is (in the free cluster)
+
+		metadata_cluster = free_cluster;
+		metadata_index = 0;
+
+		goto file_creation;		// does this even work???
 	}
 
 	DEBUG("No empty cluster found!");

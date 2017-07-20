@@ -84,7 +84,8 @@ vfs_result vfs_default_lookup(vfs_node* parent, char* path, vfs_node** result)
 
 // public functions
 
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, fs_operations* file_fncs)
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
+							vfs_node* parent, fs_operations* file_fncs)
 {
 	vfs_node* n = (vfs_node*)malloc(sizeof(vfs_node) + deep_metadata_length);
 
@@ -92,8 +93,9 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 
 	n->name_length = strlen(name);
 	n->tag = tag;
+	n->parent = parent;
 
-	if (file_fncs != 0)
+	if (file_fncs != NULL)
 		n->fs_ops = file_fncs;
 	else
 		n->fs_ops = &default_fs_operations;
@@ -127,12 +129,19 @@ vfs_node* vfs_get_root()
 
 vfs_node* vfs_get_mount_point(vfs_node* node)
 {
-	return nullptr;
+	vfs_node* mnt_point = node;
+
+	while (mnt_point != NULL && CHK_BIT(mnt_point->attributes, VFS_MOUNT_PT) == false)
+		mnt_point = mnt_point->parent;
+
+	return mnt_point;
 }
 
 vfs_node* vfs_get_parent(vfs_node* node)
 {
-	return nullptr; //node->tag;
+	if (node == 0)
+		return 0;
+	return node->parent;
 }
 
 /**********************************************/
@@ -181,7 +190,7 @@ vfs_node* vfs_find_node(char* path)
 
 vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs)
 {
-	vfs_node* node = vfs_create_node(name, true, VFS_DEVICE | VFS_READ, 0, deep_metadata_length, tag, dev_fncs);
+	vfs_node* node = vfs_create_node(name, true, VFS_DEVICE | VFS_READ, 0, deep_metadata_length, tag, vfs_get_dev(), dev_fncs);
 
 	if (node == 0)
 		return 0;
@@ -193,13 +202,14 @@ vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* t
 void vfs_add_child(vfs_node* parent, vfs_node* child)
 {
 	list_insert_back(&parent->children, child);
+	child->parent = parent;
 }
 
 void init_vfs()
 {
 	// create root - /dev
-	root = vfs_create_node("root", false, VFS_DIRECTORY, 0, 0, NULL, NULL);
-	vfs_add_child(root, vfs_create_node("dev", false, 0, 0, 0, NULL, NULL));
+	root = vfs_create_node("root", false, VFS_DIRECTORY, 0, 0, NULL, NULL, NULL);
+	vfs_add_child(root, vfs_create_node("dev", false, 0, 0, 0, NULL, root, NULL));
 }
 
 void print_vfs(vfs_node* node, int level)
@@ -273,12 +283,17 @@ void vfs_print_node(vfs_node* node)
 	char attrs_str[11] = { 0 };
 	vfs_attributes_to_string(node->attributes, attrs_str);
 
-	printf("%s\t%u bytes, attribute: %h %s", node->name, node->file_length, node->attributes, attrs_str);
+	printf("%s\t%u bytes, attr: %h %s \t%s", node->name, node->file_length, node->attributes, attrs_str, node->parent->name);
 }
 
 void vfs_print_all()
 {
-	print_vfs(root, 0);
+	auto temp = root->children.head;
+	while (temp)
+	{
+		print_vfs(temp->data, 0);
+		temp = temp->next;
+	}
 }
 
 uint32 vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)

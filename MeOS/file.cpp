@@ -2,7 +2,7 @@
 
 uint32 open_file(char* path, int* fd)
 {
-	*fd = -1;
+	*fd = INVALID_FD;
 	vfs_node* node = 0;
 
 	// vfs find the node requested
@@ -15,7 +15,7 @@ uint32 open_file(char* path, int* fd)
 
 uint32 open_file_by_node(vfs_node* node, int* fd)
 {
-	*fd = -1;
+	*fd = INVALID_FD;
 	gfe entry = create_gfe(node);
 	*fd = gft_insert_s(entry);
 

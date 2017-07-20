@@ -49,6 +49,8 @@ extern "C" {
 
 	void SetCursor(uint16 x, uint16 y);
 
+	void SetPointer(uint16 x, uint16 y);
+
 	void ClearScreen();
 
 	void ScrollUp(uint8 lineNumber);

@@ -30,7 +30,7 @@ void vm_area_init(vm_area* area)
 	area->fd = (uint32)-1;
 }
 
-vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd)
+vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32 offset)
 {
 	vm_area a;
 	vm_area_init(&a);		// on purpose 'bad' initialization of vm_area
@@ -46,6 +46,7 @@ vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd)
 	a.end_addr = end;
 	a.flags = flags;
 	a.fd = fd;
+	a.offset = offset;
 
 	return a;
 }

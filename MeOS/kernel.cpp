@@ -218,6 +218,19 @@ void test2()
 	while (true);
 }
 
+extern "C" void loadFile(uint32 addr)
+{
+	int fd;
+	if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
+		PANIC("Cannot open fd");
+
+	if (read_file(fd, 0, 20, addr) != 20)
+		PANIC("Could not read");
+
+	for (int i = 0; i < 1000000; i++);	// lengthy procedure
+	printfln("End load");
+}
+
 void test_print_time()
 {
 	printfln("Executing %s", __FUNCTION__);
@@ -226,9 +239,9 @@ void test_print_time()
 		INT_OFF;
 		uint16 x = cursorX, y = cursorY;
 
-		SetCursor(0, SCREEN_HEIGHT - 2);
-		printf("t=%u m=%u", get_ticks(), millis());
-		SetCursor(x, y);
+		SetPointer(0, SCREEN_HEIGHT - 2);
+		printf("test thread t=%u m=%u", get_ticks(), millis());
+		SetPointer(x, y);
 		INT_ON;
 	}
 }
@@ -237,6 +250,8 @@ void idle()
 {
 	while (true) _asm pause;
 }
+
+TCB* thread_test_time;
 
 void keyboard_fancy_function()
 {
@@ -268,6 +283,39 @@ void keyboard_fancy_function()
 
 			outportb(PORT + 7, 0x30);   
 			printfln("scratch pad reg: %h", inportb(PORT + 7));
+		}
+		else if (c == KEYCODE::KEY_L)
+		{
+			printfln("printing: ");
+			char* buffer = (char*)0x700000;
+			for (int i = 0; i < 20; i++)
+				printf("%c", buffer[i]);
+
+			printfln(".End");
+		}
+		else if (c == KEYCODE::KEY_S)
+		{
+			extern bool _serial_port_found;
+			_serial_port_found = true;
+			uint32 memoryKB = 256 KB;
+			serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
+
+			while (true)
+			{
+				char c = serial_read();
+				printf("%c", c);
+			}
+		}
+		else if (c == KEYCODE::KEY_H)
+		{
+			printfln("sleeping thread 3 at %u", millis());
+			thread_sleep(thread_test_time, 2000);
+
+			printfln("sleeping me at %u", millis());
+			thread_sleep(thread_get_current(), 3000);
+
+			printfln("blocking thread 3 at %u", millis());
+			thread_block(thread_test_time);
 		}
 	}
 }
@@ -339,13 +387,13 @@ void create_test_process(int fd)
 	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
 	uint32 imageBase = nt_header->OptionalHeader.ImageBase;
 
-	vm_area code = vm_area_create(imageBase + baseText, pmmngr_get_next_align(imageBase + baseText + sizeText), VM_AREA_READ | VM_AREA_EXEC, fd);
+	/*vm_area code = vm_area_create(imageBase + baseText, pmmngr_get_next_align(imageBase + baseText + sizeText), VM_AREA_READ | VM_AREA_EXEC, fd);
 	vm_area stack = vm_area_create(1 GB, 1 GB + 4 KB, VM_AREA_READ | VM_AREA_WRITE | VM_AREA_GROWS_DOWN, -1);
-	vm_area data = vm_area_create(imageBase + baseData, pmmngr_get_next_align(imageBase + baseData + sizeData), VM_AREA_READ | VM_AREA_WRITE, -1);
+	vm_area data = vm_area_create(imageBase + baseData, pmmngr_get_next_align(imageBase + baseData + sizeData), VM_AREA_READ | VM_AREA_WRITE, -1);*/
 
-	vm_contract_add_area(&proc->memory_contract, &code);
+	/*vm_contract_add_area(&proc->memory_contract, &code);
 	vm_contract_add_area(&proc->memory_contract, &stack);
-	vm_contract_add_area(&proc->memory_contract, &data);
+	vm_contract_add_area(&proc->memory_contract, &data);*/
 
 	memcpy((void*)(imageBase + section_0->VirtualAddress), ___buffer + section_0->PointerToRawData, section_0->SizeOfRawData);
 	section_0++;
@@ -353,21 +401,23 @@ void create_test_process(int fd)
 
 	uint32 address = vm_contract_get_area_for_length(&proc->memory_contract, 4096);
 
-	TCB* main = thread_create(proc, entry, stack.end_addr, 4096, 1);
+	//TCB* main = thread_create(proc, entry, stack.end_addr, 4096, 1);
 
-	thread_insert(main);
+	//thread_insert(main);
 	printfln("thread creationg ended");
 }
+
+extern "C" int execute = false;
 
 void proc_init_thread()
 {
 	printfln("executing %s", __FUNCTION__);
 	// start setting up heaps, drivers and everything needed.
-	vm_area a = vm_area_create(3 GB + 10 MB, 3 GB + 12 MB, VM_AREA_WRITE, -1);  // create a 1MB space
+	vm_area a = vm_area_create(3 GB + 10 MB, 3 GB + 12 MB, VM_AREA_WRITE, -1, 0);  // create a 1MB space
 	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
 		PANIC("could not add area 3GB");
 
-	a = vm_area_create(4 MB, 3 GB, VM_AREA_WRITE | VM_AREA_READ, -1);  // create user process running space
+	a = vm_area_create(4 MB, 3 GB, VM_AREA_WRITE | VM_AREA_READ, -1, 0);  // create user process running space
 	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
 		PANIC("could not add area 4MB");
 
@@ -389,6 +439,8 @@ void proc_init_thread()
 	page_cache_init(2 GB, 20, 16);
 	init_global_file_table(16);
 
+	page_cache_print();
+
 	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
 	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
@@ -396,84 +448,127 @@ void proc_init_thread()
 
 	vfs_add_child(vfs_get_root(), hierarchy);
 
-	if (vfs_lookup(hierarchy, "FOLDER", &folder) != 0)
-		printfln("ERROR");
-	else
-	{
-		if (vfs_open_file(folder) != VFS_OK)
-			DEBUG("error");
+	vfs_print_all();
 
-		auto layout = &((fat_node_data*)folder->deep_md)->layout;
-		printf("folder clusters ");
-		for (int i = 0; i < layout->count; i++)
-			printf("%u ", vector_at(layout, i));
-	}
-	//while (true);
-	ClearScreen();
+	//page_cache_print();
+	//debugf(strupper("print tree..."));
+
+	//ClearScreen();
+	//print_vfs(hierarchy, 0);
+
+
+	//if (vfs_lookup(hierarchy, "FOLDER", &folder) != 0)
+	//	printfln("ERROR");
+	//else
+	//{
+	//	if (vfs_open_file(folder) != VFS_OK)
+	//		DEBUG("error");
+
+	//	auto layout = &((fat_node_data*)folder->deep_md)->layout;
+	//	printf("folder clusters ");
+	//	for (int i = 0; i < layout->count; i++)
+	//		printf("%u ", vector_at(layout, i));
+	//}
+	////while (true);
+	//ClearScreen();
 
 	//print_vfs(hierarchy, 0);
 
 	//while (true);
 
-	vfs_node* file;
+	/*vfs_node* file;
 	printfln("reading clusters for FOLDER/MIC.TXT");
 
-	if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &file) != 0)
+	if (vfs_lookup(hierarchy, "FOLDER/NEW_DIR/MIC.TXT", &file) != 0)
 		printfln("ERROR");
 	else
 	{
 		uint32 err;
-		int f_desc;
-		if (err = open_file("sdc_mount/FOLDER/MIC.TXT", &f_desc))
-			printfln("Error opening mic.TXT: %u", err);
+		int f_desc;*/
+		//if (err = open_file("sdc_mount/FOLDER/MIC.TXT", &f_desc))
+		//	printfln("Error opening mic.TXT: %u", err);
 
-		printfln("creating new node");
-		/*if ((file = fat_fs_create_node(hierarchy, folder, "new_fe.txt", VFS_READ | VFS_WRITE)) == 0)
+		/*printfln("creating new node");
+		if ((file = fat_fs_create_node(hierarchy, folder, "some.txt", VFS_READ | VFS_WRITE)) == 0)
 			printfln("error creating file %u", get_last_error());
 		else
-			printfln("mica.txt file created");*/
+			printfln("some.txt file created");*/
 
-		vfs_node* mic, *newdir;
-		if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &mic) != 0 || vfs_lookup(hierarchy, "FOLDER/NEW_DIR", &newdir) != 0)
-			printfln("Error looking up names: %h %h", mic, newdir);
+		/*printfln("deleting node some.txt");
+		if (vfs_lookup(hierarchy, "FOLDER/some.txt", &file) != 0)
+			printfln("some.txt could not be found");
 
-		printfln("moving mic.txt from folder to new_dir");
-		if (fat_fs_move_node(hierarchy, mic, newdir) != VFS_OK)
-		{
-			printfln("error when moving file: %u", get_last_error());
-		}
+		if (fat_fs_delete_node(hierarchy, file) != VFS_OK)
+			printfln("could not delete some.txt");
 
-		while (true);
+		debugf("press to show cache...");
+		ClearScreen();
+		page_cache_print();
 
-		if (vfs_lookup(hierarchy, "FOLDER/MIC.TXT", &file) != 0)
-			printfln("lookup error");
+		while (true);*/
 
-		if (err = read_file(f_desc, 0, 10, (virtual_addr)___buffer) != 10)
-			printfln("Could not read file: %u", err);
-		else
-			printfln("read:   %s", ___buffer);
 
-		while (true);
+		//vfs_node* mic, *dir;
+		//if (vfs_lookup(hierarchy, "FOLDER/NEW_DIR/MIC.TXT", &mic) != 0 || vfs_lookup(hierarchy, "FOLDER", &dir) != 0)
+		//	printfln("Error looking up names: %h %h", mic, dir);
+
+		//printfln("moving mic.txt from new_dir to folder");
+		//*if (fat_fs_move_node(hierarchy, mic, dir) != VFS_OK)
+		//{
+		//	printfln("error when moving file: %u", get_last_error());
+		//}*/
+
+		//debugf("press to print cache...");
+
+		//page_cache_print();
+
+		//while (true);
+
+		//while (true);
+
+		//if (err = open_file("sdc_mount/FONT.RAW", &f_desc))
+		//	printfln("Error opening mic.TXT: %u", err);
+
+		//if (err = read_file(f_desc, 0, 128, (virtual_addr)___buffer) != 128)
+		//	printfln("Could not read file: %u", err);
+		//else
+		//{
+		//	for (uint32 i = 0; i < 128; i++)
+		//		if (((char*)___buffer)[i] != 0)
+		//			printfln("this is not zero");
+		//	//printfln("read:   %s", ___buffer);
+		//}
+
+		//while (true);
 
 		/*fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, (mass_storage_info*)hierarchy->tag->deep_md, file);
 		auto head = (fat_file_layout*)file->deep_md;
 		printf("clusters: ");
 		for (int i = 0; i < head->count; i++)
 			printf("%u ", vector_at(head, i));*/
-	}
+	//}
 
-	printfln("folder first cluster: %u", ((fat_node_data*)folder->deep_md)->metadata_cluster);
+	/*printfln("folder first cluster: %u", ((fat_node_data*)folder->deep_md)->metadata_cluster);
 
 	printf("mnt: ");
 	for (int i = 0; i < ((fat_mount_data*)hierarchy->deep_md)->layout.count; i++)
 		printf("%u ", vector_at(&((fat_mount_data*)hierarchy->deep_md)->layout, i));
-	page_cache_print();
+	page_cache_print();*/
 
-	while (true);
+	//while (true);
 
+	/*vfs_node* f;
+	if(vfs_root_lookup("sdc_mount/FONT.RAW", &f) != VFS_OK)
+		printfln("read error for FONT.RAW");
+
+	printfln("mnt point for hierarchy: %s", vfs_get_mount_point(hierarchy)->name);
+	printfln("mnt point for dev: %h", vfs_get_mount_point(vfs_get_dev()));
+	printfln("mnt point for random node: %s", vfs_get_mount_point(f)->name);
+
+	debugf("Press any key to see FAT structure...");
 	ClearScreen();
 
-	print_vfs(folder, 0);
+	print_vfs(hierarchy, 0);*/
 
 	/*printfln("deleting dire");
 	if (vfs_lookup(hierarchy, "FOLDER/TEST.TXT", &file) == 0)
@@ -492,10 +587,10 @@ void proc_init_thread()
 
 	//list_insert_back(&folder->children, file);
 
-	while (true);
+	/*while (true);*/
 
 	// initialize the page cache
-	page_cache_print();
+	//page_cache_print();
 	//debugf("");
 	INT_OFF;
 
@@ -553,19 +648,32 @@ void proc_init_thread()
 	thread_insert(thread);*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
-	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
-	thread_insert(thread);*/
+	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
+	thread_insert(thread);
+	thread_test_time = thread;
 
 	//create_vfs_pipe(___buffer, 512, fd);
 
-	ClearScreen();
-
+	//ClearScreen();
+	execute = 10;
 	INT_ON;
 
-	printfln("here end");
-	while (true);
+	//*(char*)0x700000 = 0;
 
-	int fd;
+
+	printfln("here end");
+	while (true)
+	{
+		INT_OFF;
+		uint16 x = cursorX, y = cursorY;
+
+		SetPointer(0, SCREEN_HEIGHT - 3);
+		printf("main thread t=%u m=%u", get_ticks(), millis());
+		SetPointer(x, y);
+		INT_ON;
+	}
+
+	/*int fd;
 
 	for (int i = 0; i < 10000; i++)
 		___buffer[i] = 0;
@@ -579,7 +687,7 @@ void proc_init_thread()
 		printfln("buffer: %s", ___buffer);
 
 	for (int i = 0; i < 5; i++)
-		___buffer[i] = 'c';
+		___buffer[i] = 'c';*/
 
 	/*if (write_file(fd, 5, 5, (virtual_addr)___buffer) != 5)
 		printfln("write error code %u", get_last_error());*/
@@ -597,8 +705,8 @@ void proc_init_thread()
 	node = vfs_find_node("sdc_mount/FOLDER");
 
 	printfln("node: %u %h", node->data >> 12, node->data & 0xFFF);*/
-	page_cache_print();
-	debugf("");
+	/*page_cache_print();
+	debugf("");*/
 
 	/*vfs_node* node = gft_get(fd)->file_node;
 	node->name = "NEW.TXT";
@@ -625,16 +733,18 @@ void proc_init_thread()
 			if (error = hierarchy->fs_ops->fs_sync(hierarchy->data, hierarchy, -1, 0))
 				printfln("sync error: %u", error);*/
 
-	page_cache_print();
+	/*page_cache_print();
 
 	gft_print();
 
 	printfln("end");
 
-	while (true);
+	while (true);*/
 
 	ClearScreen();
 	INT_ON;
+
+	//while (true);
 
 	/*while (true)
 	{
@@ -668,9 +778,9 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
 	pmmngr_init(memoryKB, 0xC0000000 + k_info->kernel_size);
 
-	serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
+	/*serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
 	serial_printf("Kernel size: %u bytes\n", k_info->kernel_size);
-	serial_printf("Boot device: %h\n", boot_info->m_bootDevice);
+	serial_printf("Boot device: %h\n", boot_info->m_bootDevice);*/
 
 	bios_memory_region* region = (bios_memory_region*)boot_info->m_mmap_addr;
 
@@ -693,7 +803,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	pmmngr_reserve_region(&physical_memory_region(0x100000, pmmngr_get_next_align(k_info->kernel_size + 1)));
 
-	GetMemoryStats();
+	//GetMemoryStats();
 
 	vmmngr_initialize(pmmngr_get_next_align(k_info->kernel_size + 1) / 4096);
 	pmmngr_paging_enable(true);
@@ -705,9 +815,9 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	_abar = PCIFindAHCI();
 
-	serial_printf("Found abar at: %h\n", _abar);
+	/*serial_printf("Found abar at: %h\n", _abar);
 
-	serial_printf("Virtual manager initialize\n");
+	serial_printf("Virtual manager initialize\n");*/
 
 	fsysSimpleInitialize();
 	init_keyboard();
