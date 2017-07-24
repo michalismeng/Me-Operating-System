@@ -32,6 +32,9 @@
 #include "file.h"
 #include "Debugger.h"
 
+#include "atomic.h"
+#include "queue_lf.h"
+
 extern "C" uint8 canOutput = 1;
 
 heap* kernel_heap = 0;
@@ -161,59 +164,39 @@ spinlock s;
 
 semaphore sem;
 
+queue_lf<short int> q;
+uint32 fail_insert = 0;
+uint32 fail_remove = 0;
+
 void test1()
 {
-	for (int i = 0; i < 10000000; i++)
+	printfln("executing test 1");
+
+	for (int i = 0; i < 100000; i++)
 	{
-		//mutex_acquire(&m);
-		//spinlock_acquire(&s);
-
-		semaphore_wait(&sem);
-
-		__asm
-		{
-			mov eax, dword ptr[a]
-			inc eax
-			pause
-			mov dword ptr[a], eax
-		}
-
-		semaphore_signal(&sem);
-
-		//spinlock_release(&s);
-		//mutex_release(&m);
+		if (!queue_lf_insert(&q, (short)i))
+			fail_insert++;
 	}
 
-	printfln("test1 a=%u at: %u", a, millis());
+	printfln("fail insert: %u", fail_insert);
+
+	thread_sleep(thread_get_current(), 1000);
+	printfln("queue:");
+	for (int i = 0; i < 10; i++)
+		printf("%u ", q.buffer[i]);
 	while (true);
 }
 
 void test2()
 {
-	printfln("starting test2");
-	for (int i = 0; i < 10000000; i++)
+	printfln("executing test 2");
+	for (int i = 0; i < 100000; i++)
 	{
-		//mutex_acquire(&m);
-		//spinlock_acquire(&s);
-
-		semaphore_wait(&sem);
-
-		__asm
-		{
-			mov eax, dword ptr[a]
-			inc eax
-			pause
-			pause
-			mov dword ptr[a], eax
-		}
-
-		semaphore_signal(&sem);
-
-		//spinlock_release(&s);
-		//mutex_release(&m);
+		if (!queue_lf_remove(&q))
+			fail_remove++;
 	}
 
-	printfln("test2 a=%u at: %u", a, millis());
+	printfln("fail remove: %u", fail_remove);
 
 	while (true);
 }
@@ -640,12 +623,13 @@ void proc_init_thread()
 		//spinlock_init(&s);
 		//semaphore_init(&sem, 1);
 
+	queue_lf_init(&q, 1000);
+
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 1));
 	printfln("new insertion");
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
-	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
-	thread_insert(thread);*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
 	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
@@ -768,7 +752,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	init_descriptor_tables(k_info->gdt_base, k_info->isr_handlers, k_info->idt_base);
 
 	init_pit_timer(50, timer_callback);
-	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);
+	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);		// bypass the common interrupt handler to play with the stack
 	INT_ON;
 
 	printf("Welcome to ME Operating System\n");

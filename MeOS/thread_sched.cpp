@@ -124,12 +124,17 @@ extern "C" __declspec(naked) void scheduler_interrupt()
 		pop es
 		pop ds
 
-		no_tasks :
-		mov al, 20h
-			out 20h, al
+		popad
 
-			popad
-			iretd
+no_tasks:
+
+		push eax
+
+		mov al, 20h
+		out 20h, al
+
+		pop eax
+		iretd
 	}
 }
 
