@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "spinlock.h"
+#include "thread_sched.h"
 
 extern heap* kernel_heap;
 spinlock kernel_heap_lock = 0;

@@ -3,7 +3,6 @@
 
 #include "types.h"
 #include "utility.h"
-#include "thread_sched.h"
 
 // UP spinlock. Very lightweight. No blocking queues.
 // If resource is locked => thread will sleep and retry

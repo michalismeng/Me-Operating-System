@@ -7,7 +7,11 @@
 #include "vm_contract.h"
 #include "open_file_table.h"
 
+#include "queue_lf.h"
+#include "process_exception.h"
+
 #include "Debugger.h"
+#include "spinlock.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +87,7 @@ _asm	mov esp, 0x90000
 
 #pragma pack(pop, 1)
 
+
 	typedef struct process_control_block PCB;
 
 	typedef struct thread_control_block
@@ -107,19 +112,23 @@ _asm	mov esp, 0x90000
 
 	typedef struct process_control_block
 	{
-		pdirectory* page_dir;				// address space of the process
-		process_control_block* parent;		// parent PCB that created us. PCB 0 has null parent
-		uint32 id;							// unique process id
+		pdirectory* page_dir;					// address space of the process
+		process_control_block* parent;			// parent PCB that created us. PCB 0 has null parent
+		uint32 id;								// unique process id
 
-											// TODO: Perhaps these members will be erased
-		uint32 image_base;					// base of the image this task is running
-		uint32 image_size;					// size of the image this task is running
+												// TODO: Perhaps these members will be erased
+		uint32 image_base;						// base of the image this task is running
+		uint32 image_size;						// size of the image this task is running
 
-		local_file_table lft;				// local open file table
+		local_file_table lft;					// local open file table
 
-		vm_contract memory_contract;		// virtual memory layout
+		vm_contract memory_contract;			// virtual memory layout
+		spinlock contract_spinlock;				// virtual memory contract spinlock used for reading and writing
 
-		queue<TCB> threads;					// child threads of the process
+		queue_lf<process_exception> exceptions;	// process exception queue to be consumed and served by the kernel
+		uint32 exception_lock;					// lock for the exception consumption (to be used with CAS)
+
+		queue<TCB> threads;						// child threads of the process
 	}PCB;
 
 	uint32 process_create_s(char* app_name);

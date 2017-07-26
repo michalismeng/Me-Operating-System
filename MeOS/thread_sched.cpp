@@ -163,6 +163,11 @@ TCB* thread_get_current()
 	return current_thread;
 }
 
+PCB* process_get_current()
+{
+	return current_thread->parent;
+}
+
 void scheduler_thread_switch()
 {
 	// assertions:

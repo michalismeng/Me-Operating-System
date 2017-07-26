@@ -1,12 +1,11 @@
 #include "mmngr_virtual.h"
 #include "thread_sched.h"
+#include "spinlock.h"
 
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
 
 pdirectory* kernel_directory = 0;		// kernel page directory
-
-extern TCB* current_thread;
 
 void page_fault(registers_struct* regs)
 {
@@ -17,7 +16,37 @@ void page_fault(registers_struct* regs)
 		mov dword ptr addr, eax
 	}
 
-	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u", addr, current_thread->id);
+	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u", addr, thread_get_current()->id);
+
+	if (thread_get_current() == 0 && addr > 0xF0000000)		// auto allocate space for MMIO (only when threading is not setup as map page may require time)
+	{
+		if ((addr &(~0xfff)) == 0xf0404000)
+			printfln("mapping abar"); 
+
+		addr &= ~0xfff;
+		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
+
+		printfln("mapped: %h %h", addr, vmmngr_get_phys_addr(addr));
+	}
+
+	// push thread in the exception queue
+	if (thread_get_current())
+	{
+		process_exception pe;
+		pe.exception_number = 14;
+		pe.target_thread = thread_get_current();
+		pe.data[0] = addr;
+		pe.data[1] = regs->err_code;
+
+		if (!queue_lf_insert(&process_get_current()->exceptions, pe))
+			WARNING("queue_lf insertion error");
+	}
+}
+
+void page_fault_bottom(process_exception pe)
+{
+	process_exception_print(&pe);
+	uint32 addr = pe.data[0];
 
 	if (addr > 0xF0000000)		// auto allocate space for MMIO
 	{
@@ -31,13 +60,21 @@ void page_fault(registers_struct* regs)
 	}
 	else
 	{
-		if (vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr) == 0)
+		spinlock_acquire(&process_get_current()->contract_spinlock);
+
+		bool out_of_contract = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr) == 0;
+
+		spinlock_release(&process_get_current()->contract_spinlock);
+
+		if (out_of_contract)
 			PANIC("could not find address in memory contract");
 		else
 			vmmngr_alloc_page(addr);
-
-		//printfln("ERROR CODE: %u", regs->err_code);
 	}
+
+	// extern void loadFile(uint32 addr);
+	//if (addr == 0x700000)    load file easter egg
+	//	loadFile(0x700000);
 }
 
 void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags)
@@ -82,6 +119,7 @@ void vmmngr_initialize(uint32 kernel_pages)
 
 	vmmngr_switch_directory(pdir, (physical_addr)&pdir->entries);
 	register_interrupt_handler(14, page_fault);
+	register_bottom_interrupt_handler(14, page_fault_bottom);
 }
 
 bool vmmngr_alloc_page(virtual_addr base)

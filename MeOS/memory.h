@@ -2,6 +2,7 @@
 #define MEMORY_H_16082016
 
 #include "mmngr_heap.h"
+#include "vm_area.h"
 
 #ifdef __cplusplus
 extern "C" {

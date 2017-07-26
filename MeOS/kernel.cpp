@@ -201,7 +201,7 @@ void test2()
 	while (true);
 }
 
-extern "C" void loadFile(uint32 addr)
+void loadFile(uint32 addr)
 {
 	int fd;
 	if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
@@ -269,6 +269,7 @@ void keyboard_fancy_function()
 		}
 		else if (c == KEYCODE::KEY_L)
 		{
+			ClearScreen();
 			printfln("printing: ");
 			char* buffer = (char*)0x700000;
 			for (int i = 0; i < 20; i++)
@@ -389,8 +390,6 @@ void create_test_process(int fd)
 	//thread_insert(main);
 	printfln("thread creationg ended");
 }
-
-extern "C" int execute = false;
 
 void proc_init_thread()
 {
@@ -639,7 +638,6 @@ void proc_init_thread()
 	//create_vfs_pipe(___buffer, 512, fd);
 
 	//ClearScreen();
-	execute = 10;
 	INT_ON;
 
 	//*(char*)0x700000 = 0;

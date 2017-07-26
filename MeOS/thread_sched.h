@@ -40,6 +40,9 @@ extern "C" void scheduler_interrupt();
 // returns the currently executing thread
 TCB* thread_get_current();
 
+// returns the currently executing process (the parent of the executing thread)
+PCB* process_get_current();
+
 // finds a thread given its id
 TCB* thread_find(uint32 id);
 

@@ -1,4 +1,5 @@
 #include "spinlock.h"
+#include "thread_sched.h"
 
 void spinlock_init(spinlock* lock)
 {

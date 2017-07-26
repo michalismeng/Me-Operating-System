@@ -56,9 +56,14 @@ template<class T>
 T queue_lf_peek(queue_lf<T>* q)
 {
 	if (q->tail_index != q->head_index)
-		return q->head->data;
+		return q->buffer[q->head_index];
 	return T();
 }
 
+template<class T>
+bool queue_lf_is_empty(queue_lf<T>* q)
+{
+	return (q->tail_index == q->head_index);
+}
 
 #endif
