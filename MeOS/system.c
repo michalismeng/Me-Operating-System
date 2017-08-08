@@ -97,6 +97,24 @@ void int_gen(uint8 num)
 	}
 }
 
+void enable_write_protection()
+{
+	_asm {
+		mov eax, cr0
+		or eax, 0x10000
+		mov cr0, eax
+	}
+}
+
+void disable_write_protection()
+{
+	_asm {
+		mov eax, cr0
+		and eax, ~0x10000
+		mov cr0, eax
+	}
+}
+
 __declspec(naked) uint32 get_eip()
 {
 	__asm

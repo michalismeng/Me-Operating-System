@@ -1,4 +1,5 @@
 #include "vm_area.h"
+#include "file.h"
 
 bool vm_area::operator<(const vm_area& other)
 {
@@ -24,10 +25,10 @@ bool vm_area_check_bounds(uint32 start, uint32 end)
 void vm_area_init(vm_area* area)
 {
 	area->start_addr = area->end_addr = 0;
-	area->flags = VM_AREA_INVALID;
+	area->flags = MMAP_INVALID;
 
 	//TODO: Change this to the upcoming FD_INVALID
-	area->fd = (uint32)-1;
+	area->fd = (uint32)INVALID_FD;
 }
 
 vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32 offset)
@@ -36,9 +37,9 @@ vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32
 	vm_area_init(&a);		// on purpose 'bad' initialization of vm_area
 
 	// assert good arguments and fail if necessary
-	if (vm_area_check_bounds(start, end) == false || (flags & VM_AREA_INVALID) == VM_AREA_INVALID)
+	if (vm_area_check_bounds(start, end) == false || (flags & MMAP_INVALID) == MMAP_INVALID)
 	{
-		PANIC("Bad area received");		// can be removed at release
+		WARNING("Bad area received");		// can be removed at release
 		return a;
 	}
 
@@ -85,7 +86,7 @@ void vm_area_print(vm_area* area)
 
 bool vm_area_is_ok(vm_area* area)
 {
-	return ((area->flags & VM_AREA_INVALID) != VM_AREA_INVALID) && area->start_addr < area->end_addr;
+	return ((area->flags & MMAP_INVALID) != MMAP_INVALID) && area->start_addr < area->end_addr;
 }
 
 uint32 vm_area_get_end_address(vm_area* area)
@@ -105,10 +106,10 @@ uint32 vm_area_get_length(vm_area* area)
 
 bool vm_area_is_removable(vm_area* area)
 {
-	return ((area->flags & VM_AREA_NON_REMOVE) != VM_AREA_NON_REMOVE);
+	return ((area->flags & MMAP_NON_REMOVE) != MMAP_NON_REMOVE);
 }
 
 bool vm_area_grows_down(vm_area* area)
 {
-	return ((area->flags & VM_AREA_GROWS_DOWN) == VM_AREA_GROWS_DOWN);
+	return ((area->flags & MMAP_GROWS_DOWN) == MMAP_GROWS_DOWN);
 }

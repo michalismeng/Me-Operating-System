@@ -5,7 +5,7 @@
 #include "types.h"
 #include "utility.h"
 #include "pic.h"
-#include "process_exception.h"
+#include "thread_exception.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ extern "C" {
 }
 #endif
 
-typedef void(*isr_bottom_t)(struct process_exception pe);
+typedef void(*isr_bottom_t)(struct thread_exception pe);
 
 // register bottom interrupt handler that is executed in the deferred context
 void register_bottom_interrupt_handler(uint8 n, isr_bottom_t handler);

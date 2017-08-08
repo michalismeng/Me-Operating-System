@@ -1,11 +1,11 @@
-#ifndef PROCESS_EXCEPTION_H_25072017
-#define PROCESS_EXCEPTION_H_25072017
+#ifndef THREAD_EXCEPTION_H_25072017
+#define THREAD_EXCEPTION_H_25072017
 
 #include "types.h"
 
 extern struct thread_control_block;
 
-struct process_exception
+struct thread_exception
 {
 	uint8 exception_number;
 	uint32 data[2];
@@ -16,7 +16,7 @@ struct process_exception
 //bool process_exception_insert(PCB* process, process_exception& exception);
 //process_exception process_exception_get(PCB* process);
 
-void process_exception_print(struct process_exception* pe);
+void thread_exception_print(struct thread_exception* pe);
 
 
 #endif

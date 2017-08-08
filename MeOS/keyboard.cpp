@@ -1,8 +1,12 @@
 #include "keyboard.h"
+#include "vfs.h"
+#include "process.h"
+#include "thread_sched.h"
 
 // driver private data
 
 uint32 _scancode;
+int code = 0;								// the code received by the keyboard irq
 bool _numlock, _capslock, _scrolllock;
 bool _shift, _alt, _ctrl;
 int _kybrd_error = 0;
@@ -10,6 +14,47 @@ bool _kybrd_BAT_res = false;
 bool _kybrd_diag_res = false;
 bool _kybrd_resend_res = false;
 bool _kybrd_disable = false;
+
+TCB* keyboard_daemon = 0;
+
+uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+vfs_result kybd_open(vfs_node* node);
+vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...);
+
+static fs_operations kybd_operations =
+{
+	kybd_read,		// read
+	NULL,			// write
+	kybd_open,		// open
+	NULL,			// close
+	NULL,			// sync
+	NULL,			// lookup
+	kybd_ioctl		// ioctl?
+};
+
+uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+{
+	uint8* buffer = (uint8*)address;
+
+	while (count > 0)
+	{
+		thread_block(thread_get_current());
+		count--;
+		buffer++;
+	}
+
+	return 0;
+}
+
+vfs_result kybd_open(vfs_node* node)
+{
+	return 0;
+}
+
+vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...)
+{
+	return 0;
+}
 
 // original scane set where array index == make code.
 KEYCODE _kybrd_scancode_std[] =
@@ -306,21 +351,36 @@ bool kybrd_is_disabled()
 
 void keyboard_callback(registers_t* regs)
 {
-	int code = 0;
-
 	// ensure keyboard controller buffer is full
 	if (kybrd_ctrl_input_ready())
 	{
 		// read the code
 		code = kybrd_enc_read_status();
 
+		// notify the daemon of the incoming code
+		if (keyboard_daemon != 0)
+		{
+			if (keyboard_daemon->state != THREAD_BLOCK)
+				serial_printf("err");
+
+			thread_notify(keyboard_daemon);
+		}
+	}
+}
+
+void keyboard_irq()
+{
+	// run forever
+	while (true)
+	{
 		// TODO : ADD EXTENDED CODE CAPABILITY
 		if (code == 0xE0 || code == 0xE1)
 		{
 			DEBUG("Hit keyboard extended capability");
 		}
 
-		if (code & 0x80)	// break code specific to Original Scan Set (test bit 7)
+		//break code specific to Original Scan Set(test bit 7)
+		if (code & 0x80)
 		{
 			code -= 0x80;	// retrieve make code
 
@@ -347,7 +407,8 @@ void keyboard_callback(registers_t* regs)
 				break;
 			}
 		}
-		else	// this is a make code
+		// this is a make code
+		else	
 		{
 			_scancode = code;
 			int key = _kybrd_scancode_std[code];
@@ -390,7 +451,6 @@ void keyboard_callback(registers_t* regs)
 		}
 
 		// watch for any errors
-
 		switch (code)
 		{
 		case KYBRD_ERR_BAT_FAILED:
@@ -408,6 +468,8 @@ void keyboard_callback(registers_t* regs)
 		default:
 			break;
 		}
+
+		thread_block(thread_get_current());
 	}
 }
 
@@ -415,12 +477,18 @@ void init_keyboard()
 {
 	register_interrupt_handler(33, keyboard_callback);
 
+	vfs_create_device("keyboard", 0, 0, &kybd_operations);
+
 	_kybrd_BAT_res = true;		// assume true.. will be checked at the irq handler right above
-
 	_scancode = INVALID_SCAN_CODE;
-
 	_numlock = _capslock = _scrolllock = false;
+	_shift = _alt = _ctrl = false;
+
 	kybrd_set_leds(false, false, false);
 
-	_shift = _alt = _ctrl = false;
+
+	// parent is the kernel init thread
+	keyboard_daemon = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, 3 GB + 10 MB + 500 KB, 4 KB, 1);
+	thread_insert(keyboard_daemon);
+	thread_block(keyboard_daemon);
 }

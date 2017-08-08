@@ -1,4 +1,4 @@
-#include "process_exception.h"
+#include "thread_exception.h"
 #include "process.h"
 #include "queue_lf.h"
 
@@ -29,7 +29,7 @@
 //	return exception;
 //}
 
-void process_exception_print(process_exception* pe)
+void thread_exception_print(thread_exception* pe)
 {
 	printfln("exception no: %u, target thread: %u", pe->exception_number, pe->target_thread->id);
 }

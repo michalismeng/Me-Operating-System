@@ -4,6 +4,8 @@
 #include "mmngr_heap.h"
 #include "vm_area.h"
 
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,6 +31,7 @@ extern "C" {
 
 // maps the portion of the file described by fd (local table) into the calling processes memory
 // pref if not nulled is the preffered address to load the start-length file data
+// prot is the protection level
 virtual_addr mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot);
 
 #endif

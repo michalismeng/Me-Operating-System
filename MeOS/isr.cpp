@@ -20,23 +20,23 @@ extern "C" void __cdecl isr_handler(registers_t regs)
 	// handle thread exceptions, in the defered context
 	INT_ON;
 
-	if (CAS<uint32>(&process_get_current()->exception_lock, 0, 1))
+	if (CAS<uint32>(&thread_get_current()->exception_lock, 0, 1))
 	{
-		auto exceptions = &thread_get_current()->parent->exceptions;
+		auto exceptions = &thread_get_current()->exceptions;
 
 		while (!queue_lf_is_empty(exceptions))
 		{
-			process_exception pe = queue_lf_peek(exceptions);
+			thread_exception te = queue_lf_peek(exceptions);
 			queue_lf_remove(exceptions);
 
 			// run bottom half for pe
 			if (bottom_interrupt_handlers[regs.int_no] != 0)
 			{
 				isr_bottom_t handler = bottom_interrupt_handlers[regs.int_no];
-				handler(pe);
+				handler(te);
 			}
 		}
-		process_get_current()->exception_lock = 0;		// reset the lock
+		thread_get_current()->exception_lock = 0;		// reset the lock
 	}
 
 	// return to process execution

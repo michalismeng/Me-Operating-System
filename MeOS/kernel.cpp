@@ -35,6 +35,8 @@
 #include "atomic.h"
 #include "queue_lf.h"
 
+#include "dl_list.h"
+
 extern "C" uint8 canOutput = 1;
 
 heap* kernel_heap = 0;
@@ -163,8 +165,6 @@ mutex m;
 spinlock s;
 
 semaphore sem;
-
-queue_lf<short int> q;
 uint32 fail_insert = 0;
 uint32 fail_remove = 0;
 
@@ -174,16 +174,16 @@ void test1()
 
 	for (int i = 0; i < 100000; i++)
 	{
-		if (!queue_lf_insert(&q, (short)i))
-			fail_insert++;
+		//if (!queue_lf_insert(&q, (short)i))
+		//	fail_insert++;
 	}
 
 	printfln("fail insert: %u", fail_insert);
 
-	thread_sleep(thread_get_current(), 1000);
+	//thread_sleep(thread_get_current(), 1000);
 	printfln("queue:");
-	for (int i = 0; i < 10; i++)
-		printf("%u ", q.buffer[i]);
+	//for (int i = 0; i < 10; i++)
+	//	printf("%u ", q.buffer[i]);
 	while (true);
 }
 
@@ -192,8 +192,8 @@ void test2()
 	printfln("executing test 2");
 	for (int i = 0; i < 100000; i++)
 	{
-		if (!queue_lf_remove(&q))
-			fail_remove++;
+		//if (!queue_lf_remove(&q))
+		//	fail_remove++;
 	}
 
 	printfln("fail remove: %u", fail_remove);
@@ -270,8 +270,11 @@ void keyboard_fancy_function()
 		else if (c == KEYCODE::KEY_L)
 		{
 			ClearScreen();
-			printfln("printing: ");
+			printfln("printing at thread: %u: ", thread_get_current()->id);
 			char* buffer = (char*)0x700000;
+
+			for (int i = 0; i < 20; i++)
+				buffer[i] = 'a';
 			for (int i = 0; i < 20; i++)
 				printf("%c", buffer[i]);
 
@@ -279,27 +282,27 @@ void keyboard_fancy_function()
 		}
 		else if (c == KEYCODE::KEY_S)
 		{
-			extern bool _serial_port_found;
-			_serial_port_found = true;
-			uint32 memoryKB = 256 KB;
-			serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
-
+			ClearScreen();
 			while (true)
 			{
-				char c = serial_read();
+				KEYCODE c = getch();
 				printf("%c", c);
 			}
 		}
 		else if (c == KEYCODE::KEY_H)
 		{
-			printfln("sleeping thread 3 at %u", millis());
-			thread_sleep(thread_test_time, 2000);
+			/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
+			thread_sleep(thread_test_time, 2000);*/
 
-			printfln("sleeping me at %u", millis());
-			thread_sleep(thread_get_current(), 3000);
+			/*printfln("sleeping me %u at %u", thread_get_current()->id, millis());
+			thread_sleep(thread_get_current(), 3000);*/
 
-			printfln("blocking thread 3 at %u", millis());
+			printfln("blocking thread %u at %u", thread_test_time->id, millis());
+			ClearScreen();
+
 			thread_block(thread_test_time);
+			scheduler_print_queues();
+			printfln("hello");
 		}
 	}
 }
@@ -394,26 +397,50 @@ void create_test_process(int fd)
 void proc_init_thread()
 {
 	printfln("executing %s", __FUNCTION__);
-	// start setting up heaps, drivers and everything needed.
-	vm_area a = vm_area_create(3 GB + 10 MB, 3 GB + 12 MB, VM_AREA_WRITE, -1, 0);  // create a 1MB space
-	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
-		PANIC("could not add area 3GB");
 
-	a = vm_area_create(4 MB, 3 GB, VM_AREA_WRITE | VM_AREA_READ, -1, 0);  // create user process running space
-	if (!vm_contract_add_area(&thread_get_current()->parent->memory_contract, &a))
-		PANIC("could not add area 4MB");
+	// start setting up heaps, drivers and everything needed.
+	if (mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+		PANIC("Could not map kernel land");
+
+	if (mmap(0x700000, INVALID_FD, 0, 4 KB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_WRITE) == MAP_FAILED)
+		PANIC("Could not map 7 MB");
+
+	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes on read only page
+	enable_write_protection();
 
 	// create a 16KB heap
 	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
+	/*if (mmap(4 MB, INVALID_FD, 0, 3 GB - 4 MB, VM_AREA_WRITE, 0) == MAP_FAILED)
+		PANIC("Could not map user land");*/
+
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
 
 	ClearScreen();
 
-	INT_OFF;
+	/*dl_list<int> test;
+	dl_list_init(&test);
 
+	auto x1 = new dl_list_node<int>{ 1, 0, 0 }, x2 = new dl_list_node<int>{ 2, 0, 0 }, x3 = new dl_list_node<int>{ 3, 0, 0 }, x4 = new dl_list_node<int>{ 4, 0, 0 };
+
+	dl_list_insert_back_node(&test, x1);
+	dl_list_insert_back_node(&test, x2);
+	dl_list_insert_back_node(&test, x3);
+	dl_list_insert_back_node(&test, x4);
+
+	dl_list_remove_node(&test, x1);
+
+	printfln("data: %u", dl_list_find_node(&test, 3)->data);
+
+	for (auto temp = test.head; temp != 0; temp = temp->next)
+		printf("%u ", temp->data);
+	printfln("");
+
+	PANIC("");*/
 	init_vfs();
+
+	_abar = PCIFindAHCI();
 
 	uint32 ahci_base = 0x300000;
 	init_ahci(_abar, ahci_base);
@@ -622,19 +649,20 @@ void proc_init_thread()
 		//spinlock_init(&s);
 		//semaphore_init(&sem, 1);
 
-	queue_lf_init(&q, 1000);
 
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 1));
+	init_keyboard();
+
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 	printfln("new insertion");
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 1));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 1));
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
-	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 1);
+	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
 	thread_insert(thread);
 	thread_test_time = thread;
-
+	ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
 	//ClearScreen();
@@ -795,14 +823,12 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 
 	printfln("found: %h", x);*/
 
-	_abar = PCIFindAHCI();
 
 	/*serial_printf("Found abar at: %h\n", _abar);
 
 	serial_printf("Virtual manager initialize\n");*/
 
 	fsysSimpleInitialize();
-	init_keyboard();
 
 	ClearScreen();
 
@@ -853,7 +879,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 4 GB - 4 KB);
 	uint32 thread_stack = (uint32)malloc(4050);		// allocate enough space for page aligned stack
 	// just for this thread, space is not malloc
-	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 1);	// page align stack
+	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 3);	// page align stack
 	thread_insert(t);
 
 	INT_OFF;

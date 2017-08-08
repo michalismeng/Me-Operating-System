@@ -2,7 +2,8 @@
 #define THREAD_SCHED_27112016
 
 #include "types.h"
-#include "list.h"
+//#include "list.h"
+#include "dl_list.h"
 #include "process.h"
 
 #define NUMBER_PRIORITIES 8
@@ -14,9 +15,13 @@
 
 struct _thread_sched
 {
-	list <TCB*> thread_queues[NUMBER_PRIORITIES];		// multilevel priority feedback queues. 0 is the highest -> NUMBER_PRIORITIES - 1 is the lowest
-	list<TCB*> block_queue;
-	list<TCB*> sleep_queue;
+	//list <TCB*> thread_queues[NUMBER_PRIORITIES];		// multilevel priority feedback queues. 0 is the highest -> NUMBER_PRIORITIES - 1 is the lowest
+	//list<TCB*> block_queue;
+	//list<TCB*> sleep_queue;
+	
+	dl_list<TCB*> thread_queues[NUMBER_PRIORITIES];		// multilevel priority feedback queues. 0 is the highest -> NUMBER_PRIORITIES - 1 is the lowest
+	dl_list<TCB*> block_queue;
+	dl_list<TCB*> sleep_queue;
 };
 
 // extrnal default timer handler
@@ -61,8 +66,11 @@ void thread_current_yield();
 // inserts a thread to its priority based ready queue
 void thread_insert(TCB* thread);
 
+void thread_set_priority(TCB* thread, uint32 priority);
+
 void scheduler_print_queues();
 
 void scheduler_print_queue(list<TCB*>& queue);
+void scheduler_print_queue(dl_list<TCB*>& queue);
 
 #endif

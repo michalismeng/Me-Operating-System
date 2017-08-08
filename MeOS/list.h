@@ -38,7 +38,9 @@ list_node<T>* list_get_prev(list<T>* l, T item)
 		return 0;
 
 	if (l->count == 1)
+	{
 		return l->head;
+	}
 
 	list_node<T>* temp = l->head;
 
@@ -102,6 +104,7 @@ list_node<T>* list_remove_node(list<T>* l, list_node<T>* prev)
 	{
 		l->count--;
 		l->head = l->tail = 0;
+		prev->next = 0;
 		return prev;
 	}
 
@@ -119,6 +122,7 @@ list_node<T>* list_remove_node(list<T>* l, list_node<T>* prev)
 	if (l->count == 0)
 		l->head = l->tail = 0;
 
+	temp->next = 0;
 	return temp;
 }
 
@@ -193,6 +197,7 @@ void list_insert_back(list<T>* l, const T& element)
 template<class T>
 void list_insert_back_node(list<T>* l, list_node<T>* node)
 {
+	node->next = 0;
 	if (l->count == 0)
 		l->head = l->tail = node;
 	else

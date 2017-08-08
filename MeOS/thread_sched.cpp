@@ -44,8 +44,9 @@ void thread_execute(TCB t)
 
 void scheduler_decrease_sleep_time()
 {
-	list_node<TCB*>* ptr = SLEEP_QUEUE.head;
-	list_node<TCB*>* prev = 0;
+	dl_list_node<TCB*>* ptr = SLEEP_QUEUE.head;
+	dl_list_node<TCB*>* prev = 0;
+
 	uint32 elapsed = 1000 / frequency;
 
 	while (ptr != 0)
@@ -53,23 +54,17 @@ void scheduler_decrease_sleep_time()
 		TCB* thread = ptr->data;
 		if (elapsed > ptr->data->sleep_time)
 		{
-			list_node<TCB*>* node;
+			dl_list_node<TCB*>* node;
 			ptr = ptr->next;
 
-			//if (prev == 0)
-			//	list_remove_front(&SLEEP_QUEUE);
-			//else
-			//	list_remove(&SLEEP_QUEUE, prev); // and delete
-
 			if (prev == 0)
-				node = list_remove_front_node(&SLEEP_QUEUE);
+				node = dl_list_remove_front_node(&SLEEP_QUEUE);
 			else
-				node = list_remove_node(&SLEEP_QUEUE, prev);
+				node = dl_list_remove_node(&SLEEP_QUEUE, prev);
 
 			thread->state = THREAD_READY;
 			thread->sleep_time = 0;
-			//list_insert_back(&READY_QUEUE(thread->base_priority), thread);
-			list_insert_back_node(&READY_QUEUE(thread_get_priority(thread) /*thread->base_priority*/), node);
+			dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), node);
 		}
 		else
 		{
@@ -139,7 +134,7 @@ no_tasks:
 }
 
 // returns the first non empty queue, priority taken into account.
-list<TCB*>* sched_get_first_non_empty()
+dl_list<TCB*>* sched_get_first_non_empty()
 {
 	for (uint32 i = HIGHEST_PRIORITY; i < NUMBER_PRIORITIES; i++)
 		if (scheduler.thread_queues[i].count > 0)
@@ -153,9 +148,9 @@ list<TCB*>* sched_get_first_non_empty()
 void init_thread_scheduler()
 {
 	for (uint32 i = 0; i < NUMBER_PRIORITIES; i++)
-		list_init(&scheduler.thread_queues[i]);
+		dl_list_init(&scheduler.thread_queues[i]);
 
-	list_init(&scheduler.block_queue);
+	dl_list_init(&scheduler.block_queue);
 }
 
 TCB* thread_get_current()
@@ -178,11 +173,10 @@ void scheduler_thread_switch()
 	if (current_thread->state == THREAD_STATE::THREAD_RUNNING)
 	{
 		current_thread->state = THREAD_STATE::THREAD_READY;
-		list_head_to_tail(&READY_QUEUE(thread_get_priority(current_thread)/*current_thread->base_priority*/));
+		dl_list_head_to_tail(&READY_QUEUE(thread_get_priority(current_thread)));
 	}
 
-	// find the first thread that can be run
-	list<TCB*>* to_execute_list = sched_get_first_non_empty();
+	dl_list<TCB*>* to_execute_list = sched_get_first_non_empty();
 	if (to_execute_list == 0)		// nothing was found. Serious problem
 		PANIC("Error scheduler execute list is empty");
 
@@ -190,7 +184,10 @@ void scheduler_thread_switch()
 	TCB* to_execute = LIST_PEEK(to_execute_list);
 
 	if (to_execute->state != THREAD_STATE::THREAD_READY)
+	{
+		printfln("thread at %h id: %u stack_base: %h", to_execute, to_execute->id, to_execute->stack_base);
 		PANIC("Received non ready thread to execute");
+	}
 
 	to_execute->state = THREAD_STATE::THREAD_RUNNING;
 	current_thread = to_execute;
@@ -199,7 +196,7 @@ void scheduler_thread_switch()
 
 void scheduler_start()
 {
-	list<TCB*>* queue = sched_get_first_non_empty();
+	dl_list<TCB*>* queue = sched_get_first_non_empty();
 	if (queue == 0)
 		PANIC("No thread found to start");
 
@@ -212,8 +209,27 @@ void thread_insert(TCB* thread)
 {
 	//TODO: if current thread's priority is lees than the new one's, the current should be pre-empted (except if it is non preemptible)
 	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread);
+	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), new dl_list_node<TCB*>{ thread });
 	printfln("inserted");
+}
+
+// TODO: this must be enriched and better written
+void thread_set_priority(TCB* thread, uint32 priority)
+{
+	//INT_OFF;
+
+	//list_node<TCB*>* temp = 0;
+
+	//// if the thread is ready or running we must move it up in the ready queue... else the thread_notify will do it
+	//if (thread->state == THREAD_READY || thread->state == THREAD_RUNNING)
+	//	temp = list_remove_node(&READY_QUEUE(thread_get_priority(thread)), list_get_prev(&READY_QUEUE(thread_get_priority(thread)), thread));
+
+	//thread->base_priority = priority;
+
+	//if (temp != 0)
+	//	list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), temp);
+
+	//INT_ON;
 }
 
 // TODO: Search all the queues for the thread
@@ -222,7 +238,7 @@ TCB* thread_find(uint32 id)
 	// we need a cli environment as we search a common data structure
 	INT_OFF;
 
-	list_node<TCB*>* temp = 0;
+	dl_list_node<TCB*>* temp = 0;
 
 	for (uint32 i = HIGHEST_PRIORITY; i < NUMBER_PRIORITIES; i++)
 	{
@@ -280,11 +296,8 @@ __declspec(naked) void thread_block(TCB* thread)
 	{
 		thread->state = THREAD_BLOCK;
 
-		/*if (list_remove(&scheduler.thread_queues[thread->base_priority], list_get_prev(&scheduler.thread_queues[thread->base_priority], thread)))
-			list_insert_back(&scheduler.block_queue, thread);*/
-
-		auto node = list_remove_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), list_get_prev(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread));
-		list_insert_back_node(&BLOCK_QUEUE, node);
+		auto node = dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread)), dl_list_find_node(&READY_QUEUE(thread_get_priority(thread)), thread));
+		dl_list_insert_back_node(&BLOCK_QUEUE, node); 
 
 		_asm pop ebp
 	}
@@ -294,19 +307,12 @@ __declspec(naked) void thread_block(TCB* thread)
 
 		if (thread == current_thread)
 		{
-			/*list_remove_front(&scheduler.thread_queues[thread->base_priority]);
-			list_insert_back(&scheduler.block_queue, thread);*/
-
-			auto node = list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/));
-			list_insert_back_node(&BLOCK_QUEUE, node);
+			auto node = dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)));
+			dl_list_insert_back_node(&BLOCK_QUEUE, node);
 
 			_asm pop ebp
 
-			INT_ON;
-
 			THREAD_INTERRUPT_FRAME;
-
-			INT_OFF;
 
 			THREAD_SAVE_STATE;
 
@@ -345,11 +351,8 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 	{
 		thread->state = THREAD_SLEEP;
 
-		/*if (list_remove(&READY_QUEUE(thread->base_priority), list_get_prev(&READY_QUEUE(thread->base_priority), thread)))
-			list_insert_back(&SLEEP_QUEUE, thread);*/
-
-		auto node = list_remove_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), list_get_prev(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), thread));
-		list_insert_back_node(&SLEEP_QUEUE, node);
+		auto node = dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread)), dl_list_find_node(&READY_QUEUE(thread_get_priority(thread)), thread));
+		dl_list_insert_back_node(&SLEEP_QUEUE, node);
 
 		_asm pop ebp
 	}
@@ -359,11 +362,8 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 		{
 			thread->state = THREAD_SLEEP;
 
-			/*list_remove_front(&READY_QUEUE(thread->base_priority));
-			list_insert_back(&SLEEP_QUEUE, thread);*/
-
-			auto node = list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/));
-			list_insert_back_node(&SLEEP_QUEUE, node);
+			auto node = dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)));
+			dl_list_insert_back_node(&SLEEP_QUEUE, node);
 
 			_asm pop ebp  // fix the stack to create the interrupt frame
 
@@ -397,13 +397,12 @@ void thread_notify(TCB* thread)
 		return;
 	}
 
-	/*list_remove(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
+	auto node = dl_list_remove_node(&BLOCK_QUEUE, dl_list_find_node(&BLOCK_QUEUE, thread));
 	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back(&READY_QUEUE(thread->base_priority), thread);*/
+	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), node);
 
-	auto node = list_remove_node(&BLOCK_QUEUE, list_get_prev(&BLOCK_QUEUE, thread));
-	thread->state = THREAD_STATE::THREAD_READY;
-	list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)/*thread->base_priority*/), node);
+	if (thread_get_priority(thread) > thread_get_priority(thread_get_current()))
+		thread_current_yield();		// preempt the low priority thread.
 
 	INT_ON;
 }
@@ -417,19 +416,36 @@ void scheduler_print_queue(list<TCB*>& queue)
 
 	while (ptr != 0)
 	{
-		printfln("Task: %h with address space at: %h and esp: %h, id %u", ptr->data->id, ptr->data->parent->page_dir, ptr->data->esp, ptr->data->id);
+		serial_printf("Task: %h with address space at: %h and esp: %h, id %u\n", ptr->data->id, ptr->data->parent->page_dir, ptr->data->esp, ptr->data->id);
+		ptr = ptr->next;
+	}
+}
+
+void scheduler_print_queue(dl_list<TCB*>& queue)
+{
+	if (queue.count == 0)
+		return;
+
+	dl_list_node<TCB*>* ptr = queue.head;
+
+	while (ptr != 0)
+	{
+		serial_printf("Task: %h with address space at: %h and esp: %h, id %u\n", ptr->data->id, ptr->data->parent->page_dir, ptr->data->esp, ptr->data->id);
 		ptr = ptr->next;
 	}
 }
 
 void scheduler_print_queues()
 {
-	printfln("printing");
+	serial_printf("noraml queues\n");
 	for (int i = 0; i < NUMBER_PRIORITIES; i++)
 	{
 		if (scheduler.thread_queues[i].count == 0) continue;
 
-		printfln("queue: %u", i);
-		scheduler_print_queue(scheduler.thread_queues[i]);
+		serial_printf("queue: %u\n", i);
+		scheduler_print_queue(READY_QUEUE(i));
 	}
+
+	serial_printf("block queue\n");
+	scheduler_print_queue(BLOCK_QUEUE);
 }

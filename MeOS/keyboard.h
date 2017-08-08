@@ -23,13 +23,13 @@ enum KYBRD_CTRL_IO
 enum KYBRD_CTRL_STATS_MASK
 {
 	KYBRD_CTRL_STATS_MASK_OUT_BUF = 0x1,		// keyboard output buffer empty - full
-	KYBRD_CTRL_STATS_MASK_IN_BUF = 0x2,		// keyboard input  buffer empty - full
-	KYBRD_CTRL_STATS_MASK_SYSTEM = 0x4,		// keyboard system flag (after reset - BAT)
+	KYBRD_CTRL_STATS_MASK_IN_BUF = 0x2,			// keyboard input  buffer empty - full
+	KYBRD_CTRL_STATS_MASK_SYSTEM = 0x4,			// keyboard system flag (after reset - BAT)
 	KYBRD_CTRL_STATS_MASK_CMD_DATA = 0x8,		// keyboard last write data(0x60) - command(0x64)
 	KYBRD_CTRL_STATS_MASK_LOCKED = 0x10,		// keyboard lock status
 	KYBRD_CTRL_STATS_MASK_AUX_BUF = 0x20,		// differs based on keyboard mode. AT mode when set maybe keyboard not present
 	KYBRD_CTRL_STATS_MASK_TIMEOUT = 0x40,		// differs based on keyboard mode. AT mode when set possible parity error
-	KYBRD_CTRL_STATS_MASK_PARITY = 0x80		// keyboard OK - parity error
+	KYBRD_CTRL_STATS_MASK_PARITY = 0x80			// keyboard OK - parity error
 };
 
 // inside keyboard encoder available commands

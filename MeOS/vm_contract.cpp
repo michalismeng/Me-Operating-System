@@ -15,7 +15,7 @@ void vm_contract_init(vm_contract* c, uint32 low_addr, uint32 high_addr)
 	// set guard non removable areas
 	vm_area area;
 	vm_area_init(&area);
-	area.flags = VM_AREA_NON_REMOVE;
+	area.flags = MMAP_NON_REMOVE;
 
 	vm_area_set_bounds(&area, low_addr, 4096);
 	ordered_vector_insert(&c->contract, area);
@@ -73,6 +73,7 @@ bool vm_contract_add_area(vm_contract* c, vm_area* new_area)
 	if (vm_area_intersects(&c->contract.data[last], new_area) == false &&
 		vm_area_intersects(&c->contract.data[last + 1], new_area) == false)
 	{
+		printfln("new area: %h", new_area->start_addr);
 		ordered_vector_insert(&c->contract, *new_area);
 		return true;
 	}

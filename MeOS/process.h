@@ -8,7 +8,7 @@
 #include "open_file_table.h"
 
 #include "queue_lf.h"
-#include "process_exception.h"
+#include "thread_exception.h"
 
 #include "Debugger.h"
 #include "spinlock.h"
@@ -95,19 +95,22 @@ _asm	mov esp, 0x90000
 		uint32 esp;
 		uint32 ss;
 
-		PCB* parent;					// parent process that created this thread.
-		uint32 sleep_time;				// time in millis of thread sleep. Used for the sleep function
+		PCB* parent;								// parent process that created this thread.
+		uint32 sleep_time;							// time in millis of thread sleep. Used for the sleep function
 
-		uint32 id;						// thread unique id
+		uint32 id;									// thread unique id
 
-		int32 plus_priority;			// priority gained due to different factors such as waiting in the queues
-		int32 base_priority;			// base priority given at the thread creation time
+		int32 plus_priority;						// priority gained due to different factors such as waiting in the queues
+		int32 base_priority;						// base priority given at the thread creation time
 
-		void* stack_base;				// address of the base of the thread's stack
-		void* stack_limit;				// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
+		void* stack_base;							// address of the base of the thread's stack
+		void* stack_limit;							// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
 
-		THREAD_STATE state;				// the current state of the thread
-		THREAD_ATTRIBUTE attribute;		// thread's extra attribute info
+		THREAD_STATE state;							// the current state of the thread
+		THREAD_ATTRIBUTE attribute;					// thread's extra attribute info
+
+		queue_lf<thread_exception> exceptions;		// thread exception queue to be consumed and served by the kernel
+		uint32 exception_lock;						// lock for the exception consumption (to be used with CAS)
 	}TCB;
 
 	typedef struct process_control_block
@@ -124,9 +127,6 @@ _asm	mov esp, 0x90000
 
 		vm_contract memory_contract;			// virtual memory layout
 		spinlock contract_spinlock;				// virtual memory contract spinlock used for reading and writing
-
-		queue_lf<process_exception> exceptions;	// process exception queue to be consumed and served by the kernel
-		uint32 exception_lock;					// lock for the exception consumption (to be used with CAS)
 
 		queue<TCB> threads;						// child threads of the process
 	}PCB;

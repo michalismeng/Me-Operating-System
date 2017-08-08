@@ -7,6 +7,25 @@ physical_addr current_pdbr = 0;			// current page directory base register
 
 pdirectory* kernel_directory = 0;		// kernel page directory
 
+// when fault occured the page was present in memory
+bool page_fault_error_is_page_present(uint32 error)
+{
+	return (error & 0x1);
+}
+
+// the fault occured due to a write attempt
+bool page_fault_error_is_write(uint32 error)
+{
+	return (error & 0x2);
+}
+
+// the fault occured while the cpu was in CPL=3
+bool page_fault_error_is_user(uint32 error)
+{
+	return (error & 0x4);
+}
+
+// top half page fault handler
 void page_fault(registers_struct* regs)
 {
 	uint32 addr;
@@ -16,65 +35,98 @@ void page_fault(registers_struct* regs)
 		mov dword ptr addr, eax
 	}
 
-	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u", addr, thread_get_current()->id);
-
-	if (thread_get_current() == 0 && addr > 0xF0000000)		// auto allocate space for MMIO (only when threading is not setup as map page may require time)
-	{
-		if ((addr &(~0xfff)) == 0xf0404000)
-			printfln("mapping abar"); 
-
-		addr &= ~0xfff;
-		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
-
-		printfln("mapped: %h %h", addr, vmmngr_get_phys_addr(addr));
-	}
-
 	// push thread in the exception queue
 	if (thread_get_current())
 	{
-		process_exception pe;
-		pe.exception_number = 14;
-		pe.target_thread = thread_get_current();
-		pe.data[0] = addr;
-		pe.data[1] = regs->err_code;
+		thread_exception te;
+		te.exception_number = 14;
+		te.target_thread = thread_get_current();
+		te.data[0] = addr;
+		te.data[1] = regs->err_code;
 
-		if (!queue_lf_insert(&process_get_current()->exceptions, pe))
+		if (!queue_lf_insert(&thread_get_current()->exceptions, te))
 			WARNING("queue_lf insertion error");
 	}
+	else
+		PANIC("Page fault occured but threading is not enabled!");
 }
 
-void page_fault_bottom(process_exception pe)
+extern bool pressed;
+
+void page_fault_bottom(thread_exception te)
 {
-	process_exception_print(&pe);
-	uint32 addr = pe.data[0];
+	thread_exception_print(&te);
+	uint32& addr = te.data[0];
+	uint32& code = te.data[1];
+
+	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u, ERROR CODE: %h", addr, thread_get_current()->id, code);
 
 	if (addr > 0xF0000000)		// auto allocate space for MMIO
 	{
-		if ((addr &(~0xfff)) == 0xf0404000)
-			printfln("mapping abar"); 
-
 		addr &= ~0xfff;
 		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
-
-		printfln("mapped: %h %h", addr, vmmngr_get_phys_addr(addr));
+		return;
 	}
-	else
+
+
+	spinlock_acquire(&process_get_current()->contract_spinlock);
+	vm_area* p_area = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr);
+
+	if (p_area == 0)
+		PANIC("could not find address in memory contract");		// terminate thread and process with SIGSEGV
+
+	vm_area area = *p_area;
+	spinlock_release(&process_get_current()->contract_spinlock);
+
+	// tried to acccess inaccessible page
+	if ((area.flags & MMAP_PROTECTION) == MMAP_NO_ACCESS)
 	{
-		spinlock_acquire(&process_get_current()->contract_spinlock);
-
-		bool out_of_contract = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr) == 0;
-
-		spinlock_release(&process_get_current()->contract_spinlock);
-
-		if (out_of_contract)
-			PANIC("could not find address in memory contract");
-		else
-			vmmngr_alloc_page(addr);
+		printf("address: %h is inaccessible", addr);
+		PANIC("");
 	}
 
-	// extern void loadFile(uint32 addr);
-	//if (addr == 0x700000)    load file easter egg
-	//	loadFile(0x700000);
+	// tried to write to read-only or inaccessible page
+	if (page_fault_error_is_write(code) && (area.flags & MMAP_WRITE) != MMAP_WRITE)
+	{
+		printfln("cannot write to address: %h", addr);
+		PANIC("");
+	}
+
+	// tried to read a write-only or inaccesible page ???what???
+	/*if (!page_fault_error_is_write(code) && CHK_BIT(area.flags, MMAP_READ))
+	{
+		printfln("cannot read from address: %h", addr);
+		PANIC("");
+	}*/
+
+	// if the page is present then a violation happened (we do not implement swap out/shared anonymous yet)
+	if (page_fault_error_is_page_present(code) == true)
+	{
+		printfln("memory violation at address: %h with code: %h", addr, code);
+		PANIC("");
+	}
+
+	// here we found out that the page is not present, so we need to allocate it properly
+	if (CHK_BIT(area.flags, MMAP_PRIVATE))
+	{
+		if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
+		{
+			uint32 flags = I86_PDE_PRESENT;
+
+			if (CHK_BIT(area.flags, MMAP_WRITE))
+				flags |= I86_PDE_WRITABLE;
+
+			if (CHK_BIT(area.flags, MMAP_USER))
+				flags |= I86_PDE_USER;
+
+			vmmngr_alloc_page_f(addr, flags);
+		}
+	}
+	else		// MMAP_SHARED
+	{
+		if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
+			PANIC("A shared area cannot be marked as anonymous yet.");
+	}
 }
 
 void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags)
@@ -146,7 +198,7 @@ bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags)
 			return false;
 	}
 
-	vmmngr_map_page(vmmngr_get_directory(), addr, base, DEFAULT_FLAGS);
+	vmmngr_map_page(vmmngr_get_directory(), addr, base, flags);
 	return true;
 }
 

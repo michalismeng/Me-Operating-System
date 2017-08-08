@@ -5,20 +5,7 @@
 
 #include "utility.h"
 #include "mmngr_virtual.h"
-
-enum VM_AREA_FLAGS
-{
-	VM_AREA_INVALID = 1 << 0,
-	VM_AREA_READ = 1 << 1,
-	VM_AREA_WRITE = 1 << 2,
-	VM_AREA_EXEC = 1 << 3,
-	VM_AREA_SHARED = 1 << 4,
-	VM_AREA_PRIVATE = 1 << 5,
-	VM_AREA_EXCLUSIVE = 1 << 6,
-
-	VM_AREA_NON_REMOVE = 1 << 7,
-	VM_AREA_GROWS_DOWN = 1 << 8
-};
+#include "memory_definitions.h"
 
 // defines a process virtual area. (This is the bare bones of a process - kernel memory contract)
 struct vm_area

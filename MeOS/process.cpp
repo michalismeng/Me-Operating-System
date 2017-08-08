@@ -165,8 +165,6 @@ PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 hi
 		proc->page_dir = pdir;
 
 	queue_init(&proc->threads);
-	queue_lf_init(&proc->exceptions, 10);
-	proc->exception_lock = 0;
 	vm_contract_init(&proc->memory_contract, low_address, high_address);
 
 	return proc;
@@ -186,7 +184,9 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	t->base_priority = priority;
 	t->plus_priority = 0;
 
-	printfln("here");
+	queue_lf_init(&t->exceptions, 10);
+	t->exception_lock = 0;
+
 	// TODO: Replace the directory switches by a simple kernel page map
 	pdirectory* old_dir = vmmngr_get_directory();
 	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
