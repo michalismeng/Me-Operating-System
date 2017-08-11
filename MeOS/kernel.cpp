@@ -238,71 +238,83 @@ TCB* thread_test_time;
 
 void keyboard_fancy_function()
 {
-	while (true)
+	int fd;
+	if (open_file("dev/keyboard", &fd) != VFS_OK)
 	{
-		KEYCODE c = getch();
+		printfln("error occured: %u", get_last_error());
+	}
+	else
+	{
+		while (true)
+		{
+			char c;
+			read_file(fd, 0, 1, (virtual_addr)&c);
 
-		if (c == KEYCODE::KEY_R)
-		{
-			printf("reseting system");
-			sleep(500);
-			printf(".");
-			sleep(500);
-			printf(".");
-			sleep(500);
-			printf(".");
-			sleep(500);
-			kybrd_reset_system();
-		}
-		else if (c == KEYCODE::KEY_V)
-		{
-			ClearScreen();
-			vfs_print_all();
-		}
-		else if (c == KEYCODE::KEY_P)
-		{
-			uint32 port = 0x3f8;
-			printfln("reading port 0x3f8 %h %h", *((uint32*)port), inportb(port));
-
-			outportb(PORT + 7, 0x30);   
-			printfln("scratch pad reg: %h", inportb(PORT + 7));
-		}
-		else if (c == KEYCODE::KEY_L)
-		{
-			ClearScreen();
-			printfln("printing at thread: %u: ", thread_get_current()->id);
-			char* buffer = (char*)0x700000;
-
-			for (int i = 0; i < 20; i++)
-				buffer[i] = 'a';
-			for (int i = 0; i < 20; i++)
-				printf("%c", buffer[i]);
-
-			printfln(".End");
-		}
-		else if (c == KEYCODE::KEY_S)
-		{
-			ClearScreen();
-			while (true)
+			if (c == KEYCODE::KEY_R)
 			{
-				KEYCODE c = getch();
-				printf("%c", c);
+				printf("reseting system");
+				sleep(500);
+				printf(".");
+				sleep(500);
+				printf(".");
+				sleep(500);
+				printf(".");
+				sleep(500);
+				kybrd_reset_system();
 			}
-		}
-		else if (c == KEYCODE::KEY_H)
-		{
-			/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
-			thread_sleep(thread_test_time, 2000);*/
+			else if (c == KEYCODE::KEY_V)
+			{
+				ClearScreen();
+				vfs_print_all();
+			}
+			else if (c == KEYCODE::KEY_P)
+			{
+				uint32 port = 0x3f8;
+				printfln("reading port 0x3f8 %h %h", *((uint32*)port), inportb(port));
 
-			/*printfln("sleeping me %u at %u", thread_get_current()->id, millis());
-			thread_sleep(thread_get_current(), 3000);*/
+				outportb(PORT + 7, 0x30);
+				printfln("scratch pad reg: %h", inportb(PORT + 7));
+			}
+			else if (c == KEYCODE::KEY_L)
+			{
+				ClearScreen();
+				printfln("printing at thread: %u: ", thread_get_current()->id);
+				char* buffer = (char*)0x700000;
 
-			printfln("blocking thread %u at %u", thread_test_time->id, millis());
-			ClearScreen();
+				for (int i = 0; i < 20; i++)
+					buffer[i] = 'a';
+				for (int i = 0; i < 20; i++)
+					printf("%c", buffer[i]);
 
-			thread_block(thread_test_time);
-			scheduler_print_queues();
-			printfln("hello");
+				printfln(".End");
+			}
+			else if (c == KEYCODE::KEY_S)
+			{
+				//ClearScreen();
+				while (true)
+				{
+					read_file(fd, 0, 1, (virtual_addr)&c);
+
+					if (isprint(c) || c == KEY_BACKSPACE)
+						printf("%c", c);
+				}
+
+			}
+			else if (c == KEYCODE::KEY_H)
+			{
+				/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
+				thread_sleep(thread_test_time, 2000);*/
+
+				/*printfln("sleeping me %u at %u", thread_get_current()->id, millis());
+				thread_sleep(thread_get_current(), 3000);*/
+
+				printfln("blocking thread %u at %u", thread_test_time->id, millis());
+				ClearScreen();
+
+				thread_block(thread_test_time);
+				scheduler_print_queues();
+				printfln("hello");
+			}
 		}
 	}
 }
@@ -451,11 +463,15 @@ void proc_init_thread()
 	page_cache_print();
 
 	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
-	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
+	if (disk)
+	{
+		vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
 
-	vfs_node* folder = 0;
+		vfs_node* folder = 0;
 
-	vfs_add_child(vfs_get_root(), hierarchy);
+		vfs_add_child(vfs_get_root(), hierarchy);
+	}
+	
 
 	vfs_print_all();
 
@@ -652,8 +668,9 @@ void proc_init_thread()
 
 	init_keyboard();
 
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
-	printfln("new insertion");
+	TCB* c;
+	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
+	serial_printf("fancy %u \n", c->id);
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));

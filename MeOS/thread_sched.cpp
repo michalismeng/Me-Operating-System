@@ -401,8 +401,11 @@ void thread_notify(TCB* thread)
 	thread->state = THREAD_STATE::THREAD_READY;
 	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), node);
 
-	if (thread_get_priority(thread) > thread_get_priority(thread_get_current()))
-		thread_current_yield();		// preempt the low priority thread.
+
+	// preempt the low priority thread, if it is preemptible
+	if (thread_is_preemptible(thread_get_current()) && 
+		thread_get_lower_priority(thread, thread_get_current()) == thread_get_current())
+		thread_current_yield();		
 
 	INT_ON;
 }

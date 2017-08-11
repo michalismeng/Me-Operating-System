@@ -139,6 +139,11 @@ _asm	mov esp, 0x90000
 
 	uint32* thread_get_error(TCB* thread);
 
+	bool thread_is_preemptible(TCB* thread);
+
+	// returns the thread with the lowest priority between the two.
+	TCB* thread_get_lower_priority(TCB* thread1, TCB* thread2);
+
 	bool validate_PE_image(void* image);
 
 #ifdef __cplusplus

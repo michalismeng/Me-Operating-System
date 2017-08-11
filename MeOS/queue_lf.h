@@ -66,4 +66,14 @@ bool queue_lf_is_empty(queue_lf<T>* q)
 	return (q->tail_index == q->head_index);
 }
 
+// clears the queue based on the caller type (required to mess with the right variable)
+template<class T>
+void queue_lf_clear(queue_lf<T>* q, bool reader_caller)
+{
+	if (reader_caller)
+		q->head_index = q->tail_index;
+	else
+		q->tail_index = q->head_index;
+}
+
 #endif

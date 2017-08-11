@@ -2,10 +2,13 @@
 #include "vfs.h"
 #include "process.h"
 #include "thread_sched.h"
+#include "queue_lf.h"
 
 // driver private data
 
 uint32 _scancode;
+queue_lf<uint8> keycode_buffer;
+queue_lf<uint32> user_buffer;
 int code = 0;								// the code received by the keyboard irq
 bool _numlock, _capslock, _scrolllock;
 bool _shift, _alt, _ctrl;
@@ -16,7 +19,7 @@ bool _kybrd_resend_res = false;
 bool _kybrd_disable = false;
 
 TCB* keyboard_daemon = 0;
-
+TCB* active = 0;
 uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 vfs_result kybd_open(vfs_node* node);
 vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...);
@@ -35,25 +38,36 @@ static fs_operations kybd_operations =
 uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	uint8* buffer = (uint8*)address;
+	active = thread_get_current();
+
+	// perhaps we will need to empty the user_buffer at some point
 
 	while (count > 0)
 	{
-		thread_block(thread_get_current());
-		count--;
-		buffer++;
+		if (queue_lf_is_empty(&user_buffer) == false)
+		{
+			*buffer = queue_lf_peek(&user_buffer);
+			queue_lf_remove(&user_buffer);
+			count--;
+			buffer++;
+		}
+		else
+			thread_block(thread_get_current());
 	}
+
+	active = 0;
 
 	return 0;
 }
 
 vfs_result kybd_open(vfs_node* node)
 {
-	return 0;
+	return VFS_OK;
 }
 
 vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...)
 {
-	return 0;
+	return VFS_OK;
 }
 
 // original scane set where array index == make code.
@@ -351,20 +365,15 @@ bool kybrd_is_disabled()
 
 void keyboard_callback(registers_t* regs)
 {
-	// ensure keyboard controller buffer is full
+	// ensure keyboard controller buffer has data
 	if (kybrd_ctrl_input_ready())
 	{
-		// read the code
-		code = kybrd_enc_read_status();
+		// read the code into the buffer
+		queue_lf_insert(&keycode_buffer, kybrd_enc_read_status());
 
 		// notify the daemon of the incoming code
 		if (keyboard_daemon != 0)
-		{
-			if (keyboard_daemon->state != THREAD_BLOCK)
-				serial_printf("err");
-
 			thread_notify(keyboard_daemon);
-		}
 	}
 }
 
@@ -373,100 +382,112 @@ void keyboard_irq()
 	// run forever
 	while (true)
 	{
-		// TODO : ADD EXTENDED CODE CAPABILITY
-		if (code == 0xE0 || code == 0xE1)
+		while (queue_lf_is_empty(&keycode_buffer) == false)
 		{
-			DEBUG("Hit keyboard extended capability");
-		}
+			code = queue_lf_peek(&keycode_buffer);
+			queue_lf_remove(&keycode_buffer);
 
-		//break code specific to Original Scan Set(test bit 7)
-		if (code & 0x80)
-		{
-			code -= 0x80;	// retrieve make code
-
-			int key = _kybrd_scancode_std[code];	// retrieve textual character based on Original Scan Set
-
-			// handle special key release
-			switch (key)
+			// TODO : ADD EXTENDED CODE CAPABILITY
+			if (code == 0xE0 || code == 0xE1)
 			{
-			case KEY_LSHIFT:
-			case KEY_RSHIFT:
-				_shift = false;
-				break;
+				DEBUG("Hit keyboard extended capability");
+			}
 
-			case KEY_LCTRL:
-			case KEY_RCTRL:
-				_ctrl = false;
-				break;
+			//break code specific to Original Scan Set(test bit 7)
+			if (code & 0x80)
+			{
+				code -= 0x80;	// retrieve make code
 
-			case KEY_LALT:
-			case KEY_RALT:
-				_alt = false;
+				int key = _kybrd_scancode_std[code];	// retrieve textual character based on Original Scan Set
+
+														// handle special key release
+				switch (key)
+				{
+				case KEY_LSHIFT:
+				case KEY_RSHIFT:
+					_shift = false;
+					break;
+
+				case KEY_LCTRL:
+				case KEY_RCTRL:
+					_ctrl = false;
+					break;
+
+				case KEY_LALT:
+				case KEY_RALT:
+					_alt = false;
+					break;
+				default:
+					break;
+				}
+			}
+			// this is a make code
+			else
+			{
+				_scancode = code;
+				uint32 key = _kybrd_scancode_std[code];
+				// handle special key press
+				switch (key)
+				{
+				case KEY_LSHIFT:
+				case KEY_RSHIFT:
+					_shift = true;
+					break;
+
+				case KEY_LCTRL:
+				case KEY_RCTRL:
+					_ctrl = true;
+					break;
+
+				case KEY_LALT:
+				case KEY_RALT:
+					_alt = true;
+					break;
+
+				case KEY_CAPSLOCK:
+					_capslock = !_capslock;
+					kybrd_set_leds(_numlock, _capslock, _scrolllock);
+					break;
+
+				case KEY_KP_NUMLOCK:
+					_numlock = !_numlock;
+					kybrd_set_leds(_numlock, _capslock, _scrolllock);
+					break;
+
+				case KEY_SCROLLLOCK:
+					_scrolllock = !_scrolllock;
+					kybrd_set_leds(_numlock, _capslock, _scrolllock);
+					break;
+				default:
+					break;
+				}
+
+				// if there is an active thread, write the data to it.
+				if (active != 0)
+				{
+					queue_lf_insert(&user_buffer, key);
+					thread_notify(active);
+				}
+			}
+
+			// watch for any errors
+			switch (code)
+			{
+			case KYBRD_ERR_BAT_FAILED:
+				DEBUG("BAT Error");
+				_kybrd_BAT_res = false;
+				break;
+			case KYBRD_ERR_DIAG_FAILED:
+				DEBUG("Diagnostic Error");
+				_kybrd_diag_res = false;
+				break;
+			case KYBRD_ERR_RESEND_CMD:
+				DEBUG("Resend requested");
+				_kybrd_resend_res = true;
 				break;
 			default:
 				break;
 			}
-		}
-		// this is a make code
-		else	
-		{
-			_scancode = code;
-			int key = _kybrd_scancode_std[code];
-
-			// handle special key press
-			switch (key)
-			{
-			case KEY_LSHIFT:
-			case KEY_RSHIFT:
-				_shift = true;
-				break;
-
-			case KEY_LCTRL:
-			case KEY_RCTRL:
-				_ctrl = true;
-				break;
-
-			case KEY_LALT:
-			case KEY_RALT:
-				_alt = true;
-				break;
-
-			case KEY_CAPSLOCK:
-				_capslock = !_capslock;
-				kybrd_set_leds(_numlock, _capslock, _scrolllock);
-				break;
-
-			case KEY_KP_NUMLOCK:
-				_numlock = !_numlock;
-				kybrd_set_leds(_numlock, _capslock, _scrolllock);
-				break;
-
-			case KEY_SCROLLLOCK:
-				_scrolllock = !_scrolllock;
-				kybrd_set_leds(_numlock, _capslock, _scrolllock);
-				break;
-			default:
-				break;
-			}
-		}
-
-		// watch for any errors
-		switch (code)
-		{
-		case KYBRD_ERR_BAT_FAILED:
-			DEBUG("BAT Error");
-			_kybrd_BAT_res = false;
-			break;
-		case KYBRD_ERR_DIAG_FAILED:
-			DEBUG("Diagnostic Error");
-			_kybrd_diag_res = false;
-			break;
-		case KYBRD_ERR_RESEND_CMD:
-			DEBUG("Resend requested");
-			_kybrd_resend_res = true;
-			break;
-		default:
-			break;
 		}
 
 		thread_block(thread_get_current());
@@ -479,13 +500,15 @@ void init_keyboard()
 
 	vfs_create_device("keyboard", 0, 0, &kybd_operations);
 
-	_kybrd_BAT_res = true;		// assume true.. will be checked at the irq handler right above
+	queue_lf_init(&keycode_buffer, 10);
+	queue_lf_init(&user_buffer, 10);
+
+	_kybrd_BAT_res = true;							// assume true.. will be checked at the irq handler right above
 	_scancode = INVALID_SCAN_CODE;
 	_numlock = _capslock = _scrolllock = false;
 	_shift = _alt = _ctrl = false;
 
 	kybrd_set_leds(false, false, false);
-
 
 	// parent is the kernel init thread
 	keyboard_daemon = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, 3 GB + 10 MB + 500 KB, 4 KB, 1);

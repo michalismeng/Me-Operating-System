@@ -183,6 +183,7 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	t->state = THREAD_STATE::THREAD_READY;
 	t->base_priority = priority;
 	t->plus_priority = 0;
+	t->attribute = THREAD_ATTRIBUTE::THREAD_KERNEL;
 
 	queue_lf_init(&t->exceptions, 10);
 	t->exception_lock = 0;
@@ -206,6 +207,17 @@ int32 thread_get_priority(TCB* thread)
 uint32* thread_get_error(TCB* thread)
 {
 	return (uint32*)((char*)thread->stack_base - 4);
+}
+
+bool thread_is_preemptible(TCB* thread)
+{
+	return ((thread->attribute & THREAD_NONPREEMPT) != THREAD_NONPREEMPT);
+}
+
+TCB* thread_get_lower_priority(TCB* thread1, TCB* thread2)
+{
+	// (highest priority is 0, lowest is 7)
+	return thread_get_priority(thread1) > thread_get_priority(thread2) ? thread1 : thread2;
 }
 
 bool validate_PE_image(void* image)
