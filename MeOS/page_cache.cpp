@@ -1,4 +1,5 @@
 #include "page_cache.h"
+#include "print_utility.h"
 
 // private data
 _page_cache page_cache;			// the global page cache
@@ -203,6 +204,7 @@ void page_cache_release_buffer(int gfd, uint32 page)
 
 void page_cache_register_file(int gfd)
 {
+	// TODO: This is true only if no descriptor is removed and then replaced
 	// this is a new descriptor
 	if (gfd >= page_cache.cached_files.count)
 	{

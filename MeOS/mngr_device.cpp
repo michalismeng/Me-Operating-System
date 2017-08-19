@@ -1,4 +1,5 @@
 #include "mngr_device.h"
+#include "print_utility.h"
 
 // private data and functions
 DEVICE_HEADER dev_header;

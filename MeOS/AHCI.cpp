@@ -1,4 +1,5 @@
 #include "AHCI.h"
+#include "print_utility.h"
 
 // private data and helper function
 
@@ -311,7 +312,7 @@ void ahci_setup_vfs_port(uint8 port_num)
 
 void ahci_port_rebase(uint8 port_num)
 {
-	printfln("rebase port: %u", port_num);
+	//printfln("rebase port: %u", port_num);
 	HBA_PORT_t* port = &abar->ports[port_num];
 
 	if (ahci_stop_cmd(port) == false)

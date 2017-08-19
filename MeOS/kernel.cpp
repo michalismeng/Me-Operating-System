@@ -37,6 +37,10 @@
 
 #include "dl_list.h"
 
+#include "VBEDefinitions.h"
+#include "screen_gfx.h"
+#include "print_utility.h"
+
 extern "C" uint8 canOutput = 1;
 
 heap* kernel_heap = 0;
@@ -203,15 +207,15 @@ void test2()
 
 void loadFile(uint32 addr)
 {
-	int fd;
-	if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
-		PANIC("Cannot open fd");
+	//int fd;
+	//if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
+	//	PANIC("Cannot open fd");
 
-	if (read_file(fd, 0, 20, addr) != 20)
-		PANIC("Could not read");
+	//if (read_file(fd, 0, 20, addr) != 20)
+	//	PANIC("Could not read");
 
-	for (int i = 0; i < 1000000; i++);	// lengthy procedure
-	printfln("End load");
+	//for (int i = 0; i < 1000000; i++);	// lengthy procedure
+	//printfln("End load");
 }
 
 void test_print_time()
@@ -220,12 +224,15 @@ void test_print_time()
 	while (true)
 	{
 		INT_OFF;
-		uint16 x = cursorX, y = cursorY;
+		point cursor = get_cursor();
 
-		SetPointer(0, SCREEN_HEIGHT - 2);
-		printf("test thread t=%u m=%u", get_ticks(), millis());
-		SetPointer(x, y);
+		//SetPointer(0, SCREEN_HEIGHT - 3);
+		set_cursor(0, get_chars_vertical() - 2);
+		printf("main thread t=%u m=%u", get_ticks(), millis());
+		//SetPointer(x, y);
+		set_cursor(cursor.x, cursor.y);
 		INT_ON;
+		thread_current_yield();
 	}
 }
 
@@ -290,15 +297,15 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_S)
 			{
-				//ClearScreen();
+				uint32 colors[2] = { 0xFFFFFF, 0xFF0000 };
+				uint8 ind = 0;
 				while (true)
 				{
 					read_file(fd, 0, 1, (virtual_addr)&c);
-
-					if (isprint(c) || c == KEY_BACKSPACE)
-						printf("%c", c);
+					draw_char(c);
+					if (c == 'r')
+						draw_rectangle(make_point(100, 100), make_point(400, 400), colors[ind++ % 2]);
 				}
-
 			}
 			else if (c == KEYCODE::KEY_H)
 			{
@@ -406,6 +413,8 @@ void create_test_process(int fd)
 	printfln("thread creationg ended");
 }
 
+multiboot_info* boot_info;
+
 void proc_init_thread()
 {
 	printfln("executing %s", __FUNCTION__);
@@ -414,6 +423,11 @@ void proc_init_thread()
 	if (mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map kernel land");
 
+	// memory map MMIO
+	if (mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+		PANIC("Could not map MMIO");
+
+	// test area
 	if (mmap(0x700000, INVALID_FD, 0, 4 KB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map 7 MB");
 
@@ -429,7 +443,10 @@ void proc_init_thread()
 
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
 
-	ClearScreen();
+	// standardize this!
+	vbe_mode_info_block* vbe = (vbe_mode_info_block*)(0x2000);
+
+	//ClearScreen();
 
 	/*dl_list<int> test;
 	dl_list_init(&test);
@@ -466,14 +483,11 @@ void proc_init_thread()
 	if (disk)
 	{
 		vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
-
 		vfs_node* folder = 0;
-
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
-	
 
-	vfs_print_all();
+	//vfs_print_all();
 
 	//page_cache_print();
 	//debugf(strupper("print tree..."));
@@ -668,9 +682,36 @@ void proc_init_thread()
 
 	init_keyboard();
 
+	
+
+	//uint32 addr = 0x700000;
+	//int fd;
+	//if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
+	//	PANIC("Cannot open fd");
+
+	//if (read_file(fd, 0, 20, addr) != 20)
+	//	PANIC("Could not read");
+
+	//for (int i = 0; i < 20; i++)serial_printf("%c", ((char*)addr)[i]);	// lengthy procedure
+	//printfln("End load");
+
+	//PANIC("");
+
+	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
+	init_screen_gfx(vbe);
+
+	set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);
+
+	init_print_utility();
+
+	printfln("hello");
+	printfln("hello %u", 3);
+
+	serial_printf("screen ready...\n");
+
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
-	serial_printf("fancy %u \n", c->id);
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
@@ -687,17 +728,18 @@ void proc_init_thread()
 
 	//*(char*)0x700000 = 0;
 
-
-	printfln("here end");
 	while (true)
 	{
 		INT_OFF;
-		uint16 x = cursorX, y = cursorY;
+		point cursor = get_cursor();
 
-		SetPointer(0, SCREEN_HEIGHT - 3);
+		//SetPointer(0, SCREEN_HEIGHT - 3);
+		set_cursor(0, get_chars_vertical() - 3);
 		printf("main thread t=%u m=%u", get_ticks(), millis());
-		SetPointer(x, y);
+		//SetPointer(x, y);
+		set_cursor(cursor.x, cursor.y);
 		INT_ON;
+		thread_current_yield();
 	}
 
 	/*int fd;
@@ -786,10 +828,35 @@ void proc_init_thread()
 
 extern "C" void test_handle(registers_t* regs);
 
-int kmain(multiboot_info* boot_info, kernel_info* k_info)
+extern "C" int _fltused = 1;
+
+extern "C" long __declspec (naked) _ftol2_sse() {
+
+	int a;
+	_asm	fistp[a]
+		_asm	mov	ebx, a
+	_asm	ret
+}
+
+extern "C" float __declspec(naked) _CIcos() {
+	_asm fcos
+};
+
+extern "C" float __declspec(naked) _CIsin() {
+	_asm fsin
+};
+
+extern "C" float __declspec(naked) _CIsqrt() {
+	_asm fsqrt
+};
+
+int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 {
-	SetColor(DARK_BLUE, WHITE);
-	ClearScreen();
+	boot_info = _boot_info;
+
+	printf("hello");
+
+	//printfln("LFA: %h",_boot_info->m_vbe_control_info);
 
 	INT_OFF;
 	init_descriptor_tables(k_info->gdt_base, k_info->isr_handlers, k_info->idt_base);
@@ -798,7 +865,7 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);		// bypass the common interrupt handler to play with the stack
 	INT_ON;
 
-	printf("Welcome to ME Operating System\n");
+	//printf("Welcome to ME Operating System\n");
 
 	init_serial();
 
@@ -819,10 +886,10 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 		if (i > 0 && region[i].startLo == 0)
 			break;
 
-		printf("region %i: start: 0x%x %x length (bytes): 0x%x %x type: %i (%s)\n", i,
+		/*printf("region %i: start: 0x%x %x length (bytes): 0x%x %x type: %i (%s)\n", i,
 			region[i].startHi, region[i].startLo,
 			region[i].sizeHi, region[i].sizeLo,
-			region[i].type, strMemoryTypes[region[i].type - 1]);
+			region[i].type, strMemoryTypes[region[i].type - 1]);*/
 
 		if (region[i].type == 1 && region[i].startLo >= 0x100000)	// make available only if region is above 1MB
 			pmmngr_free_region(&physical_memory_region(region[i].startLo, region[i].sizeLo));
@@ -835,51 +902,17 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	vmmngr_initialize(pmmngr_get_next_align(k_info->kernel_size + 1) / 4096);
 	pmmngr_paging_enable(true);
 
-	/*printfln("testing");
-	int x = *(uint32*)(0xF0404000);
-
-	printfln("found: %h", x);*/
-
-
-	/*serial_printf("Found abar at: %h\n", _abar);
-
-	serial_printf("Virtual manager initialize\n");*/
-
 	fsysSimpleInitialize();
 
-	ClearScreen();
-
-	/*vm_area area;
-	vm_contract c;
-
-	vm_contract_init(&c, 0, 4096 * 100);
-	area = vm_area_create(0x1000, 0x2000, VM_AREA_WRITE, -1);
-	vm_contract_add_area(&c, &area);
-
-	vm_area_set_bounds(&area, 0x4000, 0x1000);
-	area.flags |= VM_AREA_GROWS_DOWN;
-	vm_contract_add_area(&c, &area);
-
-	vm_contract_print(&c);
-	printfln("address: %h", vm_contract_get_area_for_length(&c, 0x1000));
-
-	vm_area* _p = vm_contract_find_area(&c, 0x4500);
-	if (_p == 0)
-		printfln("area not found");
-	else
-		printfln("expansion result: %u", vm_contract_expand_area(&c, _p, 0x1000));
-
-	vm_contract_print(&c);
-
-	while (true);*/
+	//ClearScreen();
 
 	// create a minimal multihtreaded environment to work with
 
 	virtual_addr space = pmmngr_get_next_align(0xC0000000 + k_info->kernel_size + 4096);
-	printfln("allocating 4KB at %h", space);
+	//printfln("allocating 4KB at %h", space);
 
-	if (vmmngr_is_page_present(space))
-		printfln("space: %h alloced", space);
+	if (vmmngr_is_page_present(space));
+		//printfln("space: %h alloced", space);
 
 	if (!vmmngr_alloc_page(space))
 		PANIC("cannot allocate for mini heap");
@@ -887,10 +920,9 @@ int kmain(multiboot_info* boot_info, kernel_info* k_info)
 	if(!vmmngr_alloc_page(space + 4096))
 		PANIC("cannot allocate for mini heap");
 
-
 	// setup a dummy kernel heap for process 0 initialization
 	kernel_heap = heap_create(space, 0x2000);
-	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
+	//printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
 	// create process 0 and its only thread
 	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 4 GB - 4 KB);

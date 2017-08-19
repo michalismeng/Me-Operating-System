@@ -17,6 +17,81 @@ void InvalidOp(registers_t* regs)
 	PANIC(str);
 }
 
+void DivisionByZero(registers_t* regs)
+{
+	PANIC("Divion by zero");
+}
+
+void GPF(registers_t* regs)
+{
+	char str[40] = "General Protection Fault at: ";
+	uitoa(regs->eip, str + 28, 16);
+	PANIC(str);
+}
+
+void DebugException(registers_t* regs)
+{
+	PANIC("Debug Exception");
+}
+
+void OverflowException(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void BRE(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void DevNotAvail(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void DoubleFault(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void InvalidTSS(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void SegmentNotPresent(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void StackSegError(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void PageFault(registers_t* regs)
+{
+	uint32 addr;
+	_asm
+	{
+		mov eax, cr2
+		mov dword ptr addr, eax
+	}
+
+	printfln("PAGE_FALUT: FAULTING ADDRESS: %h", addr);
+	PANIC(__FUNCTION__);
+}
+
+void FloatingPtException(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
+void TripleFault(registers_t* regs)
+{
+	PANIC(__FUNCTION__);
+}
+
 void test_handle(registers_t* regs)
 {
 	printfln("called");
@@ -35,7 +110,19 @@ void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t*
 	// Enrich our IDT with interrupt 0x80 (userspace program services)
 	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 	register_interrupt_handler(0x80, test_handle);
+
+	register_interrupt_handler(0, DivisionByZero);
+	register_interrupt_handler(1, DebugException);
+	register_interrupt_handler(4, OverflowException);
+	register_interrupt_handler(5, BRE);
 	register_interrupt_handler(6, InvalidOp);
+	register_interrupt_handler(7, DevNotAvail);
+	register_interrupt_handler(8, DoubleFault);
+	register_interrupt_handler(10, InvalidTSS);
+	register_interrupt_handler(11, SegmentNotPresent);
+	register_interrupt_handler(12, StackSegError);
+	register_interrupt_handler(13, GPF);
+	register_interrupt_handler(14, PageFault);
 
 }
 

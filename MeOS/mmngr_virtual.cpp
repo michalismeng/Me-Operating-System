@@ -1,6 +1,7 @@
 #include "mmngr_virtual.h"
 #include "thread_sched.h"
 #include "spinlock.h"
+#include "print_utility.h"
 
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
@@ -59,15 +60,15 @@ void page_fault_bottom(thread_exception te)
 	uint32& addr = te.data[0];
 	uint32& code = te.data[1];
 
-	printfln("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u, ERROR CODE: %h", addr, thread_get_current()->id, code);
+	//serial_printf("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u, ERROR CODE: %h\n", addr, thread_get_current()->id, code);
 
-	if (addr > 0xF0000000)		// auto allocate space for MMIO
-	{
-		addr &= ~0xfff;
-		vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
-		return;
-	}
-
+	//if (addr >= 0xE0000000)		// auto allocate space for MMIO
+	//{
+	//	//serial_printf("identity mapped\n");
+	//	addr &= ~0xfff;
+	//	vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
+	//	return;
+	//}
 
 	spinlock_acquire(&process_get_current()->contract_spinlock);
 	vm_area* p_area = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr);
@@ -81,45 +82,73 @@ void page_fault_bottom(thread_exception te)
 	// tried to acccess inaccessible page
 	if ((area.flags & MMAP_PROTECTION) == MMAP_NO_ACCESS)
 	{
-		printf("address: %h is inaccessible", addr);
+		serial_printf("address: %h is inaccessible\n", addr);
 		PANIC("");
 	}
 
 	// tried to write to read-only or inaccessible page
 	if (page_fault_error_is_write(code) && (area.flags & MMAP_WRITE) != MMAP_WRITE)
 	{
-		printfln("cannot write to address: %h", addr);
+		serial_printf("cannot write to address: %h\n", addr);
 		PANIC("");
 	}
 
 	// tried to read a write-only or inaccesible page ???what???
 	/*if (!page_fault_error_is_write(code) && CHK_BIT(area.flags, MMAP_READ))
 	{
-		printfln("cannot read from address: %h", addr);
+		serial_printf("cannot read from address: %h", addr);
 		PANIC("");
 	}*/
 
 	// if the page is present then a violation happened (we do not implement swap out/shared anonymous yet)
 	if (page_fault_error_is_page_present(code) == true)
 	{
-		printfln("memory violation at address: %h with code: %h", addr, code);
+		serial_printf("memory violation at address: %h with code: %h\n", addr, code);
 		PANIC("");
 	}
 
 	// here we found out that the page is not present, so we need to allocate it properly
 	if (CHK_BIT(area.flags, MMAP_PRIVATE))
 	{
-		if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
+		if (CHK_BIT(area.flags, MMAP_ALLOC_IMMEDIATE))
 		{
-			uint32 flags = I86_PDE_PRESENT;
+			// loop through all addresses and map them
+			for (virtual_addr address = area.start_addr; address < area.end_addr; address += 4096)
+			{
+				if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
+				{
+					uint32 flags = I86_PDE_PRESENT;
 
-			if (CHK_BIT(area.flags, MMAP_WRITE))
-				flags |= I86_PDE_WRITABLE;
+					if (CHK_BIT(area.flags, MMAP_WRITE))
+						flags |= I86_PDE_WRITABLE;
 
-			if (CHK_BIT(area.flags, MMAP_USER))
-				flags |= I86_PDE_USER;
+					if (CHK_BIT(area.flags, MMAP_USER))
+						flags |= I86_PDE_USER;
 
-			vmmngr_alloc_page_f(addr, flags);
+					if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
+						vmmngr_map_page(vmmngr_get_directory(), address, address, DEFAULT_FLAGS);
+					else
+						vmmngr_alloc_page_f(address, flags);
+				}
+			}
+		}
+		else
+		{
+			if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
+			{
+				uint32 flags = I86_PDE_PRESENT;
+
+				if (CHK_BIT(area.flags, MMAP_WRITE))
+					flags |= I86_PDE_WRITABLE;
+
+				if (CHK_BIT(area.flags, MMAP_USER))
+					flags |= I86_PDE_USER;
+
+				if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
+					vmmngr_map_page(vmmngr_get_directory(), addr & (~0xFFF), addr & (~0xFFF), DEFAULT_FLAGS);
+				else
+					vmmngr_alloc_page_f(addr, flags);
+			}
 		}
 	}
 	else		// MMAP_SHARED
@@ -153,7 +182,6 @@ void vmmngr_initialize(uint32 kernel_pages)
 {
 	pdirectory* pdir = (pdirectory*)pmmngr_alloc_block();
 	kernel_directory = pdir;
-	printfln("alloced dir at: %h", pdir);
 
 	memset(pdir, 0, sizeof(pdirectory));
 
@@ -172,6 +200,8 @@ void vmmngr_initialize(uint32 kernel_pages)
 	vmmngr_switch_directory(pdir, (physical_addr)&pdir->entries);
 	register_interrupt_handler(14, page_fault);
 	register_bottom_interrupt_handler(14, page_fault_bottom);
+
+	//printfln("alloced dir at: %h", pdir);
 }
 
 bool vmmngr_alloc_page(virtual_addr base)
@@ -365,7 +395,7 @@ pdirectory* vmmngr_create_address_space()
 	if (!dir)
 		return 0;
 
-	printfln("creating addr space at: %h", dir);
+	//printfln("creating addr space at: %h", dir);
 
 	memset(dir, 0, sizeof(pdirectory));
 	return dir;

@@ -26,22 +26,14 @@ PrintDone:
 			popa
 			ret					
 			
-Mode13:
+Mode12:
 	mov		ax, 0xa000
 	mov		es, ax
 	
 	mov ah, 00		; switch to color mode
-	mov al, 0x13
+	mov al, 0x12
 	int 0x10
-	
-	mov cx, 50
-	mov di, 10000
-	mov bp, 0
-	_loop1:			; draw silly line
-		mov byte [es:bp + di], 4
-		inc di
-		dec cx
-		jnz _loop1
+
 	ret
 			
 Reset:

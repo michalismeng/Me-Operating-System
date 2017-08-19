@@ -1,4 +1,5 @@
 #include "thread_sched.h"
+#include "print_utility.h"
 
 TCB* current_thread = 0;
 _thread_sched scheduler;
@@ -210,7 +211,7 @@ void thread_insert(TCB* thread)
 	//TODO: if current thread's priority is lees than the new one's, the current should be pre-empted (except if it is non preemptible)
 	thread->state = THREAD_STATE::THREAD_READY;
 	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), new dl_list_node<TCB*>{ thread });
-	printfln("inserted");
+	//printfln("inserted");
 }
 
 // TODO: this must be enriched and better written

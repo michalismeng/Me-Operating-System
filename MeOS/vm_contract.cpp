@@ -1,8 +1,9 @@
 #include "vm_contract.h"
+#include "print_utility.h"
 
 void vm_contract_init(vm_contract* c, uint32 low_addr, uint32 high_addr)
 {
-	printfln("high addr: %h, low addr: %h", high_addr, low_addr);
+	//printfln("high addr: %h, low addr: %h", high_addr, low_addr);
 	// assert page align
 	if (high_addr % vmmngr_get_page_size() != 0 || low_addr % vmmngr_get_page_size() != 0 || low_addr >= high_addr)
 		DEBUG("high or low process address space is not page aligned or fundamental address inequality does not hold");

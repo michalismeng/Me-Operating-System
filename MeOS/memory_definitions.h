@@ -35,7 +35,9 @@ enum MMAP_FLAGS
 	MAP_UNINITIALIZED = 1 << 12,
 
 	MMAP_NON_REMOVE = 1 << 13,
-	MMAP_INVALID = 1 << 14,
+	MMAP_ALLOC_IMMEDIATE = 1 << 14,			// Upon the first exception, the whole region is memory mapped
+	MMAP_IDENTITY_MAP = 1 << 15,			// The area must be identity mapped
+	MMAP_INVALID = 1 << 16,
 };
 
 #endif

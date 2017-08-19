@@ -34,9 +34,6 @@ extern "C" {
 	// 1 -> a | 2 -> b | 25 -> aa
 	void uitoalpha(uint32 val, char* buffer);
 
-	void printf(char* fmt, ...);
-	void printfln(char* fmt, ...);
-
 	void memset(void* base, uint8 val, uint32 length);
 	void memcpy(void* dest, void* source, uint32 length);
 
@@ -46,11 +43,6 @@ extern "C" {
 
 	uint32 pow(uint32 base, uint32 exp);
 	uint32 ceil_division(uint32 value, uint32 divisor);
-
-	void PANIC(char* str);
-	void DEBUG(char* str);
-	void WARNING(char* str);
-	void ASSERT(bool expr);
 
 #ifdef __cplusplus
 }

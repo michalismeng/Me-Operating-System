@@ -1,6 +1,7 @@
 #include "thread_exception.h"
 #include "process.h"
 #include "queue_lf.h"
+#include "print_utility.h"
 
 //process_exception process_exception_create(uint8 number, uint8* data, uint8 data_count, uint32 target_tid)
 //{
@@ -31,5 +32,5 @@
 
 void thread_exception_print(thread_exception* pe)
 {
-	printfln("exception no: %u, target thread: %u", pe->exception_number, pe->target_thread->id);
+	serial_printf("exception no: %u, target thread: %u\n", pe->exception_number, pe->target_thread->id);
 }

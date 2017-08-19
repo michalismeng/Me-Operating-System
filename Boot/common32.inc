@@ -3,7 +3,7 @@
 
 ; includes all protected mode 32 bit utilities
 
-%define KERNEL_RMODE_BASE 0x10000
+%define KERNEL_RMODE_BASE 0xFA00 + 512 * 3			; 3 is the number of sectors the stage2 requires. Must be changed in functions below to comply with the format
 %define KERNEL_PMODE_BASE 0xc0000000
 
 CopyKernel:
@@ -36,7 +36,7 @@ GetKrnLdrSize:
 	pusha 
 	
 	mov eax, dword [0x7c00 + 14]		; get sectors loaded
-	sub eax, 2							; this is one sector for stage2
+	sub eax, 3							; this is the number of sectors used by the stage2 boot. See above definition.
 	
 	mov ebx, 512						; multiply sector by bytes per sector
 	mul ebx	

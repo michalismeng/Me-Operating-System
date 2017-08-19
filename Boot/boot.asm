@@ -1,6 +1,6 @@
 bits 16
 
-%define STAGE2_BASE_HIGH 0xFC0
+%define STAGE2_BASE_HIGH 0xFA0		; remember to keep this value synced with the sectors used by the stage2 boot.
 
 jmp short main				; short jump uses relative address (jmp +12 bytes) and not absolute. We want this as segments are not yet set and	
 							; we have used not org directive

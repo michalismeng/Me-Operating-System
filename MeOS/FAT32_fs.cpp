@@ -1,4 +1,5 @@
 #include "FAT32_fs.h"
+#include "print_utility.h"
 
 uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
 vfs_result fat_fs_open(vfs_node* node);
@@ -199,8 +200,9 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 			return read;
 		}
 
+		memcpy((void*)(address + read), (void*)cache, 4096);	
 		read += 4096;
-		memcpy((void*)(address + read), (void*)cache, 4096);
+		//memcpy((void*)(address + read), (void*)cache, 4096);	
 	}
 
 	if (read == count)

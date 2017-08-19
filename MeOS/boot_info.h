@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#pragma pack(push, 1)
+
 struct multiboot_info {
 
 	uint32	m_flags;
@@ -23,11 +25,13 @@ struct multiboot_info {
 	uint32	m_bootloader_name;
 	uint32	m_apm_table;
 	uint32	m_vbe_control_info;
-	uint32	m_vbe_mode_info;
-	uint16	m_vbe_mode;
-	uint32	m_vbe_interface_addr;
+	uint16	m_vbe_mode_info;
+	uint16  m_vbe_interface_seg;
+	uint16  m_vbe_interface_off;
 	uint16	m_vbe_interface_len;
 };
+
+#pragma pack(pop, 1)
 
 struct bios_memory_region
 {

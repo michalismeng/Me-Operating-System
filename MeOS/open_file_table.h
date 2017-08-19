@@ -5,6 +5,7 @@
 #include "types.h"
 #include "vector.h"
 #include "vfs.h"
+#include "spinlock.h"
 
 enum LOCAL_FILE_FLAGS
 {
@@ -29,16 +30,40 @@ struct global_file_entry
 	// TODO: Include list of every page of the file cached
 };
 
-typedef vector<local_file_entry> local_file_table;
 typedef vector<global_file_entry> global_file_table;
 
 typedef global_file_entry gfe;
+typedef local_file_entry lfe;
 
-// initializes a per process open file entry
-void local_file_entry_init(local_file_entry* lfe, uint32 flags, uint32 gfd);
+// per process file table
+typedef struct local_file_table
+{
+	vector<lfe> entries;
+	spinlock lock;
+};
 
-// checks whether the open file entry is invalid
-bool local_file_entry_is_invalid(local_file_entry* lfe);
+/* Local File Table Functions */
+
+// initialize the per-process local file table
+void init_local_file_table(local_file_table* lfe, uint32 initial_size);
+
+// create a local file entry
+lfe create_lfe(uint32 flags);
+
+// insert a local file entry in the local table
+uint32 lft_insert(local_file_table* lft, lfe entry, vfs_node* file_node);
+
+// check whether the local file entry is invalid
+bool lfe_is_invalid(lfe* lfe);
+
+// remove the local file entry indicated by index
+bool lft_remove(local_file_table* lft, uint32 index);
+
+// retireve the local file entry indicated by index
+lfe* lft_get(local_file_table* lft, uint32 index);
+
+void lft_print(local_file_table* lft);
+
 
 /* Global File Table functions */
 
@@ -60,10 +85,13 @@ bool gfe_is_invalid(gfe* gfe);
 // remove a global file entry from the structure
 bool gft_remove(uint32 index);
 
+// if the gfe exists, increases its open count variable
+bool gfe_increase_open_count(uint32 index);
+
 // get a global file entry based on its index
 gfe* gft_get(uint32 index);
 
-// get the index of the global file entry associated with the given node or INT_MAX if it doesn't exist.
+// get the index of the global file entry associated with the given node or UINT_MAX if it doesn't exist.
 uint32 gft_get_n(vfs_node* node);
 
 // prints all the global file table

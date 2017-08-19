@@ -1,5 +1,6 @@
 #include "vm_area.h"
 #include "file.h"
+#include "print_utility.h"
 
 bool vm_area::operator<(const vm_area& other)
 {
@@ -39,7 +40,7 @@ vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32
 	// assert good arguments and fail if necessary
 	if (vm_area_check_bounds(start, end) == false || (flags & MMAP_INVALID) == MMAP_INVALID)
 	{
-		WARNING("Bad area received");		// can be removed at release
+		serial_printf("Bad area received\n");		// can be removed at release
 		return a;
 	}
 

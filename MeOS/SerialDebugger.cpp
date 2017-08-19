@@ -72,6 +72,9 @@ void serial_print(const char* str)
 
 void serial_printf(char* fmt, ...)
 {
+	if (!_serial_port_found)
+		return;
+
 	va_list arg_start;
 	va_start(arg_start, fmt);
 

@@ -1,4 +1,5 @@
 #include "mmngr_phys.h"
+#include "print_utility.h"
 
 #define PMMNGR_BLOCKS_PER_BYTE	8		// this is used in our bitmap structure
 #define PMMNGR_BLOCK_SIZE		4096	// block size in bytes (use same as page size for convenience)

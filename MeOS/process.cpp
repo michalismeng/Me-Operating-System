@@ -1,6 +1,7 @@
 #include "process.h"
 #include "descriptor_tables.h"
 #include "thread_sched.h"
+#include "print_utility.h"
 
 // private data and functions
 
@@ -166,13 +167,14 @@ PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 hi
 
 	queue_init(&proc->threads);
 	vm_contract_init(&proc->memory_contract, low_address, high_address);
+	init_local_file_table(&proc->lft, 10);
 
 	return proc;
 }
 
 TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority)
 {
-	printfln("creating thread at: %h with id: %u", esp, lastID + 1);
+	//printfln("creating thread at: %h with id: %u", esp, lastID + 1);
 	TCB* t;
 	queue_insert(&parent->threads, TCB());
 	t = &parent->threads.tail->data;
@@ -191,11 +193,11 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	// TODO: Replace the directory switches by a simple kernel page map
 	pdirectory* old_dir = vmmngr_get_directory();
 	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
-	printfln("sqitched old dir");
+	//printfln("sqitched old dir");
 	thread_setup_stack(t, entry, esp, stack_size);
-	printfln("stack setup");
+	//printfln("stack setup");
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
-	printfln("returning");
+	//printfln("returning");
 	return t;
 }
 

@@ -2,20 +2,22 @@
 
 #include "thread_sched.h"
 #include "atomic.h"
+#include "print_utility.h"
 
 isr_t* interrupt_handlers;
 isr_bottom_t bottom_interrupt_handlers[256] = { 0 };
 
 extern "C" void __cdecl isr_handler(registers_t regs)
 {
-	printfln("Executing softwqre interrupt: %h", regs.int_no);
+	serial_printf("Executing softwqre interrupt: %h\n", regs.int_no);
+
 	if (interrupt_handlers[regs.int_no] != 0)
 	{
 		isr_t handler = interrupt_handlers[regs.int_no];
 		handler(&regs);
 	}
 	else
-		printf("Unhandled exception %u", regs.int_no);
+		serial_printf("Unhandled exception %u\n", regs.int_no);
 
 	// handle thread exceptions, in the defered context
 	INT_ON;
@@ -50,7 +52,7 @@ extern "C" void __cdecl irq_handler(registers_t regs)
 		handler(&regs);
 	}
 	else
-		printf("Hardware interrupt: %u", regs.int_no);
+		serial_printf("Hardware interrupt: %u\n", regs.int_no);
 
 	if (regs.int_no >= 40)						// irq from slave
 		outportb(PIC_SLAVE_COMMAND_PORT, EOI);	// send EOI to slave

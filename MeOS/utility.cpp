@@ -1,4 +1,6 @@
 #include "utility.h"
+#include "SerialDebugger.h"
+#include "file.h"
 
 char hexes[] = "0123456789ABCDEF";
 char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
@@ -151,98 +153,6 @@ uint32 atoui_dec(char* input, uint16 length)
 	return res;
 }
 
-void printf_base(char* fmt, va_list arg_start)
-{
-	uint16 length = strlen(fmt);
-
-	uint32 val;
-	int32 ival;
-	uint8 cval;
-	uint64 lval;
-	char* ptr;
-	char buffer[20];
-
-	for (uint16 i = 0; i < length; i++)
-	{
-		switch (fmt[i])
-		{
-		case '%':
-
-			switch (fmt[i + 1])
-			{
-			case 'u':
-				val = va_arg(arg_start, uint32);
-				uitoa(val, buffer, 10);
-				Print(buffer);
-				break;
-			case 'i':
-				ival = va_arg(arg_start, int32);
-				itoa(ival, buffer, 10);
-				Print(buffer);
-				break;
-			case 'h':
-				val = va_arg(arg_start, uint32);
-				uitoa(val, buffer, 16);
-				Print("0x");
-				Print(buffer);
-				break;
-			case 'x':
-				val = va_arg(arg_start, uint32);
-				uitoa(val, buffer, 16);
-				Print(buffer);
-				break;
-			case 's':
-				ptr = va_arg(arg_start, char*);
-				Print(ptr);
-				break;
-			case 'c':
-				cval = va_arg(arg_start, uint32);
-				Printch(cval);
-				break;
-			case 'l':
-				lval = va_arg(arg_start, uint64);
-				uitoa(lval, buffer, 10);
-				Print(buffer);
-				break;
-			case 'b':
-				val = va_arg(arg_start, uint32);
-				uitoa(val, buffer, 2);
-				Print(buffer);
-			default:
-				break;
-			}
-
-			i++;
-			break;
-
-		default:
-			Printch(fmt[i]); break;
-		}
-	}
-}
-
-void printf(char* fmt, ...)
-{
-	va_list l;
-	va_start(l, fmt);	// spooky stack magic going on here
-
-	printf_base(fmt, l);
-
-	va_end(l);
-}
-
-void printfln(char* fmt, ...)
-{
-	va_list l;
-	va_start(l, fmt);	// spooky stack magic going on here
-
-	printf_base(fmt, l);
-
-	va_end(l);
-
-	Printch('\n');
-}
-
 void memset(void* base, uint8 val, uint32 length)
 {
 	char* ptr = (char*)base;
@@ -290,40 +200,4 @@ void memcpy(void* dest, void* source, uint32 length)
 
 	for (uint32 i = 0; i < length; i++)	// must be strictly less than length
 		new_ptr_d[i] = new_ptr_s[i];
-}
-
-void PANIC(char* str)
-{
-	printf("\n%s", str);
-	__asm
-	{
-		cli
-		hlt
-	}
-}
-
-void ASSERT(bool expr)
-{
-	if (!expr)
-		PANIC("Assertion failed!!");
-}
-
-void DEBUG(char* str)
-{
-	uint16 temp = color;
-	SetForegroundColor(RED);
-
-	printf("\nDEBUG: %s\n", str);
-
-	SetColor(temp >> 8, temp);
-}
-
-void WARNING(char * str)
-{
-	uint16 temp = color;
-	SetForegroundColor(DARK_GREEN);
-
-	printf("\WARNING: %s\n", str);
-
-	SetColor(temp >> 8, temp);
 }

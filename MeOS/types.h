@@ -21,6 +21,10 @@ typedef unsigned int uint32;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 
+typedef float float32;
+typedef double float64;
+
+
 typedef uint8 BYTE;
 typedef uint16 WORD;
 typedef uint32 DWORD;

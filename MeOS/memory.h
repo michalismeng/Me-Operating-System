@@ -4,8 +4,6 @@
 #include "mmngr_heap.h"
 #include "vm_area.h"
 
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif

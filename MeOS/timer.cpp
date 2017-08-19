@@ -1,5 +1,6 @@
 #include "timer.h"
 #include "thread_sched.h"
+#include "print_utility.h"
 
 volatile uint32 ticks;					// volatile is necessary for the sleep function, where compiler thinks millis is constant valued
 extern uint16 cursorX, cursorY;

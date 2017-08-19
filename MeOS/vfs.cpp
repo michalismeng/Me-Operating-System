@@ -1,4 +1,5 @@
 #include "vfs.h"
+#include "print_utility.h"
 
 // private functions and data
 
@@ -99,6 +100,22 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 		n->fs_ops = file_fncs;
 	else
 		n->fs_ops = &default_fs_operations;
+
+	if (file_fncs->fs_close == 0)
+		file_fncs->fs_close = default_fs_operations.fs_close;
+	if (file_fncs->fs_ioctl == 0)
+		file_fncs->fs_ioctl = default_fs_operations.fs_ioctl;
+	if (file_fncs->fs_lookup == 0)
+		file_fncs->fs_lookup = default_fs_operations.fs_lookup;
+	if (file_fncs->fs_open == 0)
+		file_fncs->fs_open = default_fs_operations.fs_open;
+	if (file_fncs->fs_read == 0)
+		file_fncs->fs_read = default_fs_operations.fs_read;
+	if (file_fncs->fs_write == 0)
+		file_fncs->fs_write = default_fs_operations.fs_write;
+	if (file_fncs->fs_sync == 0)
+		file_fncs->fs_sync = default_fs_operations.fs_sync;
+
 
 	if (copy_name)
 	{
@@ -314,7 +331,7 @@ uint32 vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtua
 	uint32 written = node->fs_ops->fs_write(fd, node, start, count, address);
 	if (start + written > node->file_length)
 	{
-		printfln("new length: %u", start + written);
+		//printfln("new length: %u", start + written);
 		node->file_length = start + written;
 		node->fs_ops->fs_ioctl(node, 0);
 	}
