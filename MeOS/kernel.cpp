@@ -648,7 +648,7 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
-	
+	PANIC("HELLO FROM MATSER GIT");
 
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
