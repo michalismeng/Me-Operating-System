@@ -162,7 +162,7 @@ void page_fault_bottom(thread_exception te)
 				}
 
 				if (vfs_read_file(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF)) != read_size)
-					PANIC("mmap file read less bytes than expected");
+					PANIC("mmap anonymous file read less bytes than expected");
 			}
 		}
 	}
@@ -170,6 +170,19 @@ void page_fault_bottom(thread_exception te)
 	{
 		if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
 			PANIC("A shared area cannot be marked as anonymous yet.");
+		else
+		{
+			// in the shared file mapping the address to read is ignored as data are read only to page cache. 
+			uint32 read_start = area.offset + ((addr & (~0xfff)) - area.start_addr);
+			gfe* entry = gft_get(area.fd);
+			virtual_addr used_cache;
+
+			// because the O_CACHE_ONLY flag is set, the driver returns the address where data were read
+			if ((used_cache = vfs_read_file(area.fd, entry->file_node, read_start, PAGE_SIZE, -1)) == 0)
+				PANIC("mmap shared file failed");
+
+			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), DEFAULT_FLAGS);
+		}
 	}
 }
 

@@ -13,7 +13,7 @@
 #include "error.h"
 
 #define FAT_EOF	0x0FFFFFF8
-#define GFD_FAT_SPECIAL 0
+#define FAT_FORMAT_PAGE_SIZE 4096		// this is the format page size. (Reads and writes are done as multiples of this number)
 
 #pragma pack(push, 1)
 
@@ -133,6 +133,7 @@ typedef vector<uint32> fat_file_layout;
 struct fat_node_data
 {
 	fat_file_layout layout;		// the file layout on the FAT image.
+	bool layout_loaded;			// shows whether the layout is loaded (upon first file open), so that in the next open it is not reloaded.
 	uint32 metadata_cluster;	// the cluster where this file's metadata are located.
 	uint32 metadata_index;		// the index in the cluster (0-127) where this file's metadata are located.
 };

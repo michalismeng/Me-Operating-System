@@ -15,6 +15,7 @@ vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...);
 vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache);
 bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
 uint32 fat_node_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
 
 // file operations
 static fs_operations fat_fs_operations =
@@ -160,9 +161,24 @@ bool fat_fs_validate_83_name(char* name, uint32 length)
 
 #pragma endregion
 
+uint32 fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
+{
+	vfs_node* mount_point = file->tag;
+
+	if (use_cache)
+		return fat_fs_read_to_cache (fd, file, page, cache);
+	else
+	{
+		serial_printf("read by page\n");
+		if (fat_fs_read_by_page(mount_point, file, page, *cache) == false)
+			return VFS_GENERAL_ERROR;
+		return VFS_OK;
+	}
+}
+
 #pragma region VFS API Implementation
 
-//TODO: Do more testing with larger files...
+//TODO: Perhaps count should be a multiple of the format data block (512, 1k, ->4k<-, 8k...) and the user will then have to read it all
 uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
 {
 	if (!file->tag->tag)
@@ -173,49 +189,74 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 
 	// TODO: filesystem read permission
 
-	uint32 start_pg = start / PAGE_SIZE;
+	uint32 start_pg = start / FAT_FORMAT_PAGE_SIZE;
 	uint32 current_pg = start_pg;
 	uint32 read = 0;
 
-	virtual_addr cache;
-	uint32 error;
+	bool use_file_cache = (file->flags & O_NOCACHE) == 0;
+	bool ignore_address = (file->flags & O_CACHE_ONLY) != 0;
 
-	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+	if (use_file_cache == false && ((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)) || (use_file_cache == false && ignore_address))
 	{
-		set_last_error(error);
+		set_last_error(VFS_BAD_ARGUMENTS);
 		return 0;
 	}
 
-	// copy perhaps partial data to user buffer
-	memcpy((void*)address, (void*)(cache + start % PAGE_SIZE), min(count, PAGE_SIZE - start % PAGE_SIZE));
-	read += min(count, PAGE_SIZE - start % PAGE_SIZE);
-	current_pg++;
+	virtual_addr cache;
+	// if the page cache is not to be used, then reserve a minimum of one entry to load partial data when required
+	if(use_file_cache == false)
+		cache = page_cache_reserve_anonymous();
 
-	// retrieve and read foreach intermediate page
-	for (uint32 pg = 1; pg < count / PAGE_SIZE; pg++, current_pg++)
+	uint32 error;
+	vfs_node* mount_point = file->tag;
+
+
+	uint32 offset = start % FAT_FORMAT_PAGE_SIZE;
+
+	/* Read pages until second to last */
+	for (uint32 pg = 0; pg < count / FAT_FORMAT_PAGE_SIZE; pg++, current_pg++)
 	{
-		if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
+		if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != VFS_OK)
 		{
 			set_last_error(error);
-			return read;
+			if (use_file_cache)
+				page_cache_release_anonymous(cache);
+			return 0;
 		}
 
-		memcpy((void*)(address + read), (void*)cache, 4096);	
-		read += 4096;
-		//memcpy((void*)(address + read), (void*)cache, 4096);	
+		if (!ignore_address)
+			memcpy((void*)(address + read), (void*)(cache + offset), min(4096, min(count, FAT_FORMAT_PAGE_SIZE - offset)));
+
+		read += min(4096, min(count, FAT_FORMAT_PAGE_SIZE - offset));
+		offset = 0;
 	}
 
 	if (read == count)
-		return read;
-
-	// now read the last page
-	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
 	{
-		set_last_error(error);
+		if(use_file_cache == false)
+			page_cache_release_anonymous(cache);
+
+		if (ignore_address)
+			return cache;
+
 		return read;
 	}
 
-	memcpy((void*)(address + read), (void*)cache, count - read);
+	/* read the last page */
+
+	if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != VFS_OK)
+	{
+		set_last_error(error);
+		if (use_file_cache)
+			page_cache_release_anonymous(cache);
+		return 0;
+	}
+
+	if(!ignore_address)
+		memcpy((void*)(address + read), (void*)cache, count - read);
+
+	if (ignore_address)
+		return cache;
 
 	return count;
 }
@@ -226,6 +267,14 @@ uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_
 	if (!file->tag->tag)
 	{
 		set_last_error(error_create(VFS_ERROR::VFS_INVALID_NODE_STRUCTURE));
+		return 0;
+	}
+
+	bool use_file_cache = (file->flags & O_NOCACHE) == 0;
+
+	if (use_file_cache == false && ((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)))
+	{
+		set_last_error(VFS_BAD_ARGUMENTS);
 		return 0;
 	}
 
@@ -286,7 +335,14 @@ vfs_result fat_fs_open(vfs_node* node)
 	// TODO: filesystem open permission
 	vfs_node* mount_point = node->tag;
 
-	return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, node);
+	// load the file layout only if the layout has not been loaded. else it is cached so return success.
+	if (NODE_DATA(node)->layout_loaded == false)
+	{
+		NODE_DATA(node)->layout_loaded = true;
+		return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, node);
+
+	}
+	return VFS_OK;
 }
 
 // TODO: When a page is outside the layout of a file (the file has been extended due to new data), reserve a new sector for it.
@@ -350,6 +406,8 @@ vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
 // reads a 4KB data region starting at the given linear block address. This is the lowest level data exchange function.
 bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
 {
+	serial_printf("reading %h\n", address);
+
 	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT ||
 		MOUNT_DATA(mount_point) == 0 || STORAGE_INFO(mount_point) == 0)
 	{
@@ -482,6 +540,7 @@ int fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cac
 	// if page is not found then allocate a new one to hold the required data.
 	if (cache == 0)
 	{
+		serial_printf("cache not found for: %u %u\n", fd, page);
 		cache = page_cache_reserve_buffer(fd, page);
 		if (cache == 0)
 		{
@@ -660,6 +719,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 			auto node = vfs_create_node(name, true, attrs, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
 			NODE_DATA(node)->metadata_cluster = offset;
 			NODE_DATA(node)->metadata_index = i;
+			NODE_DATA(node)->layout_loaded = false;		// even though the first entry is inserted in the layout, the whole layout is not loaded and a file open is expected.
 
 			if (name[0] != '.' && (entry[i].attributes & FAT_DIRECTORY) == FAT_DIRECTORY)
 			{

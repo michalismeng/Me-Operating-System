@@ -9,7 +9,7 @@ bool print_utility_initialized = false;
 
 void init_print_utility()
 {
-	if (open_file("dev/screen", &screen_fd) != VFS_OK)
+	if (open_file("dev/screen", &screen_fd, 0) != VFS_OK)
 		PANIC("print utility could not be initialized");
 
 	print_utility_initialized = true;

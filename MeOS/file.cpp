@@ -1,7 +1,7 @@
 #include "file.h"
 #include "thread_sched.h"
 
-uint32 open_file(char* path, int* fd)
+uint32 open_file(char* path, int* fd, uint32 flags)
 {
 	*fd = INVALID_FD;
 	vfs_node* node = 0;
@@ -10,6 +10,8 @@ uint32 open_file(char* path, int* fd)
 	uint32 error = vfs_root_lookup(path, &node);
 	if (error)
 		return error;
+
+	node->flags = flags;
 
 	return open_file_by_node(node, fd);
 }
@@ -22,8 +24,10 @@ uint32 open_file_by_node(vfs_node* node, int* local_fd)
 	*local_fd = lft_insert(&process_get_current()->lft, entry, node);
 
 	uint32 global_fd = lft_get(&process_get_current()->lft, *local_fd)->gfd;
-	page_cache_register_file(global_fd);
 
+	if (gft_get(global_fd)->open_count > 1)
+		page_cache_register_file(global_fd);
+		
 	return vfs_open_file(node);
 }
 

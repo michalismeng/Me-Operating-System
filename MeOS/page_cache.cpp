@@ -65,6 +65,21 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 	return finfo;
 }
 
+_page_cache_file* page_cache_get_file(int fd)
+{
+	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
+		if (page_cache.cached_files[i].gfd == fd)
+			return &page_cache.cached_files[i];
+
+	return 0;
+}
+
+_page_cache_file* page_cache_get_first_unused()
+{
+	// trick here.
+	return page_cache_get_file(-1);
+}
+
 // public functions
 
 void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_count)
@@ -202,25 +217,49 @@ void page_cache_release_buffer(int gfd, uint32 page)
 	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
 }
 
+
+
 void page_cache_register_file(int gfd)
 {
 	// TODO: This is true only if no descriptor is removed and then replaced
 	// this is a new descriptor
-	if (gfd >= page_cache.cached_files.count)
+	
+	// if the file exists, we do nothing.
+	// if the file doesnt exist then we must create an entry for it either add a new one, or consume an unused one.
+	if (page_cache_get_file(gfd) == 0)
 	{
-		_page_cache_file file;
+		_page_cache_file* unused = page_cache_get_first_unused();
+		if (unused == 0)		// page cache entries vector is full so extend it
+		{
+			_page_cache_file file;
+			file.gfd = gfd;
+			list_init(&file.pages);
 
-		file.gfd = gfd;
-		list_init(&file.pages);
+			vector_insert_back(&page_cache.cached_files, file);
+		}
+		else					// replace the empty entry found with the new one
+		{
+			unused->gfd = gfd;
+			list_init(&unused->pages);
+		}
 
-		vector_insert_back(&page_cache.cached_files, file);
 	}
-	else		// descriptor already existed so overwrite it.
-	{
-		page_cache.cached_files[gfd].gfd = gfd;
-		list_clear(&page_cache.cached_files[gfd].pages);		// the list should be clear, but ensure it.
-		list_init(&page_cache.cached_files[gfd].pages);			// and re-init our list.
-	}
+
+	//if (gfd >= page_cache.cached_files.count)
+	//{
+	//	_page_cache_file file;
+
+	//	file.gfd = gfd;
+	//	list_init(&file.pages);
+
+	//	vector_insert_back(&page_cache.cached_files, file);
+	//}
+	//else		// descriptor already existed so overwrite it.
+	//{
+	//	page_cache.cached_files[gfd].gfd = gfd;
+	//	list_clear(&page_cache.cached_files[gfd].pages);		// the list should be clear, but ensure it.
+	//	list_init(&page_cache.cached_files[gfd].pages);			// and re-init our list.
+	//}
 }
 
 void page_cache_unregister_file(int gfd)
@@ -247,9 +286,16 @@ void page_cache_unregister_file(int gfd)
 void page_cache_print()
 {
 	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
-		printfln("gfd: %u", page_cache.cached_files[i].gfd);
+	{
+		printf("gfd %u:", page_cache.cached_files[i].gfd);
+		for (auto temp = page_cache.cached_files[i].pages.head; temp != 0; temp = temp->next)
+			printf("%u ", temp->data);
 
-	printf("alloced: ");
+		printfln("");
+	}
+
+	printfln("alloced: ");
+	
 	for (uint32 i = 0; i < page_cache_num_buffers(); i++)
 		if (alloced_bitmap[i])
 			printf("%u ", i);

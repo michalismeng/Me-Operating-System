@@ -94,13 +94,13 @@ void test1()
 void test2()
 {
 	printfln("executing test 2");
-	for (int i = 0; i < 100000; i++)
-	{
-		//if (!queue_lf_remove(&q))
-		//	fail_remove++;
-	}
 
-	printfln("fail remove: %u", fail_remove);
+	char* x = (char*)0x800000;
+
+	for (int i = 0; i < 5; i++)
+		x[i] = 'b';
+
+	serial_printf("end of test2\n");
 
 	while (true);
 }
@@ -132,10 +132,16 @@ TCB* thread_test_time;
 
 TCB* create_test_process(int fd);
 
+extern char* ___buffer;
+char __temp[4096];
+
 void keyboard_fancy_function()
 {
+	for (int i = 0; i < 255; i++)
+		printf("%c", i);
+	printfln("");
 	int fd;
-	if (open_file("dev/keyboard", &fd) != VFS_OK)
+	if (open_file("dev/keyboard", &fd, 0) != VFS_OK)
 	{
 		printfln("error occured: %u", get_last_error());
 	}
@@ -165,8 +171,8 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_P)
 			{
-				int ___fd;
-				if (open_file("sdc_mount/TEXT.TXT", &___fd) != VFS_OK)
+				/*int ___fd;
+				if (open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
 					PANIC("Could not open text file");
 
 				if (mmap(0x700000, lft_get(&process_get_current()->lft, ___fd)->gfd, 2, 4096, MMAP_PRIVATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
@@ -178,17 +184,77 @@ void keyboard_fancy_function()
 				for (int i = 0; i < 20; i++)
 					printf("%c", character[i]);
 
-				printfln(".End");
+				printfln(".End");*/
+				char* x = (char*)0x800000;
+
+				for (int i = 0; i < 10; i++)
+					printf("%c", x[i]);
+				printfln("");
+
+				page_cache_print();
+
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
 				clear_screen();
 				int test_proc;
-				if (open_file("sdc_mount/TEST.EXE", &test_proc) != VFS_OK)
-					PANIC("could not open test.exe");
+				page_cache_print();
+
+				/*for (int i = 0; i < 256; i++)
+					printf("%c", i);
+				printfln("");*/
+
+				printfln("page for text: %h", page_cache_get_buffer(4, 0));
+
+				if (open_file("sdc_mount/TEXT.TXT", &test_proc, O_CACHE_ONLY) != VFS_OK)
+					PANIC("could not open text.exe");
+
+				if(mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
+					PANIC("Could not map file");
+
+
+
+				/*PCB* proc = process_create(process_get_current(), 0, 0, 0xFFFFE000);
+				TCB* thread = thread_create(proc, (uint32)test2, 3 GB + 10 MB + 504 KB, 4 KB, 3);
+
+				if (mmap_p(proc, 0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
+					PANIC("Could not map file");
+				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));*/
+				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));
+
+
+				char* x = (char*)0x800000;
+
+				for (int i = 0; i < 10; i++)
+					printf("%c", x[i]);
+				printfln("");
+
+				for (int i = 0; i < 5; i++)
+					x[i] = 'a';
+
+				
+
+				/*INT_OFF;
+				thread_insert(thread);
+				INT_ON;*/
+
+				/*;
+
+				if (read_file(test_proc, 0, 4096, (virtual_addr)__temp) != 4096)
+				{
+					serial_printf("error %u", get_last_error());
+					PANIC("could not read text.txt");
+				}*/
+
+				page_cache_print();
+
+				/*for (int i = 0; i < 50; i++)
+					printf("%c", __temp[i]);
+				printfln(".End");*/
+
 				INT_OFF;
-				TCB* t = create_test_process(test_proc);
-				thread_insert(t);
+				//TCB* t = create_test_process(test_proc);
+				//thread_insert(t);
 				INT_ON;
 
 			}
@@ -218,6 +284,26 @@ void keyboard_fancy_function()
 				thread_block(thread_test_time);
 				scheduler_print_queues();
 				printfln("hello");
+			}
+			else if (c == KEYCODE::KEY_D)
+			{
+				int __fd;
+				if (open_file("sdc_mount/TEXT.TXT", &__fd, 0) != VFS_OK)
+					PANIC("could not open text.exe");
+
+				if (read_file(__fd, 0, 50, (virtual_addr)__temp) != 50)
+				{
+					serial_printf("error %u", get_last_error());
+					PANIC("could not read text.txt");
+				}
+
+				page_cache_print();
+
+				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, __fd)->gfd, 0));
+
+				for (int i = 0; i < 50; i++)
+					printf("%c", __temp[i]);
+				printfln(".End");
 			}
 		}
 	}
@@ -648,7 +734,6 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
-	PANIC("THIS IS SOME PRINTING FROM THE GIT MASTER BRANCH");
 
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
