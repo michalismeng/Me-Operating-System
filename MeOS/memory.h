@@ -31,5 +31,7 @@ extern "C" {
 // pref if not nulled is the preffered address to load the start-length file data
 // prot is the protection level
 virtual_addr mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot);
+virtual_addr mmap_p(void* proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot);
+
 
 #endif

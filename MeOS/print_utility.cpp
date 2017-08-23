@@ -64,6 +64,7 @@ void printf_base(char* fmt, va_list arg_start)
 				break;
 			case 'c':
 				cval = va_arg(arg_start, uint32);
+				buffer[0] = cval;
 				write_file(screen_fd, 0, 1, (virtual_addr)buffer);
 				break;
 			case 'l':

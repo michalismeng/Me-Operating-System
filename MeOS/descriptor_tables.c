@@ -1,12 +1,16 @@
 #include "descriptor_tables.h"
+#include "SerialDebugger.h"
+#include "print_utility.h"
 
-gdt_entry_t* gdt_entries;
+gdt_entry_t gdt_entries[6];
 gdt_ptr_t 	 gdt_ptr;
 
 idt_entry_t* idt_entries;
 idt_ptr_t 	idt_ptr;
 
 isr_t* interrupt_handlers;
+
+tss_entry_struct_t tss;
 
 void InvalidOp(registers_t* regs)
 {
@@ -24,9 +28,8 @@ void DivisionByZero(registers_t* regs)
 
 void GPF(registers_t* regs)
 {
-	char str[40] = "General Protection Fault at: ";
-	uitoa(regs->eip, str + 28, 16);
-	PANIC(str);
+	serial_printf("General Protection Fault at: %h. Error: %h", regs->eip, regs->err_code);
+	PANIC("");
 }
 
 void DebugException(registers_t* regs)
@@ -69,19 +72,6 @@ void StackSegError(registers_t* regs)
 	PANIC(__FUNCTION__);
 }
 
-void PageFault(registers_t* regs)
-{
-	uint32 addr;
-	_asm
-	{
-		mov eax, cr2
-		mov dword ptr addr, eax
-	}
-
-	printfln("PAGE_FALUT: FAULTING ADDRESS: %h", addr);
-	PANIC(__FUNCTION__);
-}
-
 void FloatingPtException(registers_t* regs)
 {
 	PANIC(__FUNCTION__);
@@ -94,21 +84,23 @@ void TripleFault(registers_t* regs)
 
 void test_handle(registers_t* regs)
 {
-	printfln("called");
-	printfln("message: %s", regs->ebx);
+	//printfln("called %h", regs->ebx);
+	serial_printf("message: %h %s", regs->ebx, regs->ebx);
 }
 
 void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t* idt_base)
 {
 	// GDT and IDT are already setup by kernel loader
-	gdt_entries = gdt_base;
+	//gdt_entries = gdt_base;
 	interrupt_handlers = isr_base;
 	idt_entries = idt_base;
 
+	init_gdt();
+
 	init_idt();
+	init_tss();
 
 	// Enrich our IDT with interrupt 0x80 (userspace program services)
-	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
 	register_interrupt_handler(0x80, test_handle);
 
 	register_interrupt_handler(0, DivisionByZero);
@@ -122,22 +114,54 @@ void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t*
 	register_interrupt_handler(11, SegmentNotPresent);
 	register_interrupt_handler(12, StackSegError);
 	register_interrupt_handler(13, GPF);
-	register_interrupt_handler(14, PageFault);
-
 }
 
 void init_gdt()
 {
 	gdt_ptr.base = (uint32)&gdt_entries;
-	gdt_ptr.limit = 5 * sizeof(gdt_entry_t) - 1;
+	gdt_ptr.limit = 6 * sizeof(gdt_entry_t) - 1;
 
 	gdt_set_gate(0, 0, 0, 0, 0);				// null dummy segment
 	gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);	// Code segment
 	gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);	// Data segment
-	gdt_set_gate(3, 0, 0xFFFFF, 0xFA, 0xCF);	// User mode code segment
-	gdt_set_gate(4, 0, 0xFFFFF, 0xF2, 0xCF);	// User mode data segment
+	gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);	// User mode code segment
+	gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);	// User mode data segment
 
 	flush_gdt((uint32)&gdt_ptr);
+}
+
+void init_tss()
+{
+	uint32 base = (uint32)&tss;
+	gdt_set_gate(5, base, base + sizeof(tss_entry_struct_t), 0xE9, 0);
+
+	memset(&tss, 0, sizeof(tss_entry_struct_t));
+
+	tss.cs = 0x0b;
+	tss.ss = 0x13;
+	tss.es = 0x13;
+	tss.ds = 0x13;
+	tss.fs = 0x13;
+	tss.gs = 0x13;
+
+	// flush ltr (selector is 0x2b, 6th in the gdt). Assembly-style function does not work
+	_asm {
+		cli
+		mov eax, 0x2b
+		ltr eax
+		sti
+	}
+
+//#define I86_GDT_DESC_ACCESS			0x0001			//00000001
+//#define I86_GDT_DESC_EXEC_CODE			0x0008			//00001000
+//#define I86_GDT_DESC_DPL			0x0060			//01100000
+//#define I86_GDT_DESC_MEMORY			0x0080			//10000000
+}
+
+void set_tss(uint32 kernel_stack, uint32 kernel_esp)
+{
+	tss.ss0 = kernel_stack;
+	tss.esp0 = kernel_esp;
 }
 
 void init_idt()
@@ -182,7 +206,7 @@ void init_idt()
 	idt_set_gate(30, (uint32)isr30, 0x08, 0x8E);
 	idt_set_gate(31, (uint32)isr31, 0x08, 0x8E);
 
-	idt_set_gate(0x80, (uint32)isr128, 0x08, 0x8E);
+	idt_set_gate(0x80, (uint32)isr128, 0x08, 0xEE);	// set attributes to 0xEE to make it usable by the userspace programs
 
 	idt_set_gate(32, (uint32)irq0, 0x08, 0x8E);
 	idt_set_gate(33, (uint32)irq1, 0x08, 0x8E);

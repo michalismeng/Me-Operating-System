@@ -161,7 +161,10 @@ PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 hi
 	proc->parent = parent;
 
 	if (pdir == 0)
+	{
 		proc->page_dir = vmmngr_create_address_space();
+		vmmngr_map_kernel_space(proc->page_dir);
+	}
 	else
 		proc->page_dir = pdir;
 

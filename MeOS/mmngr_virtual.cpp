@@ -2,6 +2,7 @@
 #include "thread_sched.h"
 #include "spinlock.h"
 #include "print_utility.h"
+#include "file.h"
 
 pdirectory*	current_directory = 0;		// current page directory
 physical_addr current_pdbr = 0;			// current page directory base register
@@ -52,29 +53,22 @@ void page_fault(registers_struct* regs)
 		PANIC("Page fault occured but threading is not enabled!");
 }
 
-extern bool pressed;
-
 void page_fault_bottom(thread_exception te)
 {
 	thread_exception_print(&te);
 	uint32& addr = te.data[0];
 	uint32& code = te.data[1];
 
-	//serial_printf("PAGE_FALUT: FAULTING ADDRESS: %h, FAULTING THREAD: %u, ERROR CODE: %h\n", addr, thread_get_current()->id, code);
-
-	//if (addr >= 0xE0000000)		// auto allocate space for MMIO
-	//{
-	//	//serial_printf("identity mapped\n");
-	//	addr &= ~0xfff;
-	//	vmmngr_map_page(vmmngr_get_directory(), addr, addr, DEFAULT_FLAGS);
-	//	return;
-	//}
+	serial_printf("PAGE_FALUT: PROC: %u ADDRESS: %h, THREAD: %u, CODE: %h\n", process_get_current()->id, addr, thread_get_current()->id, code);
 
 	spinlock_acquire(&process_get_current()->contract_spinlock);
 	vm_area* p_area = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr);
 
 	if (p_area == 0)
-		PANIC("could not find address in memory contract");		// terminate thread and process with SIGSEGV
+	{
+		serial_printf("could not find address %h in memory contract", addr);
+		PANIC("");		// terminate thread and process with SIGSEGV
+	}
 
 	vm_area area = *p_area;
 	spinlock_release(&process_get_current()->contract_spinlock);
@@ -112,6 +106,7 @@ void page_fault_bottom(thread_exception te)
 	{
 		if (CHK_BIT(area.flags, MMAP_ALLOC_IMMEDIATE))
 		{
+			// TODO: Make function to unduplicate this work. +Alloc immediate for mmaped files
 			// loop through all addresses and map them
 			for (virtual_addr address = area.start_addr; address < area.end_addr; address += 4096)
 			{
@@ -126,7 +121,7 @@ void page_fault_bottom(thread_exception te)
 						flags |= I86_PDE_USER;
 
 					if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
-						vmmngr_map_page(vmmngr_get_directory(), address, address, DEFAULT_FLAGS);
+						vmmngr_map_page(vmmngr_get_directory(), address, address, flags);
 					else
 						vmmngr_alloc_page_f(address, flags);
 				}
@@ -134,20 +129,40 @@ void page_fault_bottom(thread_exception te)
 		}
 		else
 		{
+			uint32 flags = I86_PDE_PRESENT;
+
+			if (CHK_BIT(area.flags, MMAP_WRITE))
+				flags |= I86_PDE_WRITABLE;
+
+			if (CHK_BIT(area.flags, MMAP_USER))
+				flags |= I86_PDE_USER;
+
 			if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
 			{
-				uint32 flags = I86_PDE_PRESENT;
-
-				if (CHK_BIT(area.flags, MMAP_WRITE))
-					flags |= I86_PDE_WRITABLE;
-
-				if (CHK_BIT(area.flags, MMAP_USER))
-					flags |= I86_PDE_USER;
-
 				if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
-					vmmngr_map_page(vmmngr_get_directory(), addr & (~0xFFF), addr & (~0xFFF), DEFAULT_FLAGS);
+					vmmngr_map_page(vmmngr_get_directory(), addr & (~0xFFF), addr & (~0xFFF), flags);
 				else
 					vmmngr_alloc_page_f(addr, flags);
+			}
+			else
+			{
+				vmmngr_alloc_page_f(addr & (~0xFFF), flags);
+
+				uint32 read_start = area.offset + (addr - area.start_addr);
+				uint32 read_size = PAGE_SIZE;
+
+				if (read_start < area.start_addr + PAGE_SIZE)	// we are reading the first page so subtract offset from read_size
+					read_size -= area.offset;
+
+				gfe* entry = gft_get(area.fd);
+				if (entry == 0)
+				{
+					serial_printf("area.fd = %u", area.fd);
+					PANIC("page fault gfd entry = 0");
+				}
+
+				if (vfs_read_file(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF)) != read_size)
+					PANIC("mmap file read less bytes than expected");
 			}
 		}
 	}

@@ -42,14 +42,46 @@ extern "C" {
 		uint32 base;			// the addres of the first idt_entry_t struct
 	};
 
+	struct tss_entry_struct
+	{
+		uint32 prevTss;
+		uint32 esp0;
+		uint32 ss0;
+		uint32 esp1;
+		uint32 ss1;
+		uint32 esp2;
+		uint32 ss2;
+		uint32 cr3;
+		uint32 eip;
+		uint32 eflags;
+		uint32 eax;
+		uint32 ecx;
+		uint32 edx;
+		uint32 ebx;
+		uint32 esp;
+		uint32 ebp;
+		uint32 esi;
+		uint32 edi;
+		uint32 es;
+		uint32 cs;
+		uint32 ss;
+		uint32 ds;
+		uint32 fs;
+		uint32 gs;
+		uint32 ldt;
+		uint16 trap;
+		uint16 iomap;
+	};
+
 #pragma pack(pop, 1)
 
 	typedef struct gdt_entry_struct gdt_entry_t;
 	typedef struct gdt_ptr_struct 	gdt_ptr_t;
 	typedef struct idt_entry_struct	idt_entry_t;
 	typedef struct idt_ptr_struct	idt_ptr_t;
+	typedef struct tss_entry_struct tss_entry_struct_t;
 
-	extern gdt_entry_t*	gdt_entries;
+	//extern gdt_entry_t*	gdt_entries;
 	extern gdt_ptr_t 	gdt_ptr;
 
 	extern idt_entry_t*	idt_entries;
@@ -61,6 +93,10 @@ extern "C" {
 	// initializes GDTs
 	void init_gdt();
 	void gdt_set_gate(uint16 num, uint32 base, uint32 limit, uint8 access, uint8 gran);
+
+	void init_tss();
+	void set_tss(uint32 kernel_stack, uint32 kernel_esp);
+	extern void flush_tss(uint16 selector);
 
 	// calls asm code to load gdt tables
 	extern void flush_gdt(uint32 addr);

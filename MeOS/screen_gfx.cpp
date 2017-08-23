@@ -73,7 +73,6 @@ uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virt
 
 vfs_result screen_gfx_ioctl(vfs_node* node, uint32 command, ...)
 {
-	serial_printf("WARNING: tried to ioctl screen\n");
 	return VFS_OK;
 }
 
@@ -135,6 +134,15 @@ void set_cursor(uint16 x, uint16 y)
 uint16 get_chars_vertical()
 {
 	return charsVertical;
+}
+
+void clear_screen()
+{
+	for (uint16 i = 0; i < charsHorizontal; i++)
+		for (uint16 j = 0; j < charsVertical; j++)
+			draw_char(0);
+
+	cursor = make_point(0, 0);
 }
 
 void load_default_font()
@@ -227,9 +235,15 @@ void draw_char(char c)
 	switch (c)
 	{
 	case 0x08:		// backspace
-		if (cursor.x >= 0)
+		if (cursor.x > 0)
 		{
 			cursor.x--;
+			_draw_char(0, make_point(cursor.x * 8, cursor.y * 16));
+		}
+		else if(cursor.y > 0)
+		{
+			cursor.x = charsHorizontal - 1;
+			cursor.y--;
 			_draw_char(0, make_point(cursor.x * 8, cursor.y * 16));
 		}
 		break;

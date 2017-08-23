@@ -37,6 +37,34 @@ void* realloc(void* ptr, uint32 new_size)
 	return addr;
 }
 
+virtual_addr mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
+{
+	PCB* proc = (PCB*)_proc;
+
+	if (prot > 0xF)		// protection flags failed
+		return MAP_FAILED;
+
+	if (!CHK_BIT(flags, MMAP_SHARED) && !CHK_BIT(flags, MMAP_PRIVATE))
+		return MAP_FAILED;
+
+	vm_area area = vm_area_create(pref, pref + length, flags | prot, gfd, offset);
+
+	if (area.flags == MMAP_INVALID)
+		return MAP_FAILED;
+
+	spinlock_acquire(&proc->contract_spinlock);
+
+	if (!vm_contract_add_area(&proc->memory_contract, &area))	// TODO: Check flag for obligatory preffered addr load
+		return MAP_FAILED;
+
+	spinlock_release(&proc->contract_spinlock);
+
+	// from current_process
+	// from local_table get global fd through
+	// increase the open_count
+	return area.start_addr;
+}
+
 virtual_addr mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
 {
 	if (prot > 0xF)		// protection flags failed

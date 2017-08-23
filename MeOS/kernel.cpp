@@ -53,16 +53,6 @@ void GetMemoryStats()
 	serial_printf("Used blocks: %u\n", pmmngr_get_block_use_count());
 }
 
-void print(char* arr)
-{
-	for (int i = 0; i < 512; i++)
-	{
-		if (isprint(arr[i]))
-			Printch(arr[i]);
-		arr[i] = 0;
-	}
-}
-
 KEYCODE getch()
 {
 	KEYCODE key = KEY_UNKNOWN;
@@ -72,96 +62,6 @@ KEYCODE getch()
 
 	kybrd_discard_last_key();
 	return key;
-}
-
-void get_cmd(char* buff, int max_size)
-{
-	KEYCODE key = KEY_UNKNOWN;
-	int i = 0;
-
-	while (true)
-	{
-		key = (KEYCODE)getch();
-
-		if (key == KEY_RETURN)
-		{
-			Printch(key);
-			break;
-		}
-
-		if (key == KEY_BACKSPACE && i > 0)
-		{
-			buff[--i] = '\0';
-			Printch(key);
-		}
-
-		if (isprint(key) && i < max_size)
-		{
-			char c = kybrd_key_to_ascii(key);
-
-			buff[i++] = c;
-			Printch(c);
-		}
-	}
-
-	buff[i] = '\0';
-}
-
-bool run_cmd(char* cmd)
-{
-	if (strcmp(cmd, "exit") == 0)
-		return true;
-	else if (strcmp(cmd, "help") == 0)
-		printfln("Help messages");
-	else if (strcmp(cmd, "clear") == 0)
-		ClearScreen();
-	else if (strcmp(cmd, "reset") == 0)
-		kybrd_reset_system();
-	else if (strcmp(cmd, "read") == 0)
-	{
-		if (vmmngr_is_page_present(0x500000) == false)
-			vmmngr_alloc_page(0x500000);
-
-		printf("Enter the sector number to read from: ");
-		get_cmd(cmd, 20);
-		DWORD sector = atoui(cmd);
-
-		physical_addr addr = vmmngr_get_phys_addr((virtual_addr)0x500000);
-
-		if (ahci_read(0, sector, 0, 1, (VOID PTR)addr) != AHCIResult::AHCI_NO_ERROR)
-			DEBUG("AHCI ERROR");
-		else
-			print((char*)0x500000);
-	}
-	else if (strcmp(cmd, "dis_output") == 0)
-		canOutput = false;
-	else if (strcmp(cmd, "en_output") == 0)
-		canOutput = true;
-	else if (strcmp(cmd, "dis_kybrd") == 0)
-		kybrd_disable();
-	else if (strcmp(cmd, "caps") == 0)
-		ahci_print_caps();
-	else if (strcmp(cmd, "memstats") == 0)
-		GetMemoryStats();
-	else
-		printfln("Unknown command: %s.", cmd);
-
-	return false;
-}
-
-void Run()
-{
-	char cmd[30];
-	SetMinWritable(strlen("cmd>"));
-
-	while (true)
-	{
-		printf("cmd>");
-		get_cmd(cmd, 28);
-
-		if (run_cmd(cmd) == true)
-			printfln("Unfortunately cannot exit.");
-	}
 }
 
 int a = 0;
@@ -205,19 +105,6 @@ void test2()
 	while (true);
 }
 
-void loadFile(uint32 addr)
-{
-	//int fd;
-	//if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
-	//	PANIC("Cannot open fd");
-
-	//if (read_file(fd, 0, 20, addr) != 20)
-	//	PANIC("Could not read");
-
-	//for (int i = 0; i < 1000000; i++);	// lengthy procedure
-	//printfln("End load");
-}
-
 void test_print_time()
 {
 	printfln("Executing %s", __FUNCTION__);
@@ -242,6 +129,8 @@ void idle()
 }
 
 TCB* thread_test_time;
+
+TCB* create_test_process(int fd);
 
 void keyboard_fancy_function()
 {
@@ -276,24 +165,32 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_P)
 			{
-				uint32 port = 0x3f8;
-				printfln("reading port 0x3f8 %h %h", *((uint32*)port), inportb(port));
+				int ___fd;
+				if (open_file("sdc_mount/TEXT.TXT", &___fd) != VFS_OK)
+					PANIC("Could not open text file");
 
-				outportb(PORT + 7, 0x30);
-				printfln("scratch pad reg: %h", inportb(PORT + 7));
+				if (mmap(0x700000, lft_get(&process_get_current()->lft, ___fd)->gfd, 2, 4096, MMAP_PRIVATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
+					PANIC("Could not map file");
+
+				char* character = (char*)0x700000;
+
+				printfln("printing text: ");
+				for (int i = 0; i < 20; i++)
+					printf("%c", character[i]);
+
+				printfln(".End");
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
-				ClearScreen();
-				printfln("printing at thread: %u: ", thread_get_current()->id);
-				char* buffer = (char*)0x700000;
+				clear_screen();
+				int test_proc;
+				if (open_file("sdc_mount/TEST.EXE", &test_proc) != VFS_OK)
+					PANIC("could not open test.exe");
+				INT_OFF;
+				TCB* t = create_test_process(test_proc);
+				thread_insert(t);
+				INT_ON;
 
-				for (int i = 0; i < 20; i++)
-					buffer[i] = 'a';
-				for (int i = 0; i < 20; i++)
-					printf("%c", buffer[i]);
-
-				printfln(".End");
 			}
 			else if (c == KEYCODE::KEY_S)
 			{
@@ -332,18 +229,19 @@ int fd[2];
 
 void test3()
 {
-	printfln("Test3 id: %u", thread_get_current()->id);
+	//_asm int 0x80
+	serial_printf("Test3 id: %u", thread_get_current()->id);
 	char* message = "Hello from this pipe!\n";
-	printfln("I will print through the pipe");
+	serial_printf("I will print through the pipe");
 
-	for (int i = 0; i < strlen(message); i += 2)
-	{
-		//pipe_write(&pipe, message[i]);
-		write_file(fd[0], 0, 2, (virtual_addr)(message + i));
-		thread_sleep(thread_get_current(), 500);
-	}
+	//for (int i = 0; i < strlen(message); i += 2)
+	//{
+	//	//pipe_write(&pipe, message[i]);
+	//	write_file(fd[0], 0, 2, (virtual_addr)(message + i));
+	//	thread_sleep(thread_get_current(), 500);
+	//}
 
-	while (true)
+	for (;;);
 	{
 		/*vfs_node* n = vfs_find_node("sdc_mount/MIC.TXT");
 		vfs_open_file(n);
@@ -361,56 +259,110 @@ struct kernel_info
 	idt_entry_t* idt_base;
 };
 
-void create_test_process(int fd)
+uint32 entry;
+void enter_user_mode(uint32 stack, uint32 entry)
 {
+	uint32 kernel_esp;
+	_asm mov [kernel_esp], esp
+
+	set_tss(0x10, kernel_esp);
+	serial_printf("entering user mode %h, kernel stack: %h %h\n", entry, kernel_esp, stack);
+
+	_asm {
+		cli
+		mov ax, 0x23				// user mode data selector is 0x20 (GDT entry 3).Also sets RPL to 3
+		mov ds, ax
+		mov es, ax
+		mov fs, ax
+		mov gs, ax
+
+		push 0x23					// SS, notice it uses same selector as above
+		push dword ptr[stack]
+		pushfd						// push flags, move them to eax and OR with ths IF flags to enable interrupts
+		pop eax
+		or eax, 0x200
+		push eax
+		push 0x1B					// CS, user mode code selector is 0x18. With RPL 3 this is 0x1b
+		push dword ptr[entry]		// EIP first
+
+		iretd
+	}
+}
+
+// sets up a process and initializes the first thread and its stacks (kernel + user)
+void kernel_setup_process()
+{
+	if (mmap(1 GB - 28 KB, 0, 0, 32 KB, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER, PROT_READ | PROT_WRITE) == MAP_FAILED)
+		PANIC("Cannot map stack");
+
+	serial_printf("spurious x = ");
+	uint32 x = *(uint32*)(0x401000);
+	x = *(uint32*)(0x401000);
+	x = *(uint32*)(0x402000);
+	x = *(uint32*)(0x403000);
+	x = *(uint32*)(1 GB - 8 KB);
+	x = *(uint32*)(1 GB - 12 KB);
+	x = *(uint32*)(1 GB - 4 KB); 
+	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
+	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);
+
+	pd_entry* e = vmmngr_pdirectory_lookup_entry(vmmngr_get_directory(), 0xE0000000);
+	ptable* table = (ptable*)pd_entry_get_frame(*e);
+	pt_entry* page = vmmngr_ptable_lookup_entry(table, 0xE0000000);	
+	serial_printf("0xE00000 is user? :%u", (*page) & I86_PTE_USER);
+
+	enter_user_mode(1 GB - 8 KB, (uint32)entry);
+
+
+	for (;;);
+}
+
+TCB* create_test_process(int fd)
+{
+	PCB* proc = process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
+
 	for (uint32 i = 0; i < 1; i++)
 	{
 		uint32 error = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
-		if (error != 0)
+		if (error != PAGE_SIZE)
 			printfln("read error: %u", error);
 	}
 
 	if (!validate_PE_image(___buffer))
 	{
 		DEBUG("Could not load PE image. Corrupt image or data.");
-		return;
+		return 0;
 	}
 
 	IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)___buffer;
 	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)___buffer);
-	IMAGE_SECTION_HEADER* section_0 = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
+	IMAGE_SECTION_HEADER* section = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
 
-	/* address space creation goes here. Create a new address space */
-	pdirectory* address_space = vmmngr_get_directory();
+	serial_printf("section name\n");
+	for (int x = 0; x < nt_header->FileHeader.NumberOfSections; x++)
+	{
+		for (int i = 0; i < 8; i++)
+			serial_printf("%c", section[x].Name[i]);
+		serial_printf("\n");
 
-	// here we ve got a PE.
-	PCB* proc = process_create(thread_get_current()->parent, address_space, 4 MB, 2 GB);
+		serial_printf("mmaping fd: %u to %h, size of raw: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
+			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 
-	uint32 baseText = nt_header->OptionalHeader.BaseOfCode;
-	uint32 sizeText = nt_header->OptionalHeader.SizeOfCode;
-	uint32 baseData = nt_header->OptionalHeader.BaseOfData;
-	uint32 sizeData = nt_header->OptionalHeader.SizeOfInitializedData;
-	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
-	uint32 imageBase = nt_header->OptionalHeader.ImageBase;
+		if (mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
+			lft_get(&process_get_current()->lft, fd)->gfd, section->PointerToRawData, 4096,
+			MMAP_PRIVATE | MMAP_USER, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+		{
+			serial_printf("address: %h size %h", section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
+			PANIC("Could not map for process");
+		}
 
-	/*vm_area code = vm_area_create(imageBase + baseText, pmmngr_get_next_align(imageBase + baseText + sizeText), VM_AREA_READ | VM_AREA_EXEC, fd);
-	vm_area stack = vm_area_create(1 GB, 1 GB + 4 KB, VM_AREA_READ | VM_AREA_WRITE | VM_AREA_GROWS_DOWN, -1);
-	vm_area data = vm_area_create(imageBase + baseData, pmmngr_get_next_align(imageBase + baseData + sizeData), VM_AREA_READ | VM_AREA_WRITE, -1);*/
+	}
 
-	/*vm_contract_add_area(&proc->memory_contract, &code);
-	vm_contract_add_area(&proc->memory_contract, &stack);
-	vm_contract_add_area(&proc->memory_contract, &data);*/
+	serial_printf("kernel stack: %h\n\n", pmmngr_get_next_align((uint32)___buffer) + 4096 * 2);
+	entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
+	TCB* thread = thread_create(proc, (uint32)kernel_setup_process, pmmngr_get_next_align((uint32)___buffer) + 4096 * 2, 4 KB, 3);
 
-	memcpy((void*)(imageBase + section_0->VirtualAddress), ___buffer + section_0->PointerToRawData, section_0->SizeOfRawData);
-	section_0++;
-	memcpy((void*)(imageBase + section_0->VirtualAddress), ___buffer + section_0->PointerToRawData, section_0->SizeOfRawData);
-
-	uint32 address = vm_contract_get_area_for_length(&proc->memory_contract, 4096);
-
-	//TCB* main = thread_create(proc, entry, stack.end_addr, 4096, 1);
-
-	//thread_insert(main);
-	printfln("thread creationg ended");
+	return thread;
 }
 
 multiboot_info* boot_info;
@@ -426,10 +378,6 @@ void proc_init_thread()
 	// memory map MMIO
 	if (mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map MMIO");
-
-	// test area
-	if (mmap(0x700000, INVALID_FD, 0, 4 KB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_WRITE) == MAP_FAILED)
-		PANIC("Could not map 7 MB");
 
 	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes on read only page
 	enable_write_protection();
@@ -665,14 +613,6 @@ void proc_init_thread()
 	uint32 error;
 	vfs_node* n;
 
-	/*if (error = open_file("sdc_mount/FOLDER/TESTDLL.EXE", &fd[0]))
-		printfln("Error opening TestDLL.exe: %u", error);
-
-	INT_OFF;
-
-	if (!error)
-		create_test_process(fd[0]);*/
-
 		//while (true);
 
 		//mutex_init(&m);
@@ -680,9 +620,7 @@ void proc_init_thread()
 		//semaphore_init(&sem, 1);
 
 
-	init_keyboard();
-
-	
+	init_keyboard();	
 
 	//uint32 addr = 0x700000;
 	//int fd;
@@ -710,33 +648,38 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
+	
+
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
-	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
-	thread_insert(thread); */
-	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
-	thread_insert(thread);
-	thread_test_time = thread;
+	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
+	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
+	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
+	///////*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
+	//////thread_insert(thread); */
+	//////TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
+	//////thread_insert(thread);
+	//////thread_test_time = thread;
 	ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
+	// create new test process to run keyboard fancy function.
+	//PCB* p = process_create(process_get_current(), 0, 0, 0xFFFFFFFF);
+	//thread_insert(c = thread_create(p, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
+
 	//ClearScreen();
+	clear_screen();
+
 	INT_ON;
 
-	//*(char*)0x700000 = 0;
 
 	while (true)
 	{
 		INT_OFF;
 		point cursor = get_cursor();
 
-		//SetPointer(0, SCREEN_HEIGHT - 3);
 		set_cursor(0, get_chars_vertical() - 3);
 		printf("main thread t=%u m=%u", get_ticks(), millis());
-		//SetPointer(x, y);
 		set_cursor(cursor.x, cursor.y);
 		INT_ON;
 		thread_current_yield();
@@ -830,25 +773,25 @@ extern "C" void test_handle(registers_t* regs);
 
 extern "C" int _fltused = 1;
 
-extern "C" long __declspec (naked) _ftol2_sse() {
-
-	int a;
-	_asm	fistp[a]
-		_asm	mov	ebx, a
-	_asm	ret
-}
-
-extern "C" float __declspec(naked) _CIcos() {
-	_asm fcos
-};
-
-extern "C" float __declspec(naked) _CIsin() {
-	_asm fsin
-};
-
-extern "C" float __declspec(naked) _CIsqrt() {
-	_asm fsqrt
-};
+//extern "C" long __declspec (naked) _ftol2_sse() {
+//
+//	int a;
+//	_asm	fistp[a]
+//		_asm	mov	ebx, a
+//	_asm	ret
+//}
+//
+//extern "C" float __declspec(naked) _CIcos() {
+//	_asm fcos
+//};
+//
+//extern "C" float __declspec(naked) _CIsin() {
+//	_asm fsin
+//};
+//
+//extern "C" float __declspec(naked) _CIsqrt() {
+//	_asm fsqrt
+//};
 
 int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 {
@@ -909,10 +852,10 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	// create a minimal multihtreaded environment to work with
 
 	virtual_addr space = pmmngr_get_next_align(0xC0000000 + k_info->kernel_size + 4096);
-	//printfln("allocating 4KB at %h", space);
+	printfln("allocating 4KB at %h", space);
 
-	if (vmmngr_is_page_present(space));
-		//printfln("space: %h alloced", space);
+	if (vmmngr_is_page_present(space))
+		printfln("space: %h alloced", space);
 
 	if (!vmmngr_alloc_page(space))
 		PANIC("cannot allocate for mini heap");
@@ -922,10 +865,10 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 
 	// setup a dummy kernel heap for process 0 initialization
 	kernel_heap = heap_create(space, 0x2000);
-	//printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
+	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
 	// create process 0 and its only thread
-	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 4 GB - 4 KB);
+	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 0xFFFFF000/*4 GB - 4 KB*/);	// 4 GB is 0 in DWORD
 	uint32 thread_stack = (uint32)malloc(4050);		// allocate enough space for page aligned stack
 	// just for this thread, space is not malloc
 	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 3);	// page align stack
