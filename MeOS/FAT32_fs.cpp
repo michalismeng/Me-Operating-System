@@ -1,20 +1,21 @@
 #include "FAT32_fs.h"
 #include "print_utility.h"
 
-uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result fat_fs_open(vfs_node* node);
-uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
-vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...);
-
 #define STORAGE_INFO(mp) ((mass_storage_info*)mp->tag->deep_md)
 #define MOUNT_DATA(mp) ((fat_mount_data*)mp->deep_md)
 #define NODE_DATA(n) ((fat_node_data*)n->deep_md)
 #define LAYOUT(n) ((fat_file_layout*)n->deep_md)
 
-vfs_result fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache);
+error_t fat_fs_open(vfs_node* node);
+size_t fat_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t fat_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+error_t fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
+error_t fat_fs_ioctl(vfs_node* node, uint32 command, ...);
+
+
+error_t fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache);
 bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
-uint32 fat_node_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+size_t fat_node_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
 
 // file operations
@@ -161,7 +162,7 @@ bool fat_fs_validate_83_name(char* name, uint32 length)
 
 #pragma endregion
 
-uint32 fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
+error_t fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
 {
 	vfs_node* mount_point = file->tag;
 
@@ -169,7 +170,6 @@ uint32 fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_add
 		return fat_fs_read_to_cache (fd, file, page, cache);
 	else
 	{
-		serial_printf("read by page\n");
 		if (fat_fs_read_by_page(mount_point, file, page, *cache) == false)
 			return VFS_GENERAL_ERROR;
 		return VFS_OK;
@@ -179,11 +179,11 @@ uint32 fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_add
 #pragma region VFS API Implementation
 
 //TODO: Perhaps count should be a multiple of the format data block (512, 1k, ->4k<-, 8k...) and the user will then have to read it all
-uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t fat_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (!file->tag->tag)
 	{
-		set_last_error(error_create(VFS_ERROR::VFS_INVALID_NODE_STRUCTURE));
+		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
@@ -198,25 +198,31 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 
 	if (use_file_cache == false && ((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)) || (use_file_cache == false && ignore_address))
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
 	virtual_addr cache;
 	// if the page cache is not to be used, then reserve a minimum of one entry to load partial data when required
-	if(use_file_cache == false)
+	if (use_file_cache == false)
+	{
 		cache = page_cache_reserve_anonymous();
+		if (cache == 0)
+		{
+			set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
+			return 0;
+		}
+	}
 
-	uint32 error;
+	error_t error;
 	vfs_node* mount_point = file->tag;
-
 
 	uint32 offset = start % FAT_FORMAT_PAGE_SIZE;
 
 	/* Read pages until second to last */
 	for (uint32 pg = 0; pg < count / FAT_FORMAT_PAGE_SIZE; pg++, current_pg++)
 	{
-		if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != VFS_OK)
+		if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != ERROR_OK)
 		{
 			set_last_error(error);
 			if (use_file_cache)
@@ -244,7 +250,7 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 
 	/* read the last page */
 
-	if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != VFS_OK)
+	if ((error = fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache)) != ERROR_OK)
 	{
 		set_last_error(error);
 		if (use_file_cache)
@@ -262,11 +268,11 @@ uint32 fat_fs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_a
 }
 
 //TODO: Do more testing with larger files...
-uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t fat_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (!file->tag->tag)
 	{
-		set_last_error(error_create(VFS_ERROR::VFS_INVALID_NODE_STRUCTURE));
+		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
@@ -274,7 +280,7 @@ uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_
 
 	if (use_file_cache == false && ((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)))
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
@@ -285,7 +291,7 @@ uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_
 	uint32 read = 0;
 
 	virtual_addr cache;
-	uint32 error;
+	error_t error;
 
 	// ensure page cache is read
 	if (error = fat_fs_read_to_cache(fd, file, current_pg, &cache))
@@ -327,10 +333,10 @@ uint32 fat_fs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_
 	return count;
 }
 
-vfs_result fat_fs_open(vfs_node* node)
+error_t fat_fs_open(vfs_node* node)
 {
 	if (!node->tag->tag)
-		return VFS_ERROR::VFS_INVALID_NODE_STRUCTURE;
+		return set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
 
 	// TODO: filesystem open permission
 	vfs_node* mount_point = node->tag;
@@ -342,11 +348,11 @@ vfs_result fat_fs_open(vfs_node* node)
 		return fat_fs_load_file_layout((fat_mount_data*)mount_point->deep_md, node);
 
 	}
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 // TODO: When a page is outside the layout of a file (the file has been extended due to new data), reserve a new sector for it.
-vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
+error_t fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
 {
 	vfs_node* mount_point;
 	vfs_node* device;
@@ -362,7 +368,7 @@ vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_en
 		device = file->tag;
 	}
 	else
-		return VFS_ERROR::VFS_BAD_ARGUMENTS;
+		return set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 
 	// convention, sync the whole file
 	if (page_start > page_end)
@@ -384,10 +390,10 @@ vfs_result fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_en
 			return VFS_ERROR::VFS_GENERAL_ERROR;
 	}
 
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
+error_t fat_fs_ioctl(vfs_node* node, uint32 command, ...)
 {
 	if (command == 0)	// invalidate
 	{
@@ -396,7 +402,7 @@ vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
 		mount->fs_ops->fs_write(MOUNT_DATA(mount)->fd, node, 0, 0, 0);
 	}
 	
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 #pragma endregion
@@ -406,12 +412,10 @@ vfs_result fat_fs_ioctl(vfs_node* node, uint32 command, ...)
 // reads a 4KB data region starting at the given linear block address. This is the lowest level data exchange function.
 bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
 {
-	serial_printf("reading %h\n", address);
-
 	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT ||
 		MOUNT_DATA(mount_point) == 0 || STORAGE_INFO(mount_point) == 0)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -431,7 +435,7 @@ bool fat_fs_write_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address
 	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT ||
 		MOUNT_DATA(mount_point) == 0 || STORAGE_INFO(mount_point) == 0)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -450,7 +454,7 @@ bool fat_fs_read_by_data_cluster(vfs_node* mount_point, uint32 cluster, virtual_
 {
 	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT || MOUNT_DATA(mount_point) == 0)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -462,7 +466,7 @@ bool fat_fs_write_by_data_cluster(vfs_node* mount_point, uint32 cluster, virtual
 {
 	if (mount_point == 0 || (mount_point->attributes & 7) != VFS_ATTRIBUTES::VFS_MOUNT_PT || MOUNT_DATA(mount_point) == 0)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -476,7 +480,7 @@ bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page
 
 	if (layout == 0 || file_page >= layout->count)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_LAYOUT, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -490,7 +494,7 @@ bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_pag
 
 	if (layout == 0 || file_page >= layout->count)
 	{
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_LAYOUT, EO_MASS_STORAGE_FS);
 		return false;
 	}
 
@@ -518,7 +522,7 @@ uint32 fat_fs_get_entry_data_cluster(fat_dir_entry_short* e)
 /*************************************************************************************/
 
 
-uint32 fat_node_write(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address)
+size_t fat_node_write(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
 {
 	uint32 page = NODE_DATA(node)->metadata_cluster;
 	uint32 offset = NODE_DATA(node)->metadata_index;
@@ -533,18 +537,17 @@ uint32 fat_node_write(int fd, vfs_node* node, uint32 start, uint32 count, virtua
 	return sizeof(fat_dir_entry_short);
 }
 
-int fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+error_t fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
 {
 	vfs_node* mount_point = file->tag;
 	virtual_addr cache = page_cache_get_buffer(fd, page);
 	// if page is not found then allocate a new one to hold the required data.
 	if (cache == 0)
 	{
-		serial_printf("cache not found for: %u %u\n", fd, page);
 		cache = page_cache_reserve_buffer(fd, page);
 		if (cache == 0)
 		{
-			set_last_error(VFS_CACHE_FULL);
+			set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 			return VFS_CACHE_FULL;
 		}
 
@@ -552,15 +555,16 @@ int fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cac
 		{
 			page_cache_release_buffer(fd, page);
 			*_cache = 0;
+			set_last_error();
 			return 1;
 		}
 	}
 
 	*_cache = cache;
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-// returns the next cluster to read based on the current cluster and the first FAT
+// returns the next cluster to read based on the current cluster and the first FAT or zero on failure
 uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 {
 	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
@@ -569,6 +573,7 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 
 	if (!(address = page_cache_reserve_anonymous()))
 	{
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		DEBUG("error smoething went wrong");
 		return 0;
 	}
@@ -589,12 +594,15 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 	return res;
 }
 
-// returns the first free cluster and marks it with the next_cluster value
+// returns the first free cluster and marks it with the next_cluster value or zero on failure
 uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 {
 	uint32 address;	
 	if (!(address = page_cache_reserve_anonymous()))
+	{
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return 0;
+	}
 
 	uint32 fat_lba_index = 0;
 	// TODO: Find a true limit. Perhaps index < cluster LBA?
@@ -631,10 +639,11 @@ uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 
 	// we should never reach here
 	DEBUG("ERROR");
+	set_last_error(ENOMEM, FAT_NO_CLUSTERS, EO_MASS_STORAGE_FS);
 	return 0;
 }
 
-// marks the given cluster with the given value and returns its previous value
+// marks the given cluster with the given value and returns its previous value or zero on failure
 uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value)
 {
 	// each 4KB sector has 128 fat entries. We need to find out which part of FAT to load
@@ -642,6 +651,7 @@ uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value
 	uint32 address;
 	if (!(address = page_cache_reserve_anonymous()))
 	{
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		DEBUG("error smoething went wrong");
 		return 0;
 	}
@@ -789,7 +799,7 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	return mount_point;
 }
 
-vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node)
+error_t fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node)
 {
 	fat_file_layout* layout = (fat_file_layout*)node->deep_md;
 
@@ -797,29 +807,23 @@ vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node)
 	{
 		uint32 next_cluster = fat_fs_find_next_cluster(node->tag, vector_at(layout, layout->count - 1));	
 		// TODO: Consider speed up by one time cache reservation.
-		
-		/*if (next_cluster == 0)  This is not needed. Only lowest level functions set errors. All other functions return them.
-		{
-			set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
-			return VFS_ERROR::VFS_BAD_ARGUMENTS;
-		}*/
-		
+				
 		if (next_cluster >= FAT_EOF)
 			break;
 
 		vector_insert_back(layout, next_cluster);
 	}
 
-	return VFS_ERROR::VFS_OK;
+	return ERROR_OK;
 }
 
-int fat_fs_create_short_entry_from_node(fat_dir_entry_short* entry, vfs_node* node)
+error_t fat_fs_create_short_entry_from_node(fat_dir_entry_short* entry, vfs_node* node)
 {
 	if (LAYOUT(node)->count == 0)
 	{
 		DEBUG("cannot create fat entry from bad node");
-		set_last_error(VFS_ERROR::VFS_BAD_ARGUMENTS);
-		return -1;
+		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
+		return some_return;
 	}
 
 	uint32 first_cluster = vector_at(LAYOUT(node), 0);
@@ -842,7 +846,7 @@ int fat_fs_create_short_entry_from_node(fat_dir_entry_short* entry, vfs_node* no
 	entry->cluster_high = (uint16)(first_cluster >> 16) & 0x0FFF;
 
 	entry->resv0 = 0;
-	return 0;
+	return ERROR_OK;
 }
 
 // initializes a directory with the '.' and '..' entries as the first entries in the buffer.
@@ -869,19 +873,20 @@ void fat_fs_initialize_directory(uint32 parent_cluster, fat_dir_entry_short* new
 
 // TODO: Do some testing...
 // Delete a file or directory that is empty of sub-content
-vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
+error_t fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 {
 	if ((node->attributes & 7) == VFS_DIRECTORY && node->children.count > 2)		// directory has children, return failure.
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
-		return -1;
+		set_last_error(EINVAL, VFS_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
+		return some_value;
 	}
 
 	uint32 cache;
 	if (!(cache = page_cache_reserve_anonymous()))
 	{
 		DEBUG("delete file could not reserve buffer");
-		return -1;
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
+		return some_value;
 	}
 
 	uint32 cluster = NODE_DATA(node)->metadata_cluster;		// file metadata cluster
@@ -892,7 +897,7 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 	{
 		DEBUG("Could not read cluster");
 		page_cache_release_anonymous(cache);
-		return -1;
+		return some_value;
 	}
 
 	fat_dir_entry_short* entry = ((fat_dir_entry_short*)cache) + index;
@@ -907,7 +912,7 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 	{
 		DEBUG("Could not write cluster");
 		page_cache_release_anonymous(cache);
-		return -1;
+		return some_value;
 	}
 
 	// release the cache buffer as it is not used any longer.
@@ -926,11 +931,11 @@ vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 		if (next_cluster == 0)
 		{
 			DEBUG("Delete file error in deleting chains");
-			return -1;
+			return some_value;
 		}
 	}
 
-	return 0;
+	return ERROR_OK;
 }
 
 // searches for an empty entry in the given directory's clusters. 
@@ -969,29 +974,30 @@ bool fat_fs_find_empty_entry(vfs_node* mount_point, vfs_node* directory, virtual
 
 // move a node under the given directory which must be within the same filesystem
 // TODO: eliminate bad cache claiming
-vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory)
+error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory)
 {
 	if (mount_point == 0 || node == 0 || directory == 0 ||
 		(mount_point->attributes & 7) != VFS_MOUNT_PT || (directory->attributes & 7) != VFS_DIRECTORY ||
 		MOUNT_DATA(mount_point) == 0)
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
-		return -1;
+		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
+		return some_value;
 	}
 
 	int fd;
 	// TODO: This may cause problems if the directory is being used elsewhere.
-	if (open_file_by_node(directory, &fd) != VFS_OK)		// TODO: Close file
+	if (open_file_by_node(directory, &fd) != ERROR_OK)		// TODO: Close file
 	{
 		DEBUG("create file could not open directory file");
-		return 0;
+		return some_value;
 	}
 
 	uint32 cache;
 	if (!(cache = page_cache_reserve_buffer(fd, 0)))
 	{
 		DEBUG("create file could not reserve buffer");
-		return 0;
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
+		return some_value;
 	}
 
 	/* read the node's metadata cluster */
@@ -1017,7 +1023,7 @@ vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* dir
 	if (fat_fs_write_by_data_cluster(mount_point, NODE_DATA(node)->metadata_cluster, cache) == false)
 	{
 		page_cache_release_buffer(fd, 0);
-		return -1;
+		return some_value;
 	}
 
 	/* find empty metadata entry undes directory */
@@ -1031,7 +1037,7 @@ vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* dir
 		if (fat_fs_write_by_data_cluster(mount_point, metadata_cluster, cache) == false)
 		{
 			page_cache_release_buffer(fd, 0);
-			return -1;
+			return some_value;
 		}
 
 		/* update node filesystem data */
@@ -1045,7 +1051,7 @@ vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* dir
 	}
 
 	page_cache_release_buffer(fd, 0);
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 bool fat_fs_initialize_node_cluster(vfs_node* mount_point, vfs_node* new_node, vfs_node* directory, fat_dir_entry_short* entry, virtual_addr cache)
@@ -1068,6 +1074,8 @@ bool fat_fs_initialize_node_cluster(vfs_node* mount_point, vfs_node* new_node, v
 	// finally write the first cluster data back to the disk
 	if (fat_fs_write_by_data_cluster(mount_point, free_cluster, cache) == false)
 		return false;
+
+	return true;
 }
 
 // Create a new node under the given directory 
@@ -1078,13 +1086,13 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 		(mount_point->attributes & 7) != VFS_MOUNT_PT || (directory->attributes & 7) != VFS_DIRECTORY ||
 		MOUNT_DATA(mount_point) == 0)
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
 	if (fat_fs_validate_83_name(name, strlen(name)) == false)
 	{
-		set_last_error(VFS_BAD_ARGUMENTS);
+		set_last_error(EINVAL, FAT_INVALID_83_NAME, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 
@@ -1100,6 +1108,7 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 	if (!(cache = page_cache_reserve_buffer(fd, 0)))
 	{
 		DEBUG("create file could not reserve buffer");
+		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return 0;
 	}
 

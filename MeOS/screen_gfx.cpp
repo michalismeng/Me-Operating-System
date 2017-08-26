@@ -91,7 +91,7 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 
 	uint32 frame_length = vbe->pitch * vbe->height;
 
-	if (!mmap(vbe->framebuffer & (~0xFFF), INVALID_FD, 0, frame_length + PAGE_SIZE - (frame_length % PAGE_SIZE), 
+	if (!vfs_mmap(vbe->framebuffer & (~0xFFF), INVALID_FD, 0, frame_length + PAGE_SIZE - (frame_length % PAGE_SIZE), 
 		MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map screen region");
 

@@ -175,7 +175,7 @@ void keyboard_fancy_function()
 				if (open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
 					PANIC("Could not open text file");
 
-				if (mmap(0x700000, lft_get(&process_get_current()->lft, ___fd)->gfd, 2, 4096, MMAP_PRIVATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
+				if (vfs_mmap(0x700000, lft_get(&process_get_current()->lft, ___fd)->gfd, 2, 4096, MMAP_PRIVATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
 					PANIC("Could not map file");
 
 				char* character = (char*)0x700000;
@@ -185,13 +185,13 @@ void keyboard_fancy_function()
 					printf("%c", character[i]);
 
 				printfln(".End");*/
-				char* x = (char*)0x800000;
+				/*char* x = (char*)0x800000;
 
 				for (int i = 0; i < 10; i++)
 					printf("%c", x[i]);
 				printfln("");
 
-				page_cache_print();
+				page_cache_print();*/
 
 			}
 			else if (c == KEYCODE::KEY_L)
@@ -204,23 +204,14 @@ void keyboard_fancy_function()
 					printf("%c", i);
 				printfln("");*/
 
-				printfln("page for text: %h", page_cache_get_buffer(4, 0));
-
 				if (open_file("sdc_mount/TEXT.TXT", &test_proc, O_CACHE_ONLY) != VFS_OK)
 					PANIC("could not open text.exe");
 
-				if(mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
+				if(vfs_mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
 					PANIC("Could not map file");
 
-
-
-				/*PCB* proc = process_create(process_get_current(), 0, 0, 0xFFFFE000);
-				TCB* thread = thread_create(proc, (uint32)test2, 3 GB + 10 MB + 504 KB, 4 KB, 3);
-
-				if (mmap_p(proc, 0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
-					PANIC("Could not map file");
-				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));*/
-				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));
+				
+				//printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));
 
 
 				char* x = (char*)0x800000;
@@ -232,9 +223,13 @@ void keyboard_fancy_function()
 				for (int i = 0; i < 5; i++)
 					x[i] = 'a';
 
-				
+				/*if (open_file("sdc_mount/TEST.EXE", &test_proc, 0) != VFS_OK)
+					PANIC("could not open text.exe");
 
-				/*INT_OFF;
+				TCB* thread = create_test_process(test_proc);
+
+
+				INT_OFF;
 				thread_insert(thread);
 				INT_ON;*/
 
@@ -251,11 +246,6 @@ void keyboard_fancy_function()
 				/*for (int i = 0; i < 50; i++)
 					printf("%c", __temp[i]);
 				printfln(".End");*/
-
-				INT_OFF;
-				//TCB* t = create_test_process(test_proc);
-				//thread_insert(t);
-				INT_ON;
 
 			}
 			else if (c == KEYCODE::KEY_S)
@@ -378,28 +368,13 @@ void enter_user_mode(uint32 stack, uint32 entry)
 // sets up a process and initializes the first thread and its stacks (kernel + user)
 void kernel_setup_process()
 {
-	if (mmap(1 GB - 28 KB, 0, 0, 32 KB, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER, PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER, PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Cannot map stack");
 
-	serial_printf("spurious x = ");
-	uint32 x = *(uint32*)(0x401000);
-	x = *(uint32*)(0x401000);
-	x = *(uint32*)(0x402000);
-	x = *(uint32*)(0x403000);
-	x = *(uint32*)(1 GB - 8 KB);
-	x = *(uint32*)(1 GB - 12 KB);
-	x = *(uint32*)(1 GB - 4 KB); 
 	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
 	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);
 
-	pd_entry* e = vmmngr_pdirectory_lookup_entry(vmmngr_get_directory(), 0xE0000000);
-	ptable* table = (ptable*)pd_entry_get_frame(*e);
-	pt_entry* page = vmmngr_ptable_lookup_entry(table, 0xE0000000);	
-	serial_printf("0xE00000 is user? :%u", (*page) & I86_PTE_USER);
-
 	enter_user_mode(1 GB - 8 KB, (uint32)entry);
-
-
 	for (;;);
 }
 
@@ -434,7 +409,7 @@ TCB* create_test_process(int fd)
 		serial_printf("mmaping fd: %u to %h, size of raw: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
 			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 
-		if (mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
+		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
 			lft_get(&process_get_current()->lft, fd)->gfd, section->PointerToRawData, 4096,
 			MMAP_PRIVATE | MMAP_USER, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
 		{
@@ -458,11 +433,11 @@ void proc_init_thread()
 	printfln("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
-	if (mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map kernel land");
 
 	// memory map MMIO
-	if (mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
 		PANIC("Could not map MMIO");
 
 	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes on read only page

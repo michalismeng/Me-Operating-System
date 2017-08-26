@@ -1,16 +1,36 @@
 #include "error.h"
+#include "thread_sched.h"
 
-uint32 error_create(uint32 value)
+// private functions
+
+void clear_last_error()
 {
-	return value;  // TODO: further adjustments to globalify errors
+	*thread_get_error(thread_get_current()) = 0;
 }
 
-void set_last_error(uint32 error)
+uint32 error_create(uint8 base_code, uint16 extended_code, uint8 code_origin)
 {
+	uint32 value = (((uint32)code_origin) << 24) | (((uint32)extended_code) << 8) | (code_origin);		// properly format the error value
+	return value;
+}
+
+// public functions
+
+uint32 set_last_error(uint8 base_code, uint16 extended_code, uint8 code_origin)
+{
+	uint32 error = error_create(base_code, extended_code, code_origin);
 	*thread_get_error(thread_get_current()) = error;
+	return error;
 }
 
 uint32 get_last_error()
+{
+	uint32 temp = *thread_get_error(thread_get_current());
+	clear_last_error();
+	return temp;
+}
+
+uint32 get_raw_error()
 {
 	return *thread_get_error(thread_get_current());
 }

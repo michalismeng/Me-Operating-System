@@ -128,6 +128,17 @@ enum FAT_IOCTL_COMMANDS
 	FAT_CUT_FILE
 };
 
+enum FAT_ERROR
+{
+	FAT_NONE,
+	FAT_NO_CACHE,
+	FAT_BAD_NODE_STRUCTURE,
+	FAT_BAD_ARGUMENTS,
+	FAT_BAD_LAYOUT,
+	FAT_INVALID_83_NAME,
+	FAT_NO_CLUSTERS
+};
+
 typedef vector<uint32> fat_file_layout;
 
 struct fat_node_data
@@ -153,7 +164,7 @@ struct fat_mount_data
 vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node);
 
 // loads the file's, pointed by 'node', cluster chain
-vfs_result fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node);
+error_t fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node);
 
 
 uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster);
@@ -168,8 +179,8 @@ void fat_fs_generate_short_name(vfs_node* node, char name[12]);
 
 vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* name, uint32 vfs_attributes);
 
-vfs_result fat_fs_delete_node(vfs_node* mount_point, vfs_node* node);
+error_t fat_fs_delete_node(vfs_node* mount_point, vfs_node* node);
 
-vfs_result fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory);
+error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* directory);
 
 #endif

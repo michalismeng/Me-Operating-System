@@ -37,7 +37,7 @@ void* realloc(void* ptr, uint32 new_size)
 	return addr;
 }
 
-virtual_addr mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
+virtual_addr vfs_mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
 {
 	PCB* proc = (PCB*)_proc;
 
@@ -65,7 +65,7 @@ virtual_addr mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offset, u
 	return area.start_addr;
 }
 
-virtual_addr mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
+virtual_addr vfs_mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot)
 {
 	if (prot > 0xF)		// protection flags failed
 		return MAP_FAILED;

@@ -181,6 +181,10 @@ void page_fault_bottom(thread_exception te)
 			if ((used_cache = vfs_read_file(area.fd, entry->file_node, read_start, PAGE_SIZE, -1)) == 0)
 				PANIC("mmap shared file failed");
 
+			serial_printf("used cache is: %h\n", used_cache);
+			used_cache = page_cache_get_buffer(area.fd, read_start / PAGE_SIZE);
+			serial_printf("used cache is: %h\n", used_cache);
+
 			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), DEFAULT_FLAGS);
 		}
 	}

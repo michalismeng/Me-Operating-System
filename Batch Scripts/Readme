@@ -1,2 +1,0 @@
-The files contained in this folder are used to build only the booting x86 assembly part of the operating system using nasm and run the kernel.
-They contain absolute directory paths and will not work on any computer without proper changes.

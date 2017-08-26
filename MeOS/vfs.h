@@ -7,6 +7,7 @@
 #include "list.h"
 #include "MassStorageDefinitions.h"
 #include "Debugger.h"
+#include "error.h"
 
 enum VFS_ATTRIBUTES
 {
@@ -39,18 +40,17 @@ enum VFS_ERROR
 // vfs node structures
 
 struct vfs_node;
-typedef int vfs_result;
 typedef char* deep_metadata;
 
 struct fs_operations
 {
-	uint32(*fs_read)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-	uint32(*fs_write)(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-	vfs_result(*fs_open)(vfs_node* node);
-	vfs_result(*fs_close)();
-	vfs_result(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);			// page end is end or past end?
-	vfs_result(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
-	vfs_result(*fs_ioctl)(vfs_node* node, uint32 command, ...);
+	size_t(*fs_read)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+	size_t(*fs_write)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+	error_t(*fs_open)(vfs_node* node);
+	error_t(*fs_close)();
+	error_t(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);			// page end is end or past end?
+	error_t(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
+	error_t(*fs_ioctl)(vfs_node* node, uint32 command, ...);
 };
 
 struct vfs_node
@@ -109,23 +109,23 @@ vfs_node* vfs_find_node(char* path);
 // initialize the virtual file system
 void init_vfs();
 
-// include read and write to and from page-cache functions
-uint32 vfs_read_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
-
 // opens a file for operations. (Loads its drive layout)
-vfs_result vfs_open_file(vfs_node* node);
+error_t vfs_open_file(vfs_node* node);
+
+// include read and write to and from page-cache functions
+size_t vfs_read_file(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 
 // writes to an opened file
-uint32 vfs_write_file(int fd, vfs_node* node, uint32 start, uint32 count, virtual_addr address);
+size_t vfs_write_file(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 
 // syncs the in memory changes to the underlying drive
-vfs_result vfs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
+error_t vfs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
 
 // looks down the path from parent until found or returns failure
-vfs_result vfs_lookup(vfs_node* parent, char* path, vfs_node** result);
+error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result);
 
 // begins a vfs_lookup operation at the root node
-vfs_result vfs_root_lookup(char* path, vfs_node** result);
+error_t vfs_root_lookup(char* path, vfs_node** result);
 
 // vfs debug print functions
 void print_vfs(vfs_node* node, int level);
