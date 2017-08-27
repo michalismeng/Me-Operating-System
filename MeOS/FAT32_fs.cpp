@@ -417,7 +417,7 @@ bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
 	// because this is a mass storage data exchange, the fd represents the high lba address to read (for now it is zero).
 	// the count is 8 sectors !!
 
-	if (vfs_read_file(0, mount_point->tag, lba, 8, vmmngr_get_phys_addr(address)) != 8)
+	if (vfs_read_file(0, mount_point->tag, lba, 8, /*vmmngr_get_phys_addr*/(address)) != 8)
 		return false;
 
 	return true;
@@ -433,7 +433,7 @@ bool fat_fs_write_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address
 		return false;
 	}
 	
-	if(vfs_write_file(0, mount_point->tag, lba, 8, vmmngr_get_phys_addr(address)) != 8)
+	if(vfs_write_file(0, mount_point->tag, lba, 8, /*vmmngr_get_phys_addr*/(address)) != 8)
 		return false;
 
 	return true;
@@ -752,19 +752,26 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	// hard code partition code...
 	// TODO: move this part at partition/filesystem identification
 
-	mass_storage_info* info = (mass_storage_info*)dev_node->deep_md;
+	virtual_addr cache = page_cache_reserve_anonymous();
 
-	// get the primary partition offset
-	fat_mbr* buffer = (fat_mbr*)mass_storage_read(info, 0, 0, 1, 0);
-	uint32 partiton_offset = buffer->primary_partition.lba_offset;
+	// get the primary partition offset (read the first sector into the 8-sector-cache reserved)
+	if (vfs_read_file(0, dev_node, 0, 1, cache) != 1)
+		return 0;
+
+	uint32 partiton_offset = ((fat_mbr*)cache)->primary_partition.lba_offset;
 
 	// get the volume id of the primary partition
-	fat_volume_id* volume = (fat_volume_id*)mass_storage_read(info, partiton_offset, 0, 1, 0);
+	if (vfs_read_file(0, dev_node, partiton_offset, 1, cache) != 1)
+		return 0;
+
+	fat_volume_id* volume = (fat_volume_id*)cache;
 
 	// gather important data
 	uint32 fat_lba = partiton_offset + volume->reserved_sector_count;
 	uint32 cluster_lba = fat_lba + volume->number_FATs * volume->extended.sectors_per_FAT;
 	uint32 root_dir_first_cluster = volume->extended.root_cluster_lba;
+
+	page_cache_release_anonymous(cache);
 
 	// create the vfs mount point node and get the mount data pointer
 	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, NULL, &fat_mount_operations);

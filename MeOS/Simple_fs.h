@@ -1,6 +1,8 @@
 #ifndef SIMPLE_FS_H_26072016
 #define SIMPLE_FS_H_26072016
 
+/* ----- THIS MODULE IS DEPRECATED AND WILL BE REMOVED */
+
 #include "vfs.h"
 
 #ifdef __cplusplus

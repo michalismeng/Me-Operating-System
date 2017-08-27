@@ -220,14 +220,14 @@ void keyboard_fancy_function()
 					PANIC("Could not write text file");
 
 				serial_printf("read: %s\n", __temp);
-				//for (int i = 0; i < 5; i++)
-				//	__temp[i] = 'b' + i;
+				/*for (int i = 0; i < 5; i++)
+					__temp[i] = 'c' + i;
 
-				//if (write_file(___fd, 0, 5, (virtual_addr)__temp) != 5)
-				//	PANIC("Could not write text file");
+				if (write_file(___fd, 0, 5, (virtual_addr)__temp) != 5)
+					PANIC("Could not write text file");
 
-				//if (sync_file(___fd, 0, 0) != VFS_OK)
-				//	PANIC("Could not sync text file");
+				if (sync_file(___fd, 0, 0) != VFS_OK)
+					PANIC("Could not sync text file");*/
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
