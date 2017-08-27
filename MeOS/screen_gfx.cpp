@@ -19,10 +19,10 @@ uint32 foreground = 0, background = 0;
 
 bool screen_initialized = false;
 
-uint32 screen_gfx_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result screen_gfx_open(vfs_node* node);
-uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
+error_t screen_gfx_open(vfs_node* node);
+size_t screen_gfx_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t screen_gfx_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
 
 
 // file operations
@@ -37,25 +37,25 @@ static fs_operations screen_gfx_operations =
 	screen_gfx_ioctl		// ioctl?
 };
 
-uint32 screen_gfx_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t screen_gfx_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	serial_printf("WARNING: tried to read from screen\n");
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-vfs_result screen_gfx_open(vfs_node* node)
+error_t screen_gfx_open(vfs_node* node)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t screen_gfx_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	uint8* ptr = ((uint8*)address) + start;
-	uint32 res;
+	size_t res;
 
 	if (count != 0)
 	{
-		for (uint32 i = 0; i < count; i++)
+		for (size_t i = 0; i < count; i++)
 			draw_char(ptr[i]);
 
 		res = count;
@@ -65,15 +65,15 @@ uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virt
 		while (*ptr != 0)
 			draw_char(*ptr++);
 
-		res = (uint32)ptr - address;
+		res = (size_t)ptr - address;
 	}
 
 	return res;
 }
 
-vfs_result screen_gfx_ioctl(vfs_node* node, uint32 command, ...)
+error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 point make_point(uint16 x, uint16 y)

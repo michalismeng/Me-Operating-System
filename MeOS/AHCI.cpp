@@ -3,15 +3,84 @@
 
 // private data and helper function
 
+#define NODE_INFO(x) ((ahci_storage_info*)x->deep_md)
+
 HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci controller
 uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
 
 char buffer[4096];			// TODO: Make one page buffer more lovely
 
+//error_t ahci_open(vfs_node* node);
+size_t ahci_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t ahci_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+//error_t ahci_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
+error_t ahci_ioctl(vfs_node* node, uint32 command, ...);
+
+AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD count, BYTE PTR buf, bool read);
+
 static fs_operations AHCI_fs_operations =
 {
+	ahci_fs_read,		// read
+	ahci_fs_write,		// write
+	NULL,				// open
+	NULL,				// close
+	NULL,				// sync
+	NULL,				// lookup
+	ahci_ioctl			// ioctl
 };
+
+size_t ahci_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+{
+	if (file == 0 || file->deep_md == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE)
+	{
+		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
+
+	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
+
+	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
+	{
+		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
+
+	// TODO: Standardize
+	if (ahci_data_transfer(port, start, high_lba, count, (BYTE PTR)address, true) == AHCI_NO_ERROR)
+		return count;
+
+	return 0;
+}
+
+size_t ahci_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+{
+	if (file == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE || NODE_INFO(file) == 0)
+	{
+		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
+	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
+
+	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
+	{
+		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
+
+	// TODO: Standardize
+	if (ahci_data_transfer(port, start, high_lba, count, (BYTE*)address, false) == AHCI_NO_ERROR)
+		return count;
+
+	return 0;
+}
+
+error_t ahci_ioctl(vfs_node* node, uint32 command, ...)
+{
+	return ERROR_OK;
+}
 
 void* ahci_main(uint32 ahci_command, ...)
 {
@@ -150,7 +219,10 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 	if (read)
 		cmdfis->command = 0x25;//0xc8;
 	else
+	{
 		cmdfis->command = 0x35;
+		serial_printf("writing to device\n");
+	}
 
 	cmdfis->lba0 = (BYTE)startl;
 	cmdfis->lba1 = (BYTE)(startl >> 8);
@@ -200,28 +272,6 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 	port->ci = 0;
 
 	return AHCI_NO_ERROR;
-}
-
-int ahci_mass_storage_read(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
-{
-	HBA_PORT_t* port = &abar->ports[info->volume_port];
-	BYTE PTR buf = (BYTE PTR)address;
-
-	if (ahci_is_port_ok(info->volume_port) == false)
-		return PORT_NOT_OK;
-
-	return ahci_data_transfer(port, startl, starth, count, buf, true);
-}
-
-int ahci_mass_storage_write(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
-{
-	HBA_PORT_t* port = &abar->ports[info->volume_port];
-	BYTE PTR buf = (BYTE PTR)address;
-
-	if (ahci_is_port_ok(info->volume_port) == false)
-		return PORT_NOT_OK;
-
-	return ahci_data_transfer(port, startl, starth, count, buf, false);
 }
 
 void ahci_callback(registers_t* regs)
@@ -304,10 +354,10 @@ void ahci_setup_vfs_port(uint8 port_num)
 	dev_dmd->storage_info.volume_size = *(uint32*)(ptr + 60);
 	memcpy(dev_dmd->storage_info.serial_number, ptr + 10, 20);
 	dev_dmd->storage_info.sector_size = 512;
-	dev_dmd->storage_info.entry_point = ahci_main;
+	dev_dmd->storage_info.entry_point = ahci_main;						// TODO: Render this obsolete
 	dev_dmd->volume_port = port_num;
-	dev_dmd->storage_info.read = (mass_read)ahci_mass_storage_read;
-	dev_dmd->storage_info.write = (mass_write)ahci_mass_storage_write;
+	//dev_dmd->storage_info.read = (mass_read)ahci_mass_storage_read;    these are not longre useful, use vfs api calls
+	//dev_dmd->storage_info.write = (mass_write)ahci_mass_storage_write;
 }
 
 void ahci_port_rebase(uint8 port_num)
@@ -371,7 +421,7 @@ AHCIResult ahci_read(uint8 port_num, DWORD startl, DWORD starth, DWORD count, VO
 	BYTE PTR buf = (BYTE PTR)_buf;
 
 	if (ahci_is_port_ok(port_num) == false)
-		return PORT_NOT_OK;
+		return AHCI_PORT_NOT_OK;
 
 	return ahci_data_transfer(port, startl, starth, count, buf, true);
 }
@@ -392,7 +442,7 @@ AHCIResult ahci_write(uint8 port_num, DWORD startl, DWORD starth, DWORD count, V
 	BYTE PTR buf = (BYTE PTR)_buf;
 
 	if (ahci_is_port_ok(port_num) == false)
-		return PORT_NOT_OK;
+		return AHCI_PORT_NOT_OK;
 
 	return ahci_data_transfer(port, startl, starth, count, buf, false);
 }

@@ -12,7 +12,8 @@
 
 */
 
-#define ERROR_OK 0		// No error occured
+#define ERROR_OK		0			// No error occured
+#define ERROR_OCCUR		1			// Some error, use get_last_error to check
 
 typedef uint32 error_t;
 
@@ -159,7 +160,8 @@ enum ERROR_ORIGIN
 	EO_VMMNGR,				// virtual memory manager component
 	EO_PMMNG,				// physical memory manager component
 	EO_FS,					// filesystem (unknown) component
-	EO_MASS_STORAGE_FS		// mass storage filesystem component
+	EO_MASS_STORAGE_FS,		// mass storage filesystem component,
+	EO_MASS_STORAGE_DEV		// mass storage device component
 };
 
 /* The error lives in the thread stack so it is accessible from user-land */

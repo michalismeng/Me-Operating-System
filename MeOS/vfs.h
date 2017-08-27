@@ -42,14 +42,30 @@ enum VFS_ERROR
 struct vfs_node;
 typedef char* deep_metadata;
 
+// File system node operations
 struct fs_operations
 {
+	// Attempts to read up to 'count' bytes from the fd and returns the number read.
+	// A value of zero may imply no data to read. Use get_last_error to check for errors.
 	size_t(*fs_read)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+
+	// Attempts to write up to 'count' bytes to the fd and returns the number written.
+	// A value of zero may imply full buffer. Use get_last_error to check for errors.
 	size_t(*fs_write)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+
+	// Opens the file pointed by node
 	error_t(*fs_open)(vfs_node* node);
+
+	// TODO: Closes the file. Implement...
 	error_t(*fs_close)();
-	error_t(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);			// page end is end or past end?
+
+	// Syncs any temporarily saved data to the underlying device. 
+	error_t(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
+
+	// Looks up for a node based on a current path.
 	error_t(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
+
+	// Call functions specific to each node.
 	error_t(*fs_ioctl)(vfs_node* node, uint32 command, ...);
 };
 

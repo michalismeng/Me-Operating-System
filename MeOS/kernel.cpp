@@ -133,7 +133,7 @@ TCB* thread_test_time;
 TCB* create_test_process(int fd);
 
 extern char* ___buffer;
-char __temp[4096];
+char __temp[4096] = {'a', 'b', 'c', 'd', 0};
 
 void keyboard_fancy_function()
 {
@@ -171,6 +171,25 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_P)
 			{
+				/*for (int i = 0; i < 4096; i++)
+					__temp[i] = 'b';
+
+				int ___fd;
+				if(open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
+					PANIC("Could not open text file");
+
+				virtual_addr cache = page_cache_reserve_buffer(lft_get(&process_get_current()->lft, ___fd)->gfd, 0);
+
+				for (int i = 0; i < 4096; i++)
+					((char*)cache)[i] = __temp[i];
+
+				error_t e = fat_fs_sync(lft_get(&process_get_current()->lft, ___fd)->gfd, gft_get(lft_get(&process_get_current()->lft, ___fd)->gfd)->file_node,
+					0, 0);
+
+				serial_printf("error: %u", e);*/
+
+
+				//serial_printf("write result: %u\n", ahci_write(2, 0, 0, 512, (void*)vmmngr_get_phys_addr((virtual_addr)__temp)));
 				/*int ___fd;
 				if (open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
 					PANIC("Could not open text file");
@@ -193,6 +212,22 @@ void keyboard_fancy_function()
 
 				page_cache_print();*/
 
+				int ___fd;
+				if(open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
+					PANIC("Could not open text file");
+
+				if(read_file(___fd, 0, 12, (virtual_addr)__temp) != 12)
+					PANIC("Could not write text file");
+
+				serial_printf("read: %s\n", __temp);
+				//for (int i = 0; i < 5; i++)
+				//	__temp[i] = 'b' + i;
+
+				//if (write_file(___fd, 0, 5, (virtual_addr)__temp) != 5)
+				//	PANIC("Could not write text file");
+
+				//if (sync_file(___fd, 0, 0) != VFS_OK)
+				//	PANIC("Could not sync text file");
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
@@ -452,35 +487,16 @@ void proc_init_thread()
 
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
 
-	// standardize this!
+	// TODO: standardize this!
 	vbe_mode_info_block* vbe = (vbe_mode_info_block*)(0x2000);
 
 	//ClearScreen();
 
-	/*dl_list<int> test;
-	dl_list_init(&test);
-
-	auto x1 = new dl_list_node<int>{ 1, 0, 0 }, x2 = new dl_list_node<int>{ 2, 0, 0 }, x3 = new dl_list_node<int>{ 3, 0, 0 }, x4 = new dl_list_node<int>{ 4, 0, 0 };
-
-	dl_list_insert_back_node(&test, x1);
-	dl_list_insert_back_node(&test, x2);
-	dl_list_insert_back_node(&test, x3);
-	dl_list_insert_back_node(&test, x4);
-
-	dl_list_remove_node(&test, x1);
-
-	printfln("data: %u", dl_list_find_node(&test, 3)->data);
-
-	for (auto temp = test.head; temp != 0; temp = temp->next)
-		printf("%u ", temp->data);
-	printfln("");
-
-	PANIC("");*/
 	init_vfs();
 
 	_abar = PCIFindAHCI();
 
-	uint32 ahci_base = 0x300000;
+	uint32 ahci_base = 0x200000;
 	init_ahci(_abar, ahci_base);
 
 	page_cache_init(2 GB, 20, 16);

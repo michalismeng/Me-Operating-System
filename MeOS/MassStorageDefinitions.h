@@ -25,8 +25,8 @@ struct mass_storage_info
 	uint32 vendor_number;							// volume vendor identifier
 	void* (*entry_point)(uint32 command, ...);		// pointer to driver entry point
 
-	mass_read read;
-	mass_write write;
+	//mass_read read;
+	//mass_write write;
 };
 
 extern "C" void* mass_storage_read(mass_storage_info* info, uint32 start_low, uint32 start_high, uint32 count, physical_addr address);

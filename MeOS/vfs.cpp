@@ -329,12 +329,12 @@ size_t vfs_write_file(int fd, vfs_node* node, uint32 start, size_t count, virtua
 
 	// TODO: Check read permissions
 	uint32 written = node->fs_ops->fs_write(fd, node, start, count, address);
-	if (start + written > node->file_length)
+	/*if (start + written > node->file_length)
 	{
-		//printfln("new length: %u", start + written);
+		serial_printf("new length: %u", start + written);
 		node->file_length = start + written;
 		node->fs_ops->fs_ioctl(node, 0);
-	}
+	}*/
 
 	return written;
 }
