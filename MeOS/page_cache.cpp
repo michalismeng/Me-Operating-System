@@ -65,7 +65,7 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 	return finfo;
 }
 
-_page_cache_file* page_cache_get_file(int fd)
+_page_cache_file* page_cache_get_file(uint32 fd)
 {
 	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
 		if (page_cache.cached_files[i].gfd == fd)
@@ -101,7 +101,7 @@ void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_
 	page_cache_index_reserve_buffer(page_cache_index_by_addr(last_buffer));
 }
 
-virtual_addr page_cache_get_buffer(int gfd, uint32 page)
+virtual_addr page_cache_get_buffer(uint32 gfd, uint32 page)
 {
 	_page_cache_file* file = &page_cache.cached_files[gfd];
 
@@ -152,7 +152,7 @@ void page_cache_release_anonymous(virtual_addr address)
 	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
 }
 
-virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
+virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 {
 	virtual_addr address = page_cache_reserve_anonymous();
 
@@ -171,7 +171,7 @@ virtual_addr page_cache_reserve_buffer(int gfd, uint32 page)
 }
 
 // TODO: Replace common functionality with release anonymous
-void page_cache_release_buffer(int gfd, uint32 page)
+void page_cache_release_buffer(uint32 gfd, uint32 page)
 {
 	virtual_addr buffer = page_cache_get_buffer(gfd, page);
 	uint32 index = page_cache_index_by_addr(buffer);
@@ -217,9 +217,7 @@ void page_cache_release_buffer(int gfd, uint32 page)
 	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
 }
 
-
-
-void page_cache_register_file(int gfd)
+void page_cache_register_file(uint32 gfd)
 {
 	// TODO: This is true only if no descriptor is removed and then replaced
 	// this is a new descriptor
@@ -262,7 +260,7 @@ void page_cache_register_file(int gfd)
 	//}
 }
 
-void page_cache_unregister_file(int gfd)
+void page_cache_unregister_file(uint32 gfd)
 {
 	if (gfd >= page_cache.cached_files.count)		// kinda erroneous gfd
 	{

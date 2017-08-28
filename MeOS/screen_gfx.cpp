@@ -9,7 +9,7 @@ const int FONT_CHAR_WIDTH = 8, FONT_CHAR_PAD = 1, FONT_CHAR_HEIGHT = 16, FONT_EN
 const int FONT_SIZE = (FONT_CHAR_WIDTH + FONT_CHAR_PAD) * FONT_CHAR_HEIGHT * FONT_ENTRIES;
 
 char font[FONT_SIZE];
-int font_fd;
+uint32 font_fd;
 
 vbe_mode_info_block* vbe;
 
@@ -20,8 +20,8 @@ uint32 foreground = 0, background = 0;
 bool screen_initialized = false;
 
 error_t screen_gfx_open(vfs_node* node);
-size_t screen_gfx_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
-size_t screen_gfx_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
 
 
@@ -37,7 +37,7 @@ static fs_operations screen_gfx_operations =
 	screen_gfx_ioctl		// ioctl?
 };
 
-size_t screen_gfx_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	serial_printf("WARNING: tried to read from screen\n");
 	return ERROR_OK;
@@ -48,7 +48,7 @@ error_t screen_gfx_open(vfs_node* node)
 	return ERROR_OK;
 }
 
-size_t screen_gfx_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	uint8* ptr = ((uint8*)address) + start;
 	size_t res;
@@ -92,7 +92,7 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 	uint32 frame_length = vbe->pitch * vbe->height;
 
 	if (!vfs_mmap(vbe->framebuffer & (~0xFFF), INVALID_FD, 0, frame_length + PAGE_SIZE - (frame_length % PAGE_SIZE), 
-		MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
+		PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE) == MAP_FAILED)
 		PANIC("Could not map screen region");
 
 	load_default_font();

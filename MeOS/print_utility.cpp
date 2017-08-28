@@ -1,7 +1,7 @@
 #include "print_utility.h"
 #include "file.h"
 
-int screen_fd;
+uint32 screen_fd;
 
 char x[4096 * 5];
 

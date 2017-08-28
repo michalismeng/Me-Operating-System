@@ -161,8 +161,12 @@ enum ERROR_ORIGIN
 	EO_PMMNG,				// physical memory manager component
 	EO_FS,					// filesystem (unknown) component
 	EO_MASS_STORAGE_FS,		// mass storage filesystem component,
-	EO_MASS_STORAGE_DEV		// mass storage device component
+	EO_MASS_STORAGE_DEV,	// mass storage device component,
+	EO_FILE_INTERFACE		// file interface (file.h) component
 };
+
+// defines the alphabetic names of the above error origins
+extern const char* ERROR_ORIGIN_STR[];
 
 /* The error lives in the thread stack so it is accessible from user-land */
 

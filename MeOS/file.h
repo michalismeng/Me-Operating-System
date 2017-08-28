@@ -14,21 +14,27 @@ enum FILE_OPEN_FLAGS
 	O_CACHE_ONLY = 2			// when set, any data transfered from a mass storage media to the page cache, remain there and are not copied to the requested address (address is ignored).
 };
 
+enum FILE_ERROR
+{
+	FILE_NONE,
+	FILE_GFD_NOT_FOUND
+};
+
 	/* Defines the standard file io API */
 
 	// opens a file and associates a local file descriptor with it
-	uint32 open_file(char* path, int* fd, uint32 flags);
+	error_t open_file(char* path, uint32* fd, uint32 flags);
 
 	// opens a file indicated by the given node and associates a local and a global file descriptor with it
-	uint32 open_file_by_node(vfs_node* node, int* fd);
+	error_t open_file_by_node(vfs_node* node, uint32* fd);
 
 	// reads the file, given its global file descriptor, to the given buffer
-	uint32 read_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
+	size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);
 
 	// writes to the file, given its global file descriptor, from the given buffer
-	uint32 write_file(int fd, uint32 start, uint32 count, virtual_addr buffer);
+	size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);
 
 	// syncs the file, given its global file descriptor
-	uint32 sync_file(int fd, uint32 start_page, uint32 end_page);
+	error_t sync_file(uint32 fd, uint32 start_page, uint32 end_page);
 
 #endif

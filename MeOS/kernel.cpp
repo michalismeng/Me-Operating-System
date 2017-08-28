@@ -130,7 +130,7 @@ void idle()
 
 TCB* thread_test_time;
 
-TCB* create_test_process(int fd);
+TCB* create_test_process(uint32 fd);
 
 extern char* ___buffer;
 char __temp[4096] = {'a', 'b', 'c', 'd', 0};
@@ -140,7 +140,7 @@ void keyboard_fancy_function()
 	for (int i = 0; i < 255; i++)
 		printf("%c", i);
 	printfln("");
-	int fd;
+	uint32 fd;
 	if (open_file("dev/keyboard", &fd, 0) != VFS_OK)
 	{
 		printfln("error occured: %u", get_last_error());
@@ -212,7 +212,7 @@ void keyboard_fancy_function()
 
 				page_cache_print();*/
 
-				int ___fd;
+				uint32 ___fd;
 				if(open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
 					PANIC("Could not open text file");
 
@@ -232,8 +232,16 @@ void keyboard_fancy_function()
 			else if (c == KEYCODE::KEY_L)
 			{
 				clear_screen();
-				int test_proc;
+				uint32 test_proc;
 				page_cache_print();
+
+				// test error printing
+				if (open_file("sdc_mount/noent/TEST.EXE", &test_proc, 0) != ERROR_OK)
+				{
+					serial_printf("error: %e", get_last_error());
+					PANIC("could not open text.exe");
+
+				}
 
 				/*for (int i = 0; i < 256; i++)
 					printf("%c", i);
@@ -242,7 +250,7 @@ void keyboard_fancy_function()
 				if (open_file("sdc_mount/TEXT.TXT", &test_proc, O_CACHE_ONLY) != VFS_OK)
 					PANIC("could not open text.exe");
 
-				if(vfs_mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, MMAP_SHARED, PROT_READ | PROT_WRITE) == MAP_FAILED)
+				if(vfs_mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, PROT_READ | PROT_WRITE, MMAP_SHARED) == MAP_FAILED)
 					PANIC("Could not map file");
 
 				
@@ -290,7 +298,7 @@ void keyboard_fancy_function()
 				while (true)
 				{
 					read_file(fd, 0, 1, (virtual_addr)&c);
-					draw_char(c);
+					draw_char(kybrd_key_to_ascii((KEYCODE)c));
 					if (c == 'r')
 						draw_rectangle(make_point(100, 100), make_point(400, 400), colors[ind++ % 2]);
 				}
@@ -312,7 +320,7 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_D)
 			{
-				int __fd;
+				uint32 __fd;
 				if (open_file("sdc_mount/TEXT.TXT", &__fd, 0) != VFS_OK)
 					PANIC("could not open text.exe");
 
@@ -336,7 +344,7 @@ void keyboard_fancy_function()
 
 char* ___buffer;
 _pipe pipe;
-int fd[2];
+uint32 fd[2];
 
 void test3()
 {
@@ -403,7 +411,7 @@ void enter_user_mode(uint32 stack, uint32 entry)
 // sets up a process and initializes the first thread and its stacks (kernel + user)
 void kernel_setup_process()
 {
-	if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER, PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER) == MAP_FAILED)
 		PANIC("Cannot map stack");
 
 	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
@@ -413,7 +421,7 @@ void kernel_setup_process()
 	for (;;);
 }
 
-TCB* create_test_process(int fd)
+TCB* create_test_process(uint32 fd)
 {
 	PCB* proc = process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
 
@@ -444,9 +452,10 @@ TCB* create_test_process(int fd)
 		serial_printf("mmaping fd: %u to %h, size of raw: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
 			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 
+		// TODO: Remember vfs_map_p prot and flags were reversed in the definition and this function is not cheched if working.
 		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
 			lft_get(&process_get_current()->lft, fd)->gfd, section->PointerToRawData, 4096,
-			MMAP_PRIVATE | MMAP_USER, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+			PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_USER) == MAP_FAILED)
 		{
 			serial_printf("address: %h size %h", section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 			PANIC("Could not map for process");
@@ -468,11 +477,11 @@ void proc_init_thread()
 	printfln("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
-	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, MMAP_PRIVATE | MMAP_ANONYMOUS, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS) == MAP_FAILED)
 		PANIC("Could not map kernel land");
 
 	// memory map MMIO
-	if (vfs_mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP, PROT_NONE | PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (vfs_mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP) == MAP_FAILED)
 		PANIC("Could not map MMIO");
 
 	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes on read only page
@@ -481,9 +490,6 @@ void proc_init_thread()
 	// create a 16KB heap
 	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
-
-	/*if (mmap(4 MB, INVALID_FD, 0, 3 GB - 4 MB, VM_AREA_WRITE, 0) == MAP_FAILED)
-		PANIC("Could not map user land");*/
 
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
 
@@ -728,14 +734,14 @@ void proc_init_thread()
 
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
-	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
 	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
 	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
-	///////*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
-	//////thread_insert(thread); */
-	//////TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
-	//////thread_insert(thread);
-	//////thread_test_time = thread;
+	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
+	thread_insert(thread); */
+	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
+	thread_insert(thread);
+	thread_test_time = thread;
 	ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 

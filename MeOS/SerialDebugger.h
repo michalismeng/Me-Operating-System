@@ -1,6 +1,8 @@
 #ifndef SERIAL_DEBUGGER_H_25072016
 #define SERIAL_DEBUGGER_H_25072016
 
+#include "error.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

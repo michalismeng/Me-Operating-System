@@ -21,7 +21,7 @@ bool _kybrd_disable = false;
 
 TCB* keyboard_daemon = 0;
 TCB* active = 0;
-size_t kybd_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 error_t kybd_open(vfs_node* node);
 error_t kybd_ioctl(vfs_node* node, uint32 command, ...);
 
@@ -36,7 +36,7 @@ static fs_operations kybd_operations =
 	kybd_ioctl		// ioctl?
 };
 
-size_t kybd_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	uint8* buffer = (uint8*)address;
 	active = thread_get_current();

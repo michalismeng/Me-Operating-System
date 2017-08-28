@@ -31,8 +31,8 @@ extern "C" {
 // pref if not nulled is the preffered address to load the start-length file data
 // flags represent various file mapping attributes
 // prot is the protection level
-virtual_addr vfs_mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot);
-virtual_addr vfs_mmap_p(void* proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 flags, uint32 prot);
+virtual_addr vfs_mmap(virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 prot, uint32 flags);
+virtual_addr vfs_mmap_p(void* proc, virtual_addr pref, uint32 gfd, uint32 offset, uint32 length, uint32 prot, uint32 flags);
 
 
 #endif

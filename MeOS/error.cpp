@@ -14,6 +14,18 @@ uint32 error_create(uint8 base_code, uint16 extended_code, uint8 code_origin)
 	return value;
 }
 
+extern const char* ERROR_ORIGIN_STR[] =
+{
+	"",						// one dummy entry to match the above enum
+	"VFS",
+	"VMMNGR",
+	"PMMNGR",
+	"FS",
+	"MASS STORAGE FS",
+	"MASS STORAGE DEV",
+	"FILE INTERFACE"
+};
+
 // public functions
 
 uint32 set_last_error(uint8 base_code, uint16 extended_code, uint8 code_origin)

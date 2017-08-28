@@ -7,15 +7,15 @@
 #define LAYOUT(n) ((fat_file_layout*)n->deep_md)
 
 error_t fat_fs_open(vfs_node* node);
-size_t fat_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
-size_t fat_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
-error_t fat_fs_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
+size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+error_t fat_fs_sync(uint32 fd, vfs_node* file, uint32 start_page, uint32 end_page);
 error_t fat_fs_ioctl(vfs_node* node, uint32 command, ...);
 
 
-error_t fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache);
+error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache);
 bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
-size_t fat_node_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t fat_node_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
 
 // file operations
@@ -162,7 +162,7 @@ bool fat_fs_validate_83_name(char* name, uint32 length)
 
 #pragma endregion
 
-error_t fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
+error_t fat_fs_custom_cache_read(uint32 fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
 {
 	vfs_node* mount_point = file->tag;
 
@@ -178,7 +178,7 @@ error_t fat_fs_custom_cache_read(int fd, vfs_node* file, uint32 page, virtual_ad
 
 #pragma region VFS API Implementation
 
-size_t fat_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (!file->tag->tag)
 	{
@@ -263,7 +263,7 @@ size_t fat_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_a
 }
 
 //TODO: Do more testing with larger files...
-size_t fat_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (!file->tag->tag)
 	{
@@ -342,7 +342,7 @@ error_t fat_fs_open(vfs_node* node)
 }
 
 // TODO: When a page is outside the layout of a file (the file has been extended due to new data), reserve a new sector for it.
-error_t fat_fs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end)
+error_t fat_fs_sync(uint32 fd, vfs_node* file, uint32 page_start, uint32 page_end)
 {
 	vfs_node* mount_point;
 	vfs_node* device;
@@ -512,7 +512,7 @@ uint32 fat_fs_get_entry_data_cluster(fat_dir_entry_short* e)
 /*************************************************************************************/
 
 
-size_t fat_node_write(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
+size_t fat_node_write(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
 {
 	uint32 page = NODE_DATA(node)->metadata_cluster;
 	uint32 offset = NODE_DATA(node)->metadata_index;
@@ -527,7 +527,7 @@ size_t fat_node_write(int fd, vfs_node* node, uint32 start, size_t count, virtua
 	return sizeof(fat_dir_entry_short);
 }
 
-error_t fat_fs_read_to_cache(int fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache)
 {
 	vfs_node* mount_point = file->tag;
 	virtual_addr cache = page_cache_get_buffer(fd, page);
@@ -980,7 +980,7 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 		return ERROR_OCCUR;
 	}
 
-	int fd;
+	uint32 fd;
 	// TODO: This may cause problems if the directory is being used elsewhere.
 	if (open_file_by_node(directory, &fd) != ERROR_OK)		// TODO: Close file
 	{
@@ -1092,7 +1092,7 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 		return 0;
 	}
 
-	int fd;
+	uint32 fd;
 	// TODO: This may cause problems if the directory is being used elsewhere.
 	if (open_file_by_node(directory, &fd) != VFS_OK)		// TODO: Close file
 	{

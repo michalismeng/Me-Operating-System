@@ -9,6 +9,8 @@
 #include "Debugger.h"
 #include "error.h"
 
+// TODO: formalize error here!
+
 enum VFS_ATTRIBUTES
 {
 	VFS_UNDEFINED,			// 00000
@@ -47,11 +49,11 @@ struct fs_operations
 {
 	// Attempts to read up to 'count' bytes from the fd and returns the number read.
 	// A value of zero may imply no data to read. Use get_last_error to check for errors.
-	size_t(*fs_read)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+	size_t(*fs_read)(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 
 	// Attempts to write up to 'count' bytes to the fd and returns the number written.
 	// A value of zero may imply full buffer. Use get_last_error to check for errors.
-	size_t(*fs_write)(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+	size_t(*fs_write)(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 
 	// Opens the file pointed by node
 	error_t(*fs_open)(vfs_node* node);
@@ -60,7 +62,7 @@ struct fs_operations
 	error_t(*fs_close)();
 
 	// Syncs any temporarily saved data to the underlying device. 
-	error_t(*fs_sync)(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
+	error_t(*fs_sync)(uint32 fd, vfs_node* file, uint32 page_start, uint32 page_end);
 
 	// Looks up for a node based on a current path.
 	error_t(*fs_lookup)(vfs_node* parent, char* path, vfs_node** result);
@@ -129,13 +131,13 @@ void init_vfs();
 error_t vfs_open_file(vfs_node* node);
 
 // include read and write to and from page-cache functions
-size_t vfs_read_file(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
+size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 
 // writes to an opened file
-size_t vfs_write_file(int fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
+size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 
 // syncs the in memory changes to the underlying drive
-error_t vfs_sync(int fd, vfs_node* file, uint32 page_start, uint32 page_end);
+error_t vfs_sync(uint32 fd, vfs_node* file, uint32 page_start, uint32 page_end);
 
 // looks down the path from parent until found or returns failure
 error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result);

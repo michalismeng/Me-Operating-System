@@ -11,8 +11,8 @@ uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
 
 //error_t ahci_open(vfs_node* node);
-size_t ahci_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
-size_t ahci_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 //error_t ahci_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
 error_t ahci_ioctl(vfs_node* node, uint32 command, ...);
 
@@ -29,10 +29,9 @@ static fs_operations AHCI_fs_operations =
 	ahci_ioctl			// ioctl
 };
 
-
 #pragma region VFS API IMPLEMENTATION
 
-size_t ahci_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (file == 0 || file->deep_md == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE)
 	{
@@ -56,7 +55,7 @@ size_t ahci_fs_read(int fd, vfs_node* file, uint32 start, size_t count, virtual_
 	return 0;
 }
 
-size_t ahci_fs_write(int fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
+size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	if (file == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE || NODE_INFO(file) == 0)
 	{
