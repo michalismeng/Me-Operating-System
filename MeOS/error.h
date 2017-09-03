@@ -15,8 +15,6 @@
 #define ERROR_OK		0			// No error occured
 #define ERROR_OCCUR		1			// Some error, use get_last_error to check
 
-typedef uint32 error_t;
-
 // defines the linux error codes (131 in total).
 // we use additional bytes to elaborate on the nature of the error, should the user require more information.
 // most of the errors defined below are not used but they are listed for completness.
@@ -158,7 +156,9 @@ enum ERROR_ORIGIN
 {
 	EO_VFS = 1,				// VFS component
 	EO_VMMNGR,				// virtual memory manager component
-	EO_PMMNG,				// physical memory manager component
+	EO_PMMNGR,				// physical memory manager component
+	EO_HMMNGR,				// heap memory manager
+	EO_MEMORY,				// memory wrapper functions
 	EO_FS,					// filesystem (unknown) component
 	EO_MASS_STORAGE_FS,		// mass storage filesystem component,
 	EO_MASS_STORAGE_DEV,	// mass storage device component,

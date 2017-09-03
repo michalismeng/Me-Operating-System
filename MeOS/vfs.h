@@ -42,7 +42,6 @@ enum VFS_ERROR
 // vfs node structures
 
 struct vfs_node;
-typedef char* deep_metadata;
 
 // File system node operations
 struct fs_operations

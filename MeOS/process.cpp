@@ -43,20 +43,21 @@ void thread_setup_stack(TCB* t, uint32 entry, uint32 esp, uint32 stack_size)
 
 // public functions
 
+// This function contains deprecated code and should never be called.
 uint32 process_create_s(char* app_name)
 {
 	PCB* p;
 	TCB* t;
+	uint8 buf[512];
 
-	FILE file = fsysSimpleDirectory(app_name);
+	/*FILE file = fsysSimpleDirectory(app_name);
 	if (file.flags == FS_INVALID)
 	{
 		DEBUG("File was not found.");
 		return 0;
 	}
 
-	uint8 buf[512];
-	fsysSimpleRead(&file, buf, 512);
+	fsysSimpleRead(&file, buf, 512);*/
 
 	/* validation of PE image */
 	if (!validate_PE_image(buf))
@@ -105,18 +106,18 @@ uint32 process_create_s(char* app_name)
 	memcpy(memory, buf, 512);
 
 	uint32 i = 1;
-	for (; i <= p->image_size / 512; i++)
+	/*for (; i <= p->image_size / 512; i++)
 	{
 		if (file.eof == true)
 			break;
 		fsysSimpleRead(&file, memory + 512 * i, 512);
-	}
+	}*/
 
 	printfln("image base: %h, size: %u entry at: %h", nt_header->OptionalHeader.ImageBase, nt_header->OptionalHeader.SizeOfImage, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase);
 	vmmngr_map_page(p->page_dir, (physical_addr)memory, nt_header->OptionalHeader.ImageBase, DEFAULT_FLAGS);
 
 	i = 1;
-	while (file.eof != true)
+	/*while (file.eof != true)
 	{
 		uint8* cur = (uint8*)pmmngr_alloc_block();
 		vmmngr_map_page(p->page_dir, (physical_addr)cur, nt_header->OptionalHeader.ImageBase + i * 4096, DEFAULT_FLAGS);
@@ -130,7 +131,7 @@ uint32 process_create_s(char* app_name)
 		}
 
 		i++;
-	}
+	}*/
 
 	void* stack = (void*)(nt_header->OptionalHeader.ImageBase + nt_header->OptionalHeader.SizeOfImage + 4096);
 	void* stack_phys = pmmngr_alloc_block();

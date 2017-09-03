@@ -7,7 +7,7 @@
 
 #include "keyboard.h"
 #include "SerialDebugger.h"
-#include "Simple_fs.h"
+//#include "Simple_fs.h"
 
 #include "PCI.h"
 #include "AHCI.h"
@@ -42,6 +42,7 @@
 #include "print_utility.h"
 
 extern "C" uint8 canOutput = 1;
+extern "C" int _fltused = 1;
 
 heap* kernel_heap = 0;
 HBA_MEM_t* _abar;
@@ -141,7 +142,7 @@ void keyboard_fancy_function()
 		printf("%c", i);
 	printfln("");
 	uint32 fd;
-	if (open_file("dev/keyboard", &fd, 0) != VFS_OK)
+	if (open_file("dev/keyboard", &fd, 0) != ERROR_OK)
 	{
 		printfln("error occured: %u", get_last_error());
 	}
@@ -851,37 +852,9 @@ void proc_init_thread()
 	}*/
 }
 
-extern "C" void test_handle(registers_t* regs);
-
-extern "C" int _fltused = 1;
-
-//extern "C" long __declspec (naked) _ftol2_sse() {
-//
-//	int a;
-//	_asm	fistp[a]
-//		_asm	mov	ebx, a
-//	_asm	ret
-//}
-//
-//extern "C" float __declspec(naked) _CIcos() {
-//	_asm fcos
-//};
-//
-//extern "C" float __declspec(naked) _CIsin() {
-//	_asm fsin
-//};
-//
-//extern "C" float __declspec(naked) _CIsqrt() {
-//	_asm fsqrt
-//};
-
 int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 {
 	boot_info = _boot_info;
-
-	printf("hello");
-
-	//printfln("LFA: %h",_boot_info->m_vbe_control_info);
 
 	INT_OFF;
 	init_descriptor_tables(k_info->gdt_base, k_info->isr_handlers, k_info->idt_base);
@@ -889,8 +862,6 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	init_pit_timer(50, timer_callback);
 	idt_set_gate(32, (uint32)scheduler_interrupt, 0x08, 0x8E);		// bypass the common interrupt handler to play with the stack
 	INT_ON;
-
-	//printf("Welcome to ME Operating System\n");
 
 	init_serial();
 
@@ -927,7 +898,7 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	vmmngr_initialize(pmmngr_get_next_align(k_info->kernel_size + 1) / 4096);
 	pmmngr_paging_enable(true);
 
-	fsysSimpleInitialize();
+	//fsysSimpleInitialize();
 
 	//ClearScreen();
 

@@ -27,6 +27,7 @@ typedef double float64;
 typedef uint32 size_t;
 typedef int32 ssize_t;
 
+typedef uint32 error_t;
 
 typedef uint8 BYTE;
 typedef uint16 WORD;

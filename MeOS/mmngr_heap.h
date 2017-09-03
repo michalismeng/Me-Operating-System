@@ -2,6 +2,7 @@
 #define MMNGR_HEAP_H_14082016
 
 #include "types.h"
+#include "error.h"
 #include "utility.h"
 #include "mmngr_virtual.h"
 
@@ -9,6 +10,14 @@
 
 #undef HEAP_ALLOC_FIRST_IMPLEMENT
 #undef HEAP_REALLOC_FIRST_IMPLEMENT
+
+enum HEAP_ERROR
+{
+	HEAP_NONE,
+	HEAP_BAD_MAGIC,
+	HEAP_BAD_ARGUMENT,
+	HEAP_OUT_OF_MEMORY
+};
 
 // Heap header block definition. (One per requested allocation)
 struct heap_block
@@ -35,7 +44,7 @@ heap* heap_create(virtual_addr base, uint32 size);
 void* heap_alloc(heap* h, uint32 size);
 
 // deallocates a previously allocated space. (May front-merge unused blocks)
-uint32 heap_free(heap* h, void* address);
+error_t heap_free(heap* h, void* address);
 
 // re-allocates a previously allocated space to take up 'new_size' space.
 void* heap_realloc(heap* h, void* address, uint32 new_size);

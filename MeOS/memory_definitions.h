@@ -40,4 +40,12 @@ enum MMAP_FLAGS
 	MMAP_INVALID = 1 << 16,
 };
 
+enum MEMORY_ERROR
+{
+	MEMORY_NONE,
+	лелоRу_BAD_PROTECTION,
+	MEMORY_BAD_FLAGS
+};
+
+
 #endif

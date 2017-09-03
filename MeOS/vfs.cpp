@@ -105,6 +105,9 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 {
 	vfs_node* n = (vfs_node*)malloc(sizeof(vfs_node) + deep_metadata_length);
 
+	if (n == 0)			// allocation failed
+		return 0;
+
 	list_init(&n->children);
 
 	n->name_length = strlen(name);
@@ -135,6 +138,12 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 	if (copy_name)
 	{
 		n->name = (char*)malloc(n->name_length + 1);		// deep copy name
+		if (n->name == 0)									// allocation failed
+		{
+			free(n);
+			return 0;
+		}
+
 		strcpy(n->name, name);
 	}
 	else
@@ -142,7 +151,7 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 
 	n->attributes = attributes;
 	n->file_length = file_length;
-	//n->is_open = false;										// by default file is closed and no operations can be done upon it
+	//n->is_open = false;									// by default file is closed and no operations can be done upon it
 
 	return n;
 }
@@ -156,8 +165,6 @@ vfs_node* vfs_get_root()
 {
 	return root;
 }
-
-// TODO: WRITE THESE TWO NOBLE FUNCTIONS!!!
 
 vfs_node* vfs_get_mount_point(vfs_node* node)
 {
@@ -182,7 +189,10 @@ vfs_node* vfs_find_relative_node(vfs_node* start, char* path)
 {
 	//expected path: something/folder/another_folder/file.txt  (or just something till a folder level). No leading slash
 	if (path == 0)
+	{
+		set_last_error(EINVAL, VFS_BAD_ARGUMENTS, EO_VFS);
 		return 0;
+	}
 
 	vfs_node* next = start;
 	char* slash;
@@ -207,10 +217,14 @@ vfs_node* vfs_find_relative_node(vfs_node* start, char* path)
 			path = slash + 1;					// continue to the next substring
 		}
 
-		if (next == 0)	// path could not be constructed. Child not found
+		if (next == 0)							// path could not be constructed. Child not found
+		{
+			set_last_error(ENOENT, VFS_PATH_NOT_FOUND, EO_VFS);
 			return 0;
+		}
 	}
 
+	// we should never reach here
 	return 0;
 }
 
