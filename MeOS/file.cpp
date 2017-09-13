@@ -1,5 +1,6 @@
 #include "file.h"
 #include "thread_sched.h"
+#include "print_utility.h"
 
 error_t open_file(char* path, uint32* fd, uint32 flags)
 {
@@ -7,9 +8,8 @@ error_t open_file(char* path, uint32* fd, uint32 flags)
 	vfs_node* node = 0;
 
 	// vfs find the node requested
-	error_t error = vfs_root_lookup(path, &node);
-	if (error)
-		return error;
+	if (vfs_root_lookup(path, &node) != ERROR_OK)
+		return ERROR_OCCUR;
 
 	node->flags = flags;
 
@@ -25,8 +25,8 @@ error_t open_file_by_node(vfs_node* node, uint32* local_fd)
 
 	uint32 global_fd = lft_get(&process_get_current()->lft, *local_fd)->gfd;
 
-	// TODO: Check what this is?? > 1 shouldn't it be == 1
-	if (gft_get(global_fd)->open_count > 1)
+	printfln("file: %s open count: %u", gft_get(global_fd)->file_node->name, gft_get(global_fd)->open_count);
+	if (gft_get(global_fd)->open_count == 1)
 		page_cache_register_file(global_fd);
 		
 	return vfs_open_file(node);

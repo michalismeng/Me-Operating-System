@@ -388,7 +388,10 @@ error_t vfs_open_file(vfs_node* node)
 error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result)
 {
 	if (!parent)
-		return VFS_INVALID_NODE;
+	{
+		set_last_error(EINVAL, VFS_INVALID_NODE, EO_VFS);
+		return ERROR_OCCUR;
+	}
 
 	if (parent->fs_ops->fs_lookup == 0)
 		return vfs_default_lookup(parent, path, result);

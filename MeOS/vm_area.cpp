@@ -27,9 +27,7 @@ void vm_area_init(vm_area* area)
 {
 	area->start_addr = area->end_addr = 0;
 	area->flags = MMAP_INVALID;
-
-	//TODO: Change this to the upcoming FD_INVALID
-	area->fd = (uint32)INVALID_FD;
+	area->fd = INVALID_FD;
 }
 
 vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32 offset)
@@ -40,7 +38,7 @@ vm_area vm_area_create(uint32 start, uint32 end, uint32 flags, uint32 fd, uint32
 	// assert good arguments and fail if necessary
 	if (vm_area_check_bounds(start, end) == false || (flags & MMAP_INVALID) == MMAP_INVALID)
 	{
-		serial_printf("Bad area received\n");		// can be removed at release
+		set_last_error(EINVAL, VM_AREA_BAD_BOUNDS, EO_VM_AREA);
 		return a;
 	}
 

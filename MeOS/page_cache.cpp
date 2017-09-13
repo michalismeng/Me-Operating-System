@@ -87,7 +87,7 @@ void page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_
 	page_cache.cache_size = no_buffers * PAGE_CACHE_SIZE;		// size entries = size pages
 
 	page_cache.cache = (_cache_cell*)start;
-	vector_init(&page_cache.cached_files, initial_file_count);
+	vector_init(&page_cache.cached_files, initial_file_count);		// TODO: If(error == error_occur)
 
 	// Here we assume that alloced bitmap fits into just one page buffer. 
 	// TODO: Perhaps change this in the future.
@@ -155,7 +155,7 @@ void page_cache_release_anonymous(virtual_addr address)
 virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 {
 	virtual_addr address = page_cache_reserve_anonymous();
-
+	
 	if (address == 0)
 		return 0;
 
@@ -166,6 +166,8 @@ virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 
 	_page_cache_file_info finfo = page_cache_file_info_create(page, free_buf);
 	list_insert_back(&page_cache.cached_files[gfd].pages, finfo);
+	// TODO: This function gives a buffer even to a non-registered gfd. We first need to assert that cached_files[gfd] is allocated
+	printfln("cached file gfd: %u", page_cache.cached_files[gfd].gfd);
 
 	return address;
 }

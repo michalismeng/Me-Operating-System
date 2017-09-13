@@ -25,7 +25,9 @@ const char* ERROR_ORIGIN_STR[] =
 	"FS",
 	"MASS STORAGE FS",
 	"MASS STORAGE DEV",
-	"FILE INTERFACE"
+	"FILE INTERFACE",
+	"VM AREA",
+	"VM CONTRACT"
 };
 
 // public functions

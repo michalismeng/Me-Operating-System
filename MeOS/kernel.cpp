@@ -7,7 +7,6 @@
 
 #include "keyboard.h"
 #include "SerialDebugger.h"
-//#include "Simple_fs.h"
 
 #include "PCI.h"
 #include "AHCI.h"
@@ -168,6 +167,7 @@ void keyboard_fancy_function()
 			else if (c == KEYCODE::KEY_V)
 			{
 				ClearScreen();
+				printfln("printing vfs:");
 				vfs_print_all();
 			}
 			else if (c == KEYCODE::KEY_P)
@@ -306,11 +306,11 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_H)
 			{
-				/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
-				thread_sleep(thread_test_time, 2000);*/
+				printfln("sleeping thread %u at %u", thread_test_time->id, millis());
+				thread_sleep(thread_test_time, 2000);
 
-				/*printfln("sleeping me %u at %u", thread_get_current()->id, millis());
-				thread_sleep(thread_get_current(), 3000);*/
+				printfln("sleeping me %u at %u", thread_get_current()->id, millis());
+				thread_sleep(thread_get_current(), 3000);
 
 				printfln("blocking thread %u at %u", thread_test_time->id, millis());
 				ClearScreen();
@@ -910,10 +910,10 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	if (vmmngr_is_page_present(space))
 		printfln("space: %h alloced", space);
 
-	if (!vmmngr_alloc_page(space))
+	if (vmmngr_alloc_page(space) != ERROR_OK)
 		PANIC("cannot allocate for mini heap");
 
-	if(!vmmngr_alloc_page(space + 4096))
+	if(vmmngr_alloc_page(space + 4096) != ERROR_OK)
 		PANIC("cannot allocate for mini heap");
 
 	// setup a dummy kernel heap for process 0 initialization

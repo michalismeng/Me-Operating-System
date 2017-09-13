@@ -256,6 +256,8 @@ void draw_char(char c)
 		cursor.y++;
 		break;	
 	default:
+		if (c == 0x09)			// TAB CHARACTER
+			c = 0x20;			// MAKE IT A SPACE
 		_draw_char(c, make_point(cursor.x * 8, cursor.y * 16));
 		cursor.x++;
 		break;

@@ -160,9 +160,11 @@ enum ERROR_ORIGIN
 	EO_HMMNGR,				// heap memory manager
 	EO_MEMORY,				// memory wrapper functions
 	EO_FS,					// filesystem (unknown) component
-	EO_MASS_STORAGE_FS,		// mass storage filesystem component,
-	EO_MASS_STORAGE_DEV,	// mass storage device component,
-	EO_FILE_INTERFACE		// file interface (file.h) component
+	EO_MASS_STORAGE_FS,		// mass storage filesystem component
+	EO_MASS_STORAGE_DEV,	// mass storage device component
+	EO_FILE_INTERFACE,		// file interface (file.h) component
+	EO_VM_AREA,				// virtual memory area component
+	EO_VM_CONTRACT,			// virtual memory contract area
 };
 
 // defines the alphabetic names of the above error origins

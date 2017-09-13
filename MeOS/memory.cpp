@@ -21,11 +21,13 @@ void* calloc(uint32 size)
 	return ptr;
 }
 
-void free(void* ptr)
+error_t free(void* ptr)
 {
 	spinlock_acquire(&kernel_heap_lock);
-	heap_free(kernel_heap, ptr);
+	error_t res = heap_free(kernel_heap, ptr);
 	spinlock_release(&kernel_heap_lock);
+
+	return res;
 }
 
 void* realloc(void* ptr, uint32 new_size)
@@ -60,14 +62,10 @@ virtual_addr vfs_mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offse
 
 	spinlock_acquire(&proc->contract_spinlock);
 
-	if (!vm_contract_add_area(&proc->memory_contract, &area))	// TODO: Check flag for obligatory preffered addr load
+	if (vm_contract_add_area(&proc->memory_contract, &area) != ERROR_OK)	// TODO: Check flag for obligatory prefered addr load
 		return MAP_FAILED;
 
 	spinlock_release(&proc->contract_spinlock);
-
-	// from current_process
-	// from local_table get global fd through
-	// increase the open_count
 	return area.start_addr;
 }
 

@@ -17,38 +17,49 @@ struct ordered_vector
 };
 
 template<class T>
-void ordered_vector_init(ordered_vector<T>* v)
+error_t ordered_vector_init(ordered_vector<T>* v)
 {
 	v->count = 0;
 
 	v->r_size = 1;
 	v->data = (T*)malloc(sizeof(T));
 
+	if (!v->data)
+		return ERROR_OCCUR;
+
+	// TODO: Remove this
 	if (v->data == 0)
 		printfln("data is zero");
+
+	return ERROR_OK;
 }
 
 // reserve space for 'num_elements' keeping the current elements inside the vector untouched
 template<class T>
-void ordered_vector_reserve(ordered_vector<T>* v, int num_elements)
+error_t ordered_vector_reserve(ordered_vector<T>* v, int num_elements)
 {
 	v->data = (T*)realloc(v->data, num_elements * sizeof(T));
+
+	// TODO: Remove this
 	if (v->data == 0)		// allocation error
 	{
 		PANIC("Ordered vector received null data");
-		return;
+		return ERROR_OCCUR;
 	}
 
-	v->r_size = num_elements;
+	if (!v->data)
+		return ERROR_OCCUR;
 
-	printfln("expanding vector to: %u", num_elements);
+	v->r_size = num_elements;
+	return ERROR_OK;
 }
 
 template<class T>
-void ordered_vector_insert(ordered_vector<T>* v, T& data)
+error_t ordered_vector_insert(ordered_vector<T>* v, T& data)
 {
 	if (v->count == v->r_size)
-		ordered_vector_reserve(v, 2 * v->count);
+		if (ordered_vector_reserve(v, 2 * v->count) != ERROR_OK)
+			return ERROR_OCCUR;
 
 	uint32 i = v->count;
 
@@ -60,13 +71,15 @@ void ordered_vector_insert(ordered_vector<T>* v, T& data)
 
 	v->data[i] = data;
 	v->count++;
+
+	return ERROR_OK;
 }
 
 template<class T>
-void ordered_vector_remove(ordered_vector<T>* v, uint32 index)
+bool ordered_vector_remove(ordered_vector<T>* v, uint32 index)
 {
 	if (index >= v->count)
-		return;
+		return false;
 
 	uint32 i = index;
 	v->count--;
@@ -76,6 +89,8 @@ void ordered_vector_remove(ordered_vector<T>* v, uint32 index)
 		v->data[i] = v->data[i + 1];
 		i++;
 	}
+
+	return true;
 }
 
 template<class T>
@@ -99,11 +114,13 @@ uint32 ordered_vector_find(ordered_vector<T>* v, T& data)
 }
 
 template<class T>
-void ordered_vector_uninit(ordered_vector<T>* v)
+error_t ordered_vector_uninit(ordered_vector<T>* v)
 {
-	free(v->data);
 	v->count = 0;
 	v->r_size = 0;
+
+	if (free(v->data) != ERROR_OK)
+		return ERROR_OCCUR;	
 }
 
 #endif

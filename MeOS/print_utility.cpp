@@ -60,7 +60,7 @@ void printf_base(char* fmt, va_list arg_start)
 				break;
 			case 's':
 				ptr = va_arg(arg_start, char*);
-				write_file(screen_fd, 0, 0, (virtual_addr)buffer);
+				write_file(screen_fd, 0, 0, (virtual_addr)ptr);
 				break;
 			case 'c':
 				cval = va_arg(arg_start, uint32);

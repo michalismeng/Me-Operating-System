@@ -18,7 +18,7 @@ extern "C" {
 	void* calloc(uint32 size);
 
 	// frees an allocated memory
-	void free(void* ptr);
+	error_t free(void* ptr);
 
 	// re-allocates the given memory to now hold 'new_size' bytes
 	void* realloc(void* ptr, uint32 new_size);

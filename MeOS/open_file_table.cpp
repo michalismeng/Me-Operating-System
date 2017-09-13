@@ -11,9 +11,11 @@ spinlock gft_lock;
 
 // local file table functions
 
-void init_local_file_table(local_file_table* lft, uint32 initial_size)
+error_t init_local_file_table(local_file_table* lft, uint32 initial_size)
 {
-	vector_init(&lft->entries, initial_size);
+	if (vector_init(&lft->entries, initial_size) != ERROR_OK)
+		return ERROR_OCCUR;
+
 	spinlock_init(&lft->lock);
 }
 
@@ -111,8 +113,6 @@ uint32 gft_insert(gfe entry)
 	}
 	else
 		gft[index] = entry;
-
-	// Why not increase open count ??
 
 	return index;
 }

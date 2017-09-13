@@ -3,9 +3,16 @@
 
 // contains heavy c++ code
 
+#include "error.h"
 #include "utility.h"
 #include "mmngr_virtual.h"
 #include "memory_definitions.h"
+
+enum VM_AREA_ERROR
+{
+	VM_AREA_NONE,
+	VM_AREA_BAD_BOUNDS
+};
 
 // defines a process virtual area. (This is the bare bones of a process - kernel memory contract)
 struct vm_area

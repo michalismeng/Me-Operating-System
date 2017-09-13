@@ -531,10 +531,14 @@ error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_add
 {
 	vfs_node* mount_point = file->tag;
 	virtual_addr cache = page_cache_get_buffer(fd, page);
+	printfln("file: %s cache: %h", file->name, cache);
 	// if page is not found then allocate a new one to hold the required data.
 	if (cache == 0)
 	{
 		cache = page_cache_reserve_buffer(fd, page);
+
+		printfln("file: %s cache: %h", file->name, cache);
+
 		if (cache == 0)
 		{
 			set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
@@ -730,8 +734,11 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 			// setup layout list and add the starting cluster
 			fat_file_layout* layout = &NODE_DATA(node)->layout;
 
-			vector_init(layout, ceil_division(entry[i].file_size, 4096));
-			vector_insert_back(layout, fat_fs_get_entry_data_cluster(entry + i));
+			if (vector_init(layout, ceil_division(entry[i].file_size, 4096)) != ERROR_OK)
+				return list<vfs_node*>();
+
+			if(vector_insert_back(layout, fat_fs_get_entry_data_cluster(entry + i)) != ERROR_OK)
+				return list<vfs_node*>();
 
 			node->children = children;
 			list_insert_back(&l, node);
@@ -776,7 +783,8 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	// create the vfs mount point node and get the mount data pointer
 	vfs_node* mount_point = vfs_create_node(mount_name, true, VFS_MOUNT_PT, 0, sizeof(fat_mount_data), dev_node, NULL, &fat_mount_operations);
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
-	vector_init(&mount_data->layout, 1);
+	if (vector_init(&mount_data->layout, 1) != ERROR_OK)
+		return 0;
 
 	// create the mount point file (root directory)
 
@@ -807,7 +815,8 @@ error_t fat_fs_load_file_layout(fat_mount_data* mount_info, vfs_node* node)
 		if (next_cluster >= FAT_EOF)
 			break;
 
-		vector_insert_back(layout, next_cluster);
+		if (vector_insert_back(layout, next_cluster) != ERROR_OK)
+			return ERROR_OCCUR;
 	}
 
 	return ERROR_OK;
@@ -1132,8 +1141,11 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 		NODE_DATA(new_node)->metadata_cluster = metadata_cluster;
 		NODE_DATA(new_node)->metadata_index = metadata_index;
 
-		vector_init(LAYOUT(new_node), 1);
-		vector_insert_back(LAYOUT(new_node), free_cluster);
+		if (vector_init(LAYOUT(new_node), 1) != ERROR_OK)
+			return 0;
+
+		if (vector_insert_back(LAYOUT(new_node), free_cluster) != ERROR_OK)
+			return 0;
 
 		if (fat_fs_create_short_entry_from_node(file_entry, new_node) != 0)
 		{
@@ -1183,7 +1195,8 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 
 		/* Append the cluster to the FAT cluster-chain */
 		fat_fs_mark_cluster(mount_point, vector_at(LAYOUT(directory), LAYOUT(directory)->count - 1), free_cluster);
-		vector_insert_back(LAYOUT(directory), free_cluster);
+		if (vector_insert_back(LAYOUT(directory), free_cluster) != ERROR_OK)
+			return 0;
 
 		// re-run the function but now we know where the empty entry is (in the free cluster)
 

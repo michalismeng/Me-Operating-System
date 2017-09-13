@@ -289,7 +289,7 @@ error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 	AHCI_BASE = base;
 	abar = _abar;
 
-	if (!vmmngr_alloc_page((virtual_addr)abar))
+	if (vmmngr_alloc_page((virtual_addr)abar) != ERROR_OK)
 		PANIC("Virtual memory allocation for ahci failed");
 
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)

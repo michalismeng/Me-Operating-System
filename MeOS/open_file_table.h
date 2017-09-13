@@ -45,7 +45,7 @@ typedef struct local_file_table
 /* Local File Table Functions */
 
 // initialize the per-process local file table
-void init_local_file_table(local_file_table* lfe, uint32 initial_size);
+error_t init_local_file_table(local_file_table* lfe, uint32 initial_size);
 
 // create a local file entry
 lfe create_lfe(uint32 flags);

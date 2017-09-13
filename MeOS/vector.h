@@ -2,6 +2,7 @@
 #define VECTOR_H_28102016
 
 #include "types.h"
+#include "error.h"
 
 #define find_predicate_test(T, name) bool(*name)(T*)
 
@@ -28,7 +29,7 @@ T& vector_front(vector<T>* v)
 }
 
 template<class T>
-void vector_init(vector<T>* v, uint32 initial_length)
+error_t vector_init(vector<T>* v, uint32 initial_length)
 {
 	if (initial_length == 0)
 		initial_length = 1;
@@ -37,29 +38,42 @@ void vector_init(vector<T>* v, uint32 initial_length)
 
 	v->r_size = initial_length;
 	v->data = new T[initial_length];
+
+	if (!v->data)
+		return ERROR_OCCUR;
+
+	return ERROR_OK;
 }
 
 // reserve space for 'num_elements' keeping the current elements inside the vector untouched
 template<class T>
-void vector_reserve(vector<T>* v, int num_elements)
+error_t vector_reserve(vector<T>* v, int num_elements)
 {
 	v->data = (T*)realloc(v->data, num_elements * sizeof(T));
+
+	// TODO: Remove this
 	if (v->data == 0)		// allocation error
 	{
 		PANIC("ERROR");
-		return;
+		return ERROR_OCCUR;
 	}
 
+	if (!v->data)
+		return ERROR_OCCUR;
+
 	v->r_size = num_elements;
+	return ERROR_OK;
 }
 
 template<class T>
-void vector_insert_back(vector<T>* v, const T& data)
+error_t vector_insert_back(vector<T>* v, const T& data)
 {
 	if (v->count == v->r_size)
-		vector_reserve(v, 2 * v->count);
+		if (vector_reserve(v, 2 * v->count) != ERROR_OK)
+			return ERROR_OCCUR;
 
 	v->data[v->count++] = data;
+	return ERROR_OK;
 }
 
 template<class T>
