@@ -3,9 +3,7 @@
 void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
 {
 	if (dev->bar_type == 0)
-	{
 		*(uint32*)(dev->mem_base + addr) = value;
-	}
 	else
 	{
 		outportl(dev->io_base, addr);
@@ -16,9 +14,7 @@ void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
 uint32 e1000_read_command(e1000* dev, uint16 addr)
 {
 	if (dev->bar_type == 0)
-	{
 		return *(uint32*)(dev->mem_base + addr);
-	}
 	else
 	{
 		outportl(dev->io_base, addr);

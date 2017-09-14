@@ -18,16 +18,18 @@ error_t open_file(char* path, uint32* fd, uint32 flags)
 
 error_t open_file_by_node(vfs_node* node, uint32* local_fd)
 {
-	*local_fd = INVALID_FD;
-
 	lfe entry = create_lfe(FILE_READ);
 	*local_fd = lft_insert(&process_get_current()->lft, entry, node);
 
+	if (*local_fd == INVALID_FD)
+		return ERROR_OCCUR;
+
 	uint32 global_fd = lft_get(&process_get_current()->lft, *local_fd)->gfd;
 
-	printfln("file: %s open count: %u", gft_get(global_fd)->file_node->name, gft_get(global_fd)->open_count);
+	// register the file once when it is first opened.
 	if (gft_get(global_fd)->open_count == 1)
-		page_cache_register_file(global_fd);
+		if (page_cache_register_file(global_fd) != ERROR_OK)
+			return ERROR_OCCUR;
 		
 	return vfs_open_file(node);
 }

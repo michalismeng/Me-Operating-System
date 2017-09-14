@@ -6,7 +6,6 @@
 #include "open_file_table.h"
 #include "page_cache.h"
 
-#define INVALID_FD -1
 
 enum FILE_OPEN_FLAGS
 {

@@ -236,14 +236,6 @@ void keyboard_fancy_function()
 				uint32 test_proc;
 				page_cache_print();
 
-				// test error printing
-				if (open_file("sdc_mount/noent/TEST.EXE", &test_proc, 0) != ERROR_OK)
-				{
-					serial_printf("error: %e", get_last_error());
-					PANIC("could not open text.exe");
-
-				}
-
 				/*for (int i = 0; i < 256; i++)
 					printf("%c", i);
 				printfln("");*/

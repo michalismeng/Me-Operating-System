@@ -45,6 +45,7 @@ typedef void   VOID;
 #define REF &
 
 #define NULL 0
+#define INVALID_FD -1
 
 #define cast(type, param) ((type)param)
 

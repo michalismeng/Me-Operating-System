@@ -3,7 +3,6 @@
 #include "mmngr_virtual.h"
 
 // private data and helper function
-
 #define NODE_INFO(x) ((ahci_storage_info*)x->deep_md)
 
 HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci controller

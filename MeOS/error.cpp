@@ -16,7 +16,7 @@ uint32 error_create(uint8 base_code, uint16 extended_code, uint8 code_origin)
 
 const char* ERROR_ORIGIN_STR[] =
 {
-	"",						// one dummy entry to match the above enum
+	"NO ERRORS",						// one dummy entry to match the above enum
 	"VFS",
 	"VMMNGR",
 	"PMMNGR",

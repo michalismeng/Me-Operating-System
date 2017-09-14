@@ -208,12 +208,8 @@ size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtua
 	// if the page cache is not to be used, then reserve a minimum of one entry to load partial data when required
 	if (use_file_cache == false)
 	{
-		cache = page_cache_reserve_anonymous();
-		if (cache == 0)
-		{
-			set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
+		if (!(cache = page_cache_reserve_anonymous()))
 			return 0;
-		}
 	}
 
 	/* Read pages until second to last */
@@ -531,19 +527,12 @@ error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_add
 {
 	vfs_node* mount_point = file->tag;
 	virtual_addr cache = page_cache_get_buffer(fd, page);
-	printfln("file: %s cache: %h", file->name, cache);
+	
 	// if page is not found then allocate a new one to hold the required data.
 	if (cache == 0)
 	{
-		cache = page_cache_reserve_buffer(fd, page);
-
-		printfln("file: %s cache: %h", file->name, cache);
-
-		if (cache == 0)
-		{
-			set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
-			return VFS_CACHE_FULL;
-		}
+		if ((cache = page_cache_reserve_buffer(fd, page)) == 0)
+			return ERROR_OCCUR;
 
 		if(fat_fs_read_by_page(mount_point, file, page, cache) == false)
 		{
@@ -565,11 +554,7 @@ uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
 	uint32 address;
 
 	if (!(address = page_cache_reserve_anonymous()))
-	{
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
-		DEBUG("error smoething went wrong");
-		return 0;
-	}
+		return ERROR_OCCUR;
 
 	// Load desired FAT cluster
 	if(fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
@@ -591,10 +576,7 @@ uint32 fat_fs_reserve_first_cluster(vfs_node* mount_point, uint32 next_cluster)
 {
 	uint32 address;	
 	if (!(address = page_cache_reserve_anonymous()))
-	{
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return 0;
-	}
 
 	uint32 fat_lba_index = 0;
 	// TODO: Find a true limit. Perhaps index < first cluster LBA?
@@ -642,11 +624,7 @@ uint32 fat_fs_mark_cluster(vfs_node* mount_point, uint32 fat_index, uint32 value
 	uint32 fat_offset = fat_index / 128;
 	uint32 address;
 	if (!(address = page_cache_reserve_anonymous()))
-	{
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
-		DEBUG("error smoething went wrong");
-		return 0;
-	}
+		return ERROR_OCCUR;
 
 	// Load desired FAT cluster
 	if (fat_fs_read_by_lba(mount_point, MOUNT_DATA(mount_point)->fat_lba + fat_offset, address) == false)
@@ -760,6 +738,8 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	// TODO: move this part at partition/filesystem identification
 
 	virtual_addr cache = page_cache_reserve_anonymous();
+	if (!cache)
+		return 0;
 
 	// get the primary partition offset (read the first sector into the 8-sector-cache reserved)
 	if (vfs_read_file(0, dev_node, 0, 1, cache) != 1)
@@ -789,7 +769,8 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	// create the mount point file (root directory)
 
 	MOUNT_DATA(mount_point)->fd = gft_insert_s(create_gfe(mount_point));
-	page_cache_register_file(MOUNT_DATA(mount_point)->fd);
+	if (page_cache_register_file(MOUNT_DATA(mount_point)->fd) != ERROR_OK)
+		return 0;
 
 	// load the data at the mount point
 	mount_data->cluster_lba = cluster_lba;
@@ -888,11 +869,7 @@ error_t fat_fs_delete_node(vfs_node* mount_point, vfs_node* node)
 
 	uint32 cache;
 	if (!(cache = page_cache_reserve_anonymous()))
-	{
-		DEBUG("delete file could not reserve buffer");
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return ERROR_OCCUR;
-	}
 
 	uint32 cluster = NODE_DATA(node)->metadata_cluster;		// file metadata cluster
 	uint32 index = NODE_DATA(node)->metadata_index;
@@ -999,11 +976,7 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 
 	uint32 cache;
 	if (!(cache = page_cache_reserve_buffer(fd, 0)))
-	{
-		DEBUG("create file could not reserve buffer");
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return ERROR_OCCUR;
-	}
 
 	/* read the node's metadata cluster */
 	if (fat_fs_read_by_data_cluster(mount_point, NODE_DATA(node)->metadata_cluster, cache) == false)
@@ -1111,11 +1084,7 @@ vfs_node* fat_fs_create_node(vfs_node* mount_point, vfs_node* directory, char* n
 
 	uint32 cache;
 	if (!(cache = page_cache_reserve_buffer(fd, 0)))
-	{
-		DEBUG("create file could not reserve buffer");
-		set_last_error(ENOMEM, FAT_NO_CACHE, EO_MASS_STORAGE_FS);
 		return 0;
-	}
 
 	uint32 metadata_cluster, metadata_index;
 

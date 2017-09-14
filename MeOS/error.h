@@ -165,6 +165,8 @@ enum ERROR_ORIGIN
 	EO_FILE_INTERFACE,		// file interface (file.h) component
 	EO_VM_AREA,				// virtual memory area component
 	EO_VM_CONTRACT,			// virtual memory contract area
+	EO_OPEN_FILE_TBL,		// open file table component
+	EO_PAGE_CACHE,			// page cahce component
 };
 
 // defines the alphabetic names of the above error origins
