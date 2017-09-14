@@ -1,12 +1,20 @@
 #ifndef MMNGR_PHYS_H_090516
 #define MMNGR_PHYS_H_090516
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include "types.h"
 #include "utility.h"
+
+	enum PMEM_ERROR
+	{
+		PMEM_NONE,
+		PMEM_OUT_OF_MEM,
+		PMEM_BAD_ARGUMENT
+	};
 
 	typedef uint32 physical_addr;
 
@@ -37,10 +45,10 @@ extern "C" {
 	void pmmngr_init(uint32 size, physical_addr base);
 
 	// initialize a region for use
-	void pmmngr_free_region(physical_memory_region* region);
+	error_t pmmngr_free_region(physical_memory_region* region);
 
 	// uninitialize a region (make it unusable)
-	void pmmngr_reserve_region(physical_memory_region* region);
+	error_t pmmngr_reserve_region(physical_memory_region* region);
 
 	// allocates a block of memory
 	void* pmmngr_alloc_block();

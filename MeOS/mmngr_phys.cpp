@@ -1,4 +1,5 @@
 #include "mmngr_phys.h"
+#include "error.h"
 #include "print_utility.h"
 
 #define PMMNGR_BLOCKS_PER_BYTE	8		// this is used in our bitmap structure
@@ -45,6 +46,7 @@ uint32 mmap_first_free()
 		}
 	}
 
+	set_last_error(ENOMEM, PMEM_OUT_OF_MEM, EO_PMMNGR);
 	return 0;
 }
 
@@ -52,7 +54,10 @@ uint32 mmap_first_free()
 int mmap_first_free_s(uint32 count)
 {
 	if (count == 0)		// error
+	{
+		set_last_error(EINVAL, PMEM_BAD_ARGUMENT, EO_PMMNGR);
 		return -1;
+	}
 
 	if (count == 1)		// mmap_first_free should be used
 		return mmap_first_free();
@@ -83,6 +88,7 @@ int mmap_first_free_s(uint32 count)
 		bit++;
 	}
 
+	set_last_error(ENOMEM, PMEM_OUT_OF_MEM, EO_PMMNGR);
 	return 0;
 }
 
@@ -134,10 +140,13 @@ void pmmngr_init(uint32 size, physical_addr base)
 	memset(mmngr_bitmap, 0xff, pmmngr_get_block_count() / PMMNGR_BLOCKS_PER_BYTE);
 }
 
-void pmmngr_free_region(physical_memory_region* region)
+error_t pmmngr_free_region(physical_memory_region* region)
 {
 	if (region->length == 0)		// error
-		return;
+	{
+		set_last_error(EINVAL, PMEM_BAD_ARGUMENT, EO_PMMNGR);
+		return ERROR_OCCUR;
+	}
 
 	if (region->length % PMMNGR_BLOCK_SIZE != 0 || region->base % PMMNGR_BLOCK_SIZE != 0)
 		PANIC("align error");
@@ -161,10 +170,13 @@ void pmmngr_free_region(physical_memory_region* region)
 	}
 }
 
-void pmmngr_reserve_region(physical_memory_region* region)
+error_t pmmngr_reserve_region(physical_memory_region* region)
 {
 	if (region->length == 0)		// error
-		return;
+	{
+		set_last_error(EINVAL, PMEM_BAD_ARGUMENT, EO_PMMNGR);
+		return ERROR_OCCUR;
+	}
 
 	if (region->length % PMMNGR_BLOCK_SIZE != 0 || region->base % PMMNGR_BLOCK_SIZE != 0)
 		PANIC("align error");
@@ -185,7 +197,10 @@ void pmmngr_reserve_region(physical_memory_region* region)
 void* pmmngr_alloc_block()
 {
 	if (pmmngr_get_free_block_count() <= 0)		// out of memory
+	{
+		set_last_error(ENOMEM, PMEM_OUT_OF_MEM, EO_PMMNGR);
 		return 0;
+	}
 
 	uint32 frame = mmap_first_free();
 
@@ -217,7 +232,10 @@ void* pmmngr_alloc_blocks(uint32 size)
 	uint32 count = ceil_division(size, pmmngr_get_block_size());
 
 	if (pmmngr_get_free_block_count() < count)	// not enough memory
+	{
+		set_last_error(ENOMEM, PMEM_OUT_OF_MEM, EO_PMMNGR);
 		return 0;
+	}
 
 	uint32 frame = mmap_first_free_s(count);
 

@@ -14,6 +14,13 @@ enum LOCAL_FILE_FLAGS
 	FILE_WRITE
 };
 
+enum OPEN_FILE_TBL_ERROR
+{
+	OPEN_FILE_NONE,
+	OPEN_FILE_OUT_OF_BOUNDS,
+	OPEN_FILE_NOT_EXIST
+};
+
 // per process file table entry
 struct local_file_entry
 {
@@ -45,7 +52,7 @@ typedef struct local_file_table
 /* Local File Table Functions */
 
 // initialize the per-process local file table
-void init_local_file_table(local_file_table* lfe, uint32 initial_size);
+error_t init_local_file_table(local_file_table* lfe, uint32 initial_size);
 
 // create a local file entry
 lfe create_lfe(uint32 flags);
@@ -57,7 +64,7 @@ uint32 lft_insert(local_file_table* lft, lfe entry, vfs_node* file_node);
 bool lfe_is_invalid(lfe* lfe);
 
 // remove the local file entry indicated by index
-bool lft_remove(local_file_table* lft, uint32 index);
+error_t lft_remove(local_file_table* lft, uint32 index);
 
 // retireve the local file entry indicated by index
 lfe* lft_get(local_file_table* lft, uint32 index);
@@ -68,13 +75,13 @@ void lft_print(local_file_table* lft);
 /* Global File Table functions */
 
 // initializes the global file table
-void init_global_file_table(uint32 initial_size);
+error_t init_global_file_table(uint32 initial_size);
 
 // initializes a global open file entry
 gfe create_gfe(vfs_node* file);
 
 // insert a global file entry to the global table and returns its inserted index
-uint32 gft_insert(gfe entry);
+error_t gft_insert(gfe entry, uint32* index);
 
 // safe insert (if duplicate exists no new entry is created) and return inseted index
 uint32 gft_insert_s(gfe entry);
@@ -86,7 +93,7 @@ bool gfe_is_invalid(gfe* gfe);
 bool gft_remove(uint32 index);
 
 // if the gfe exists, increases its open count variable
-bool gfe_increase_open_count(uint32 index);
+error_t gfe_increase_open_count(uint32 index);
 
 // get a global file entry based on its index
 gfe* gft_get(uint32 index);

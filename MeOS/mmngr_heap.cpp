@@ -73,14 +73,20 @@ heap* heap_create(virtual_addr base, uint32 size)
 void* heap_alloc(heap* h, uint32 r_size)
 {
 	if (h == 0 || r_size == 0)
+	{
+		set_last_error(EINVAL, HEAP_BAD_ARGUMENT, EO_HMMNGR);
 		return 0;
+	}
 
 	heap_block* block = (heap_block*)h->start_address;
 
 	while (block != 0)
 	{
 		if (block->magic != HEAP_BLOCK_MAGIC)
+		{
+			set_last_error(EINVAL, HEAP_BAD_MAGIC, EO_HMMNGR);	// invalid heap given or invalid heap state (can this happen?)
 			return 0;
+		}
 
 		if (block->used == true)
 			block = block->next;
@@ -104,17 +110,24 @@ void* heap_alloc(heap* h, uint32 r_size)
 	}
 
 	// allocation failed
+	set_last_error(ENOMEM, HEAP_OUT_OF_MEMORY, EO_HMMNGR);
 	return 0;
 }
 
-uint32 heap_free(heap* h, void* address)
+error_t heap_free(heap* h, void* address)
 {
 	if (h == 0 || address == 0)
-		return 1;
+	{
+		set_last_error(EINVAL, HEAP_BAD_ARGUMENT, EO_HMMNGR);
+		return ERROR_OCCUR;
+	}
 
 	heap_block* block = (heap_block*)((char*)address - sizeof(heap_block));
 	if (block->magic != HEAP_BLOCK_MAGIC)
-		return 1;
+	{
+		set_last_error(EINVAL, HEAP_BAD_MAGIC, EO_HMMNGR);
+		return ERROR_OCCUR;
+	}
 
 	block->used = false;
 	if (block->next != 0 && block->next->used == false)		// front-only merge unused block to partially defrag
@@ -123,18 +136,24 @@ uint32 heap_free(heap* h, void* address)
 		h->current_blocks--;
 	}
 
-	return 0;
+	return ERROR_OK;
 }
 
 void* heap_realloc(heap* h, void* address, uint32 new_size)
 {
 	if (h == 0 || address == 0)
+	{
+		set_last_error(EINVAL, HEAP_BAD_ARGUMENT, EO_HMMNGR);
 		return 0;
+	}
 
 	heap_block* block = (heap_block*)((char*)address - sizeof(heap_block));
 
 	if (block->magic != HEAP_BLOCK_MAGIC)
+	{
+		set_last_error(EINVAL, HEAP_BAD_MAGIC, EO_HMMNGR);
 		return 0;
+	}
 
 	uint32 block_size = heap_block_size(h, block);
 
@@ -174,7 +193,8 @@ void* heap_realloc(heap* h, void* address, uint32 new_size)
 		return 0;
 
 	memcpy(new_addr, address, min(block_size, new_size));
-	heap_free(h, address);
+	if (heap_free(h, address) != ERROR_OK)
+		return 0;
 
 	return new_addr;
 #endif
@@ -183,7 +203,10 @@ void* heap_realloc(heap* h, void* address, uint32 new_size)
 uint32 heap_defrag(heap* h)
 {
 	if (h == 0)
+	{
+		set_last_error(EINVAL, HEAP_BAD_ARGUMENT, EO_HMMNGR);
 		return 0;
+	}
 
 	uint32 blocks_merged = 0;
 	heap_block* block = (heap_block*)h->start_address;

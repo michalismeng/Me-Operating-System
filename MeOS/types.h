@@ -24,6 +24,10 @@ typedef unsigned long long uint64;
 typedef float float32;
 typedef double float64;
 
+typedef uint32 size_t;
+typedef int32 ssize_t;
+
+typedef uint32 error_t;
 
 typedef uint8 BYTE;
 typedef uint16 WORD;
@@ -41,6 +45,7 @@ typedef void   VOID;
 #define REF &
 
 #define NULL 0
+#define INVALID_FD -1
 
 #define cast(type, param) ((type)param)
 

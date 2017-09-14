@@ -21,9 +21,9 @@ bool _kybrd_disable = false;
 
 TCB* keyboard_daemon = 0;
 TCB* active = 0;
-uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result kybd_open(vfs_node* node);
-vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...);
+size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+error_t kybd_open(vfs_node* node);
+error_t kybd_ioctl(vfs_node* node, uint32 command, ...);
 
 static fs_operations kybd_operations =
 {
@@ -36,7 +36,7 @@ static fs_operations kybd_operations =
 	kybd_ioctl		// ioctl?
 };
 
-uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	uint8* buffer = (uint8*)address;
 	active = thread_get_current();
@@ -57,18 +57,17 @@ uint32 kybd_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_add
 	}
 
 	active = 0;
-
-	return 0;
+	return count;
 }
 
-vfs_result kybd_open(vfs_node* node)
+error_t kybd_open(vfs_node* node)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-vfs_result kybd_ioctl(vfs_node* node, uint32 command, ...)
+error_t kybd_ioctl(vfs_node* node, uint32 command, ...)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 // original scane set where array index == make code.

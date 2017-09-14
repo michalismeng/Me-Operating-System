@@ -5,6 +5,7 @@
 #include "utility.h"
 #include "VBEDefinitions.h"
 #include "SerialDebugger.h"
+#include "error.h"
 
 struct point
 {

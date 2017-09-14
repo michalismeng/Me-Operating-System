@@ -37,42 +37,42 @@ int CheckAHCIType(HBA_MEM_t* _abar)
 }
 
 /* Fast network card detection due to high enthusiasm. this section is to be moved to the proper driver */
-e1000 dev;
-
-bool readMACAddress()
-{
-	if (dev.eeprom_exists)
-	{
-		printfln("EEprom exists");
-		uint32 temp;
-		temp = e1000_eeprom_read(&dev, 0);
-		dev.mac[0] = temp & 0xff;
-		dev.mac[1] = temp >> 8;
-		temp = e1000_eeprom_read(&dev, 1);
-		dev.mac[2] = temp & 0xff;
-		dev.mac[3] = temp >> 8;
-		temp = e1000_eeprom_read(&dev, 2);
-		dev.mac[4] = temp & 0xff;
-		dev.mac[5] = temp >> 8;
-	}
-	else
-	{
-		printfln("EEprom does not exist exists");
-
-		uint8* mem_base_mac_8 = (uint8 *)(dev.mem_base + 0x5400);
-		uint32* mem_base_mac_32 = (uint32 *)(dev.mem_base + 0x5400);
-		if (mem_base_mac_32[0] != 0)
-		{
-			for (int i = 0; i < 6; i++)
-			{
-				dev.mac[i] = mem_base_mac_8[i];
-			}
-		}
-		else return false;
-	}
-
-	return true;
-}
+//e1000 dev;
+//
+//bool readMACAddress()
+//{
+//	if (dev.eeprom_exists)
+//	{
+//		printfln("EEprom exists");
+//		uint32 temp;
+//		temp = e1000_eeprom_read(&dev, 0);
+//		dev.mac[0] = temp & 0xff;
+//		dev.mac[1] = temp >> 8;
+//		temp = e1000_eeprom_read(&dev, 1);
+//		dev.mac[2] = temp & 0xff;
+//		dev.mac[3] = temp >> 8;
+//		temp = e1000_eeprom_read(&dev, 2);
+//		dev.mac[4] = temp & 0xff;
+//		dev.mac[5] = temp >> 8;
+//	}
+//	else
+//	{
+//		printfln("EEprom does not exist exists");
+//
+//		uint8* mem_base_mac_8 = (uint8 *)(dev.mem_base + 0x5400);
+//		uint32* mem_base_mac_32 = (uint32 *)(dev.mem_base + 0x5400);
+//		if (mem_base_mac_32[0] != 0)
+//		{
+//			for (int i = 0; i < 6; i++)
+//			{
+//				dev.mac[i] = mem_base_mac_8[i];
+//			}
+//		}
+//		else return false;
+//	}
+//
+//	return true;
+//}
 
 /*----------------------------------------------------------------------------------*/
 
@@ -108,7 +108,7 @@ int check(uint8 bus, uint8 device, uint8 function)
 	}
 	else if (cls == 0x2 && subcls == 0 && progif == 0)
 	{
-		printfln("found ethernet network: BAR0: %u interrupt line: %u BAR5: %h, vendor: %h, devID: %h",
+		/*printfln("found ethernet network: BAR0: %u interrupt line: %u BAR5: %h, vendor: %h, devID: %h",
 			PCIReadRegister(bus, device, function, 0x10) & 0x1,
 			PCIReadRegister(bus, device, function, 0x3C) & 0xff,
 			PCIReadRegister(bus, device, function, 0x24),
@@ -119,7 +119,7 @@ int check(uint8 bus, uint8 device, uint8 function)
 		e1000_detect_eeprom(&dev);
 		if (!readMACAddress()) PANIC("Could not read MAC address");
 
-		printfln("MAC address: %x %x %x %x %x %x", dev.mac[0], dev.mac[1], dev.mac[2], dev.mac[3], dev.mac[4], dev.mac[5]);
+		printfln("MAC address: %x %x %x %x %x %x", dev.mac[0], dev.mac[1], dev.mac[2], dev.mac[3], dev.mac[4], dev.mac[5]);*/
 	}
 	else if (cls == 0x7)
 	{

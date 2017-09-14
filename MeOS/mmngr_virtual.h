@@ -8,6 +8,12 @@
 #include "vmmngr_pte.h"
 #include "vmmngr_pde.h"
 
+enum VMEM_ERROR
+{
+	VMEM_NONE,
+	VMEM_BAD_ARGUMENT
+};
+
 typedef uint32 virtual_addr;
 
 #define PAGES_PER_TABLE 1024	// intel arch definitions
@@ -43,25 +49,25 @@ struct pdirectory
 // INTERFACE
 
 // maps the virtual address given to the physical address given
-void vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags);
+error_t vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, uint32 flags);
 
 // initializes the virtual memory manager
-void vmmngr_initialize(uint32 kernel_pages);
+error_t vmmngr_initialize(uint32 kernel_pages);
 
 // allocates a virtual page with the default flags
-bool vmmngr_alloc_page(virtual_addr base);
+error_t vmmngr_alloc_page(virtual_addr base);
 
 // allocates a virtual page with flags
-bool vmmngr_alloc_page_f(virtual_addr base, uint32 flags);
+error_t vmmngr_alloc_page_f(virtual_addr base, uint32 flags);
 
 // frees a virtual page
-void vmmngr_free_page(pt_entry* entry);
+error_t vmmngr_free_page(pt_entry* entry);
 
 // frees a virtual page using a virtual address
 void vmmngr_free_page_addr(virtual_addr addr);
 
 // switch page directory
-bool vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr);
+error_t vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr);
 
 // get the current page directory
 pdirectory* vmmngr_get_directory();
@@ -70,13 +76,13 @@ pdirectory* vmmngr_get_directory();
 void vmmngr_flush_TLB_entry(virtual_addr addr);
 
 // clear a page table
-void vmmngr_ptable_clear(ptable* table);
+error_t vmmngr_ptable_clear(ptable* table);
 
 // returns entry of ptable p based on addr
 pt_entry* vmmngr_ptable_lookup_entry(ptable* p, virtual_addr addr);
 
 // clear a page directory
-void vmmngr_pdirectory_clear(pdirectory* pdir);
+error_t vmmngr_pdirectory_clear(pdirectory* pdir);
 
 // returns entry of pdirectory p based on addr
 pd_entry* vmmngr_pdirectory_lookup_entry(pdirectory* p, virtual_addr addr);
@@ -91,15 +97,15 @@ physical_addr vmmngr_get_phys_addr(virtual_addr addr);
 bool vmmngr_is_page_present(virtual_addr addr);
 
 // creates a page table for the dir address space
-bool vmmngr_create_table(pdirectory* dir, virtual_addr addr, uint32 flags);
+error_t vmmngr_create_table(pdirectory* dir, virtual_addr addr, uint32 flags);
 
 // creates a new address space
 pdirectory* vmmngr_create_address_space();
 
 // maps the kernel pages to the directory given
-void vmmngr_map_kernel_space(pdirectory* pdir);
+error_t vmmngr_map_kernel_space(pdirectory* pdir);
 
-void vmmngr_switch_to_kernel_directory();
+error_t vmmngr_switch_to_kernel_directory();
 
 // return the page size
 uint32 vmmngr_get_page_size();

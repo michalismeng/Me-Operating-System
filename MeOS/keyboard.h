@@ -2,6 +2,7 @@
 #define KEYBOARD_H_180516
 
 #include "types.h"
+#include "error.h"
 #include "system.h"
 #include "isr.h"
 

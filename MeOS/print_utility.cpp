@@ -1,7 +1,7 @@
 #include "print_utility.h"
 #include "file.h"
 
-int screen_fd;
+uint32 screen_fd;
 
 char x[4096 * 5];
 
@@ -9,7 +9,7 @@ bool print_utility_initialized = false;
 
 void init_print_utility()
 {
-	if (open_file("dev/screen", &screen_fd) != VFS_OK)
+	if (open_file("dev/screen", &screen_fd, 0) != ERROR_OK)
 		PANIC("print utility could not be initialized");
 
 	print_utility_initialized = true;
@@ -60,7 +60,7 @@ void printf_base(char* fmt, va_list arg_start)
 				break;
 			case 's':
 				ptr = va_arg(arg_start, char*);
-				write_file(screen_fd, 0, 0, (virtual_addr)buffer);
+				write_file(screen_fd, 0, 0, (virtual_addr)ptr);
 				break;
 			case 'c':
 				cval = va_arg(arg_start, uint32);

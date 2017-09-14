@@ -5,6 +5,7 @@
 volatile uint32 ticks;					// volatile is necessary for the sleep function, where compiler thinks millis is constant valued
 extern uint16 cursorX, cursorY;
 
+// this function is never called - see kmain first lines
 void timer_callback(registers_t* regs)
 {
 	ticks++;

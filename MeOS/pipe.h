@@ -6,6 +6,7 @@
 #include "vfs.h"
 #include "open_file_table.h"
 #include "semaphore.h"
+#include "error.h"
 
 struct _pipe
 {
@@ -23,9 +24,9 @@ void create_vfs_pipe(char* buf, uint32 size, uint32 fd[2]);
 
 void pipe_close();
 
-vfs_result pipe_vfs_open(vfs_node* node);
-uint32 pipe_vfs_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-uint32 pipe_vfs_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
+error_t pipe_vfs_open(vfs_node* node);
+size_t pipe_vfs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t pipe_vfs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 
 char pipe_read(_pipe* pipe);
 void pipe_write(_pipe* pipe, char element);

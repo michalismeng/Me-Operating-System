@@ -11,10 +11,14 @@ spinlock gft_lock;
 
 // local file table functions
 
-void init_local_file_table(local_file_table* lft, uint32 initial_size)
+error_t init_local_file_table(local_file_table* lft, uint32 initial_size)
 {
-	vector_init(&lft->entries, initial_size);
+	if (vector_init(&lft->entries, initial_size) != ERROR_OK)
+		return ERROR_OCCUR;
+
 	spinlock_init(&lft->lock);
+
+	return ERROR_OK;
 }
 
 lfe create_lfe(uint32 flags)
@@ -33,7 +37,9 @@ uint32 lft_insert(local_file_table* lft, lfe entry, vfs_node* file_node)
 
 	if (loc_index >= lft->entries.count)					// there is no invalid entry (every entry is used)
 	{
-		vector_insert_back(&lft->entries, entry);
+		if (vector_insert_back(&lft->entries, entry) != ERROR_OK)
+			return INVALID_FD;
+
 		loc_index = lft->entries.count - 1;
 	}
 	else
@@ -42,11 +48,17 @@ uint32 lft_insert(local_file_table* lft, lfe entry, vfs_node* file_node)
 	// open the corresponding gfe
 	uint32 gfd = gft_get_n(file_node);
 
-	if (gfd == (uint32)-1)								// the gfe does not exist, so create it
-		gfd = gft_insert_s(create_gfe(file_node));
+	if (gfd == INVALID_FD)								// the gfe does not exist, so create it
+	{
+		if ((gfd = gft_insert_s(create_gfe(file_node))) == -1)
+			return INVALID_FD;
+	}
 	else
-		if (gfe_increase_open_count(gfd) == false)
-			printfln("could not increase count for: %u", gfd);
+	{
+		if (gfe_increase_open_count(gfd) != ERROR_OK)
+			return INVALID_FD;
+	}
+		
 
 	lft->entries[loc_index].gfd = gfd;
 	return loc_index;
@@ -57,22 +69,28 @@ bool lfe_is_invalid(lfe* lfe)
 	return (lfe->flags == FILE_INVALID && lfe->gfd == 0);
 }
 
-bool lft_remove(local_file_table* lft, uint32 index)
+error_t lft_remove(local_file_table* lft, uint32 index)
 {
 	if (index >= lft->entries.count)		// out of range
-		return false;
+	{
+		set_last_error(EBADF, OPEN_FILE_OUT_OF_BOUNDS, EO_OPEN_FILE_TBL);
+		return ERROR_OCCUR;
+	}
 
 	lft->entries[index].pos = (uint32)(-1);
 	lft->entries[index].flags = FILE_INVALID;
 	lft->entries[index].gfd = 0;
 
-	return true;
+	return ERROR_OK;
 }
 
 lfe* lft_get(local_file_table* lft, uint32 index)
 {
 	if (index >= lft->entries.count)
+	{
+		set_last_error(EBADF, OPEN_FILE_OUT_OF_BOUNDS, EO_OPEN_FILE_TBL);
 		return 0;
+	}
 
 	return &lft->entries[index];
 }
@@ -85,10 +103,14 @@ void lft_print(local_file_table* lft)
 
 // global file table functions
 
-void init_global_file_table(uint32 initial_size)
+error_t init_global_file_table(uint32 initial_size)
 {
-	vector_init(&gft, initial_size);
+	if (vector_init(&gft, initial_size) != ERROR_OK)
+		return ERROR_OCCUR;
+
 	spinlock_init(&gft_lock);
+
+	return ERROR_OK;
 }
 
 gfe create_gfe(vfs_node* file)
@@ -100,21 +122,22 @@ gfe create_gfe(vfs_node* file)
 	return entry;
 }
 
-uint32 gft_insert(gfe entry)
+error_t gft_insert(gfe entry, uint32* index)
 {
-	uint32 index = vector_find_first(&gft, gfe_is_invalid);
+	uint32 _index = vector_find_first(&gft, gfe_is_invalid);
 
-	if (index >= gft.count)					// there is no invalid entry (every entry is used)
+	if (_index >= gft.count)					// there is no invalid entry (every entry is used)
 	{
-		vector_insert_back(&gft, entry);
-		index = gft.count - 1;
+		if (vector_insert_back(&gft, entry) != ERROR_OK)
+			return ERROR_OCCUR;
+
+		_index = gft.count - 1;
 	}
 	else
-		gft[index] = entry;
+		gft[_index] = entry;
 
-	// Why not increase open count ??
-
-	return index;
+	*index = _index;			// pass the index back to the caller
+	return ERROR_OK;
 }
 
 uint32 gft_insert_s(gfe entry)
@@ -124,7 +147,8 @@ uint32 gft_insert_s(gfe entry)
 	uint32 entry_index = gft_get_n(entry.file_node);	// possible entry index in the global table
 
 	if (entry_index == -1)								// entry doesn't exist
-		entry_index = gft_insert(entry);
+		if (gft_insert(entry, &entry_index) != ERROR_OK)
+			return -1;
 
 	gft[entry_index].open_count++;						// open one more time
 
@@ -141,29 +165,38 @@ bool gfe_is_invalid(gfe* gfe)
 bool gft_remove(uint32 index)
 {
 	if (index >= gft.count)		// out of range
-		return false;
+	{
+		set_last_error(EBADF, OPEN_FILE_OUT_OF_BOUNDS, EO_OPEN_FILE_TBL);
+		return ERROR_OCCUR;
+	}
 
 	gft[index].file_node = 0;
 	gft[index].open_count = 0;
 
-	return true;
+	return ERROR_OK;
 }
 
-bool gfe_increase_open_count(uint32 index)
+error_t gfe_increase_open_count(uint32 index)
 {
 	gfe* entry = gft_get(index);
 
 	if (entry == 0 || gfe_is_invalid(entry) == true)		// this entry does not exist
-		return false;
+	{
+		set_last_error(EBADF, OPEN_FILE_NOT_EXIST, EO_OPEN_FILE_TBL);
+		return ERROR_OCCUR;
+	}
 
 	entry->open_count++;
-	return true;
+	return ERROR_OK;
 }
 
 gfe* gft_get(uint32 index)
 {
 	if (index >= gft.count)
+	{
+		set_last_error(EBADF, OPEN_FILE_OUT_OF_BOUNDS, EO_OPEN_FILE_TBL);
 		return 0;
+	}
 
 	return &gft[index];
 }

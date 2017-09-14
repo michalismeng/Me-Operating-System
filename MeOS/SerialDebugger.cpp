@@ -84,6 +84,7 @@ void serial_printf(char* fmt, ...)
 	int32 ival;
 	uint8 cval;
 	uint64 lval;
+	error_t err;
 	char* ptr;
 	char buffer[20];
 
@@ -133,6 +134,18 @@ void serial_printf(char* fmt, ...)
 				val = va_arg(arg_start, uint32);
 				uitoa(val, buffer, 2);
 				serial_print(buffer);
+				break;
+			// display error in human readable form
+			case 'e':
+				err = va_arg(arg_start, error_t);
+				uitoa(err & 0xFF, buffer, 10);				// get linux code
+				serial_print("base: ");
+				serial_print(buffer);
+				serial_print(" ext: ");
+				uitoa((err >> 8) & 0xFFFF, buffer, 10);		// get extended code
+				serial_print(buffer);
+				serial_print(" ");
+				serial_print(ERROR_ORIGIN_STR[err >> 24]);
 			default:
 				break;
 			}

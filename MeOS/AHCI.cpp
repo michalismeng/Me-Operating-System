@@ -1,92 +1,89 @@
 #include "AHCI.h"
 #include "print_utility.h"
+#include "mmngr_virtual.h"
 
 // private data and helper function
+#define NODE_INFO(x) ((ahci_storage_info*)x->deep_md)
 
 HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci controller
 uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
 
-char buffer[4096];			// TODO: Make one page buffer more lovely
+//error_t ahci_open(vfs_node* node);
+size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+//error_t ahci_sync(int fd, vfs_node* file, uint32 start_page, uint32 end_page);
+error_t ahci_ioctl(vfs_node* node, uint32 command, ...);
+
+error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD count, physical_addr buf, bool read);
 
 static fs_operations AHCI_fs_operations =
 {
+	ahci_fs_read,		// read
+	ahci_fs_write,		// write
+	NULL,				// open
+	NULL,				// close
+	NULL,				// sync
+	NULL,				// lookup
+	ahci_ioctl			// ioctl
 };
 
-void* ahci_main(uint32 ahci_command, ...)
+#pragma region VFS API IMPLEMENTATION
+
+size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	va_list l;
-	va_start(l, ahci_command);
-
-	switch (ahci_command)
+	if (file == 0 || file->deep_md == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE)
 	{
-	case 0:
-	{
-		ahci_storage_info* info = va_arg(l, ahci_storage_info*);
-		DWORD startl = va_arg(l, DWORD);
-		DWORD starth = va_arg(l, DWORD);
-		DWORD count = va_arg(l, DWORD);
-		DWORD addr = va_arg(l, DWORD);
+		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
 
-		if (addr == 0)
-			return ahci_read(info, startl, starth, count);
-		else
-		{
-			ahci_read(info->volume_port, startl, starth, count, (VOID*)addr);
-			return 0;
-		}
+	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
+
+	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
+	{
+		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
+		return 0;
 	}
-	}
+
+	// retrieve data using the physical address!
+	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), true) == ERROR_OK)
+		return count;
+
+	return 0;
 }
 
-bool ahci_start_cmd(HBA_PORT_t* port)
+size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	if ((port->cmd & HBA_PxCMD_CR) != 0 || (port->cmd & HBA_PxCMD_FR) != 0 || (port->cmd & HBA_PxCMD_FRE) != 0)
-		PANIC("Port is still running");
-
-	// Set FRE (bit4) and ST (bit0)
-	port->cmd |= HBA_PxCMD_FRE;
-
-	Timer t;
-	while (t.GetElapsedMillis() <= 500);
-
-	t.Restart();
-
-	while ((port->tfd & 0x80) != 0 || (port->tfd & 0x8) != 0 || (port->ssts & 0xF) != 3)
+	if (file == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE || NODE_INFO(file) == 0)
 	{
-		if (t.GetElapsedMillis() >= 1000)
-			return false;
+		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
+		return 0;
+	}
+	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
+
+	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
+	{
+		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
+		return 0;
 	}
 
-	port->cmd |= HBA_PxCMD_ST;
-	return true;
+	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), false) == ERROR_OK)
+		return count;
+
+	return 0;
 }
 
-bool ahci_stop_cmd(HBA_PORT_t* port)
+error_t ahci_ioctl(vfs_node* node, uint32 command, ...)
 {
-	// Clear ST (bit0)
-	port->cmd &= ~HBA_PxCMD_ST;
-
-	Timer t;
-	while ((port->cmd & HBA_PxCMD_CR) == 1)
-	{
-		if (t.GetElapsedMillis() >= 500)		// wait for at least 500 millis
-			return false;
-	}
-
-	// Clear FRE (bit4)
-	port->cmd &= ~HBA_PxCMD_FRE;
-
-	t.Restart();
-	while ((port->cmd & HBA_PxCMD_FR) == 1)
-	{
-		if (t.GetElapsedMillis() >= 500)		// wait another 500 millis at least
-			return false;
-	}
-
-	// TODO: test if either CR or FR are zero and if not attempt reset
-	return true;
+	return ERROR_OK;
 }
+
+#pragma endregion
+
+#pragma region AHCI PRIVATE FUNCTIONS
 
 int32 ahci_find_empty_slot(HBA_PORT_t* port)
 {
@@ -103,13 +100,17 @@ int32 ahci_find_empty_slot(HBA_PORT_t* port)
 	return -1;
 }
 
-AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD count, BYTE PTR buf, bool read)
+error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD count, physical_addr buf, bool read)
 {
 	port->is = (DWORD)-1;	// clear interrupts
 
 	int slot = ahci_find_empty_slot(port);
 
-	if (slot == -1) { printf("SLOT_ERROR\n"); return SPIN_ERROR; }
+	if (slot == -1) 
+	{
+		set_last_error(EBUSY, AHCI_NO_PORT_AVAIL, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
+	}
 
 	HBA_CMD_HEADER_t* cmd = (HBA_CMD_HEADER_t*)port->clb;
 	cmd += slot;
@@ -170,8 +171,8 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 	{
 		if (t.GetElapsedMillis() >= 500)
 		{
-			printf("SPIN ERROR\n");
-			return SPIN_ERROR;
+			set_last_error(EBUSY, AHCI_SPIN_ERROR, EO_MASS_STORAGE_DEV);
+			return ERROR_OCCUR;
 		}
 	}
 
@@ -185,43 +186,70 @@ AHCIResult ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWOR
 			break;
 		if (port->is & HBA_PxIS_TFES)	// Task file error
 		{
-			printf("TASK ERROR\n");
-			return TASK_ERROR;
+			set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+			return ERROR_OCCUR;
 		}
 	}
 
 	// Check again
 	if (port->is & HBA_PxIS_TFES)
 	{
-		printf("ERROR\n");
-		return TASK_ERROR;
+		set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
 	}
 
 	port->ci = 0;
 
-	return AHCI_NO_ERROR;
+	return ERROR_OK;
 }
 
-int ahci_mass_storage_read(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
+bool ahci_start_cmd(HBA_PORT_t* port)
 {
-	HBA_PORT_t* port = &abar->ports[info->volume_port];
-	BYTE PTR buf = (BYTE PTR)address;
+	if ((port->cmd & HBA_PxCMD_CR) != 0 || (port->cmd & HBA_PxCMD_FR) != 0 || (port->cmd & HBA_PxCMD_FRE) != 0)
+		PANIC("Port is still running");
 
-	if (ahci_is_port_ok(info->volume_port) == false)
-		return PORT_NOT_OK;
+	// Set FRE (bit4) and ST (bit0)
+	port->cmd |= HBA_PxCMD_FRE;
 
-	return ahci_data_transfer(port, startl, starth, count, buf, true);
+	Timer t;
+	while (t.GetElapsedMillis() <= 500);
+
+	t.Restart();
+
+	while ((port->tfd & 0x80) != 0 || (port->tfd & 0x8) != 0 || (port->ssts & 0xF) != 3)
+	{
+		if (t.GetElapsedMillis() >= 1000)
+			return false;
+	}
+
+	port->cmd |= HBA_PxCMD_ST;
+	return true;
 }
 
-int ahci_mass_storage_write(ahci_storage_info* info, uint32 startl, uint32 starth, uint32 count, VOID* address)
+bool ahci_stop_cmd(HBA_PORT_t* port)
 {
-	HBA_PORT_t* port = &abar->ports[info->volume_port];
-	BYTE PTR buf = (BYTE PTR)address;
+	// Clear ST (bit0)
+	port->cmd &= ~HBA_PxCMD_ST;
 
-	if (ahci_is_port_ok(info->volume_port) == false)
-		return PORT_NOT_OK;
+	Timer t;
+	while ((port->cmd & HBA_PxCMD_CR) == 1)
+	{
+		if (t.GetElapsedMillis() >= 500)		// wait for at least 500 millis
+			return false;
+	}
 
-	return ahci_data_transfer(port, startl, starth, count, buf, false);
+	// Clear FRE (bit4)
+	port->cmd &= ~HBA_PxCMD_FRE;
+
+	t.Restart();
+	while ((port->cmd & HBA_PxCMD_FR) == 1)
+	{
+		if (t.GetElapsedMillis() >= 500)		// wait another 500 millis at least
+			return false;
+	}
+
+	// TODO: test if either CR or FR are zero and if not attempt reset
+	return true;
 }
 
 void ahci_callback(registers_t* regs)
@@ -248,9 +276,11 @@ void ahci_callback(registers_t* regs)
 	//PANIC("ahci interrupt");
 }
 
+#pragma endregion
+
 //public functions
 
-void init_ahci(HBA_MEM_t* _abar, uint32 base)
+error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 {
 	if (_abar == 0)
 		PANIC("null abar");
@@ -258,38 +288,35 @@ void init_ahci(HBA_MEM_t* _abar, uint32 base)
 	AHCI_BASE = base;
 	abar = _abar;
 
-	if (!vmmngr_alloc_page((virtual_addr)abar))
+	if (vmmngr_alloc_page((virtual_addr)abar) != ERROR_OK)
 		PANIC("Virtual memory allocation for ahci failed");
 
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 	{
 		if (ahci_is_port_implemented(i))
 		{
-			ahci_port_rebase(i);
+			if (ahci_port_rebase(i) != ERROR_OK)
+				return ERROR_OCCUR;
 
 			if (ahci_is_port_ok(i))
-				ahci_setup_vfs_port(i);
+				if (ahci_setup_vfs_port(i) != ERROR_OK)
+					return ERROR_OCCUR;
 		}
 	}
 
 	//register_interrupt_handler(43, ahci_callback);
 	//ahci_enable_interrupts(false);
 
-	printfln("ahci driver initialized with port_ok %h", port_ok);
+	return ERROR_OK;
 }
 
-void ahci_print_dmd(ahci_storage_info* info)
-{
-	printfln("size: %h, port: %u, serial: %s", info->storage_info.volume_size, info->volume_port, info->storage_info.serial_number);
-}
-
-void ahci_setup_vfs_port(uint8 port_num)
+error_t ahci_setup_vfs_port(uint8 port_num)
 {
 	char buf[512];
 
 	// read identify packet
-	if (ahci_send_identify(port_num, buf) != AHCIResult::AHCI_NO_ERROR)
-		return;
+	if (ahci_send_identify(port_num, buf) != ERROR_OK)
+		return ERROR_OCCUR;
 
 	// create device node and get deep metadata
 	char name[8] = { 0 };
@@ -304,21 +331,20 @@ void ahci_setup_vfs_port(uint8 port_num)
 	dev_dmd->storage_info.volume_size = *(uint32*)(ptr + 60);
 	memcpy(dev_dmd->storage_info.serial_number, ptr + 10, 20);
 	dev_dmd->storage_info.sector_size = 512;
-	dev_dmd->storage_info.entry_point = ahci_main;
 	dev_dmd->volume_port = port_num;
-	dev_dmd->storage_info.read = (mass_read)ahci_mass_storage_read;
-	dev_dmd->storage_info.write = (mass_write)ahci_mass_storage_write;
+
+	return ERROR_OK;
 }
 
-void ahci_port_rebase(uint8 port_num)
+error_t ahci_port_rebase(uint8 port_num)
 {
 	//printfln("rebase port: %u", port_num);
 	HBA_PORT_t* port = &abar->ports[port_num];
 
 	if (ahci_stop_cmd(port) == false)
 	{
-		printfln("port %u is not ok due to stop", port_num);
-		return;
+		set_last_error(EIO, AHCI_CANT_STOP_PORT, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
 	}
 
 	// Command list entry size = 32 bytes
@@ -358,46 +384,15 @@ void ahci_port_rebase(uint8 port_num)
 	//port->ie = (DWORD)-1;
 	if (ahci_start_cmd(port) == false)
 	{
-		printfln("port %u is not ok due to start", port_num);
-		return;
+		set_last_error(EIO, AHCI_CANT_STOP_PORT, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
 	}
 
 	port_ok |= (1 << port_num);
+	return ERROR_OK;
 }
 
-AHCIResult ahci_read(uint8 port_num, DWORD startl, DWORD starth, DWORD count, VOID* _buf)
-{
-	HBA_PORT_t* port = &abar->ports[port_num];
-	BYTE PTR buf = (BYTE PTR)_buf;
-
-	if (ahci_is_port_ok(port_num) == false)
-		return PORT_NOT_OK;
-
-	return ahci_data_transfer(port, startl, starth, count, buf, true);
-}
-
-char* ahci_read(ahci_storage_info* info, DWORD startl, DWORD starth, DWORD count)
-{
-	uint8 cnt = min(count, 8);
-	if (ahci_read(info->volume_port, startl, starth, cnt, (VOID*)vmmngr_get_phys_addr((virtual_addr)buffer))
-		!= AHCIResult::AHCI_NO_ERROR)
-		return 0;
-
-	return buffer;
-}
-
-AHCIResult ahci_write(uint8 port_num, DWORD startl, DWORD starth, DWORD count, VOID* _buf)
-{
-	HBA_PORT_t* port = &abar->ports[port_num];
-	BYTE PTR buf = (BYTE PTR)_buf;
-
-	if (ahci_is_port_ok(port_num) == false)
-		return PORT_NOT_OK;
-
-	return ahci_data_transfer(port, startl, starth, count, buf, false);
-}
-
-AHCIResult ahci_send_identify(uint8 port_num, VOID* _buf)
+error_t ahci_send_identify(uint8 port_num, VOID* _buf)
 {
 	HBA_PORT_t* port = &abar->ports[port_num];
 	BYTE PTR buf = (BYTE PTR)_buf;
@@ -407,7 +402,11 @@ AHCIResult ahci_send_identify(uint8 port_num, VOID* _buf)
 
 	int slot = ahci_find_empty_slot(port);
 
-	if (slot == -1) { printf("SLOT_ERROR\n"); return SLOT_ERROR; }
+	if (slot == -1)
+	{
+		set_last_error(EBUSY, AHCI_NO_PORT_AVAIL, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
+	}
 
 	HBA_CMD_HEADER_t* cmd = (HBA_CMD_HEADER_t*)port->clb;
 	cmd += slot;
@@ -447,8 +446,8 @@ AHCIResult ahci_send_identify(uint8 port_num, VOID* _buf)
 	}
 	if (spin == 1000000)
 	{
-		printf("SPIN ERROR\n");
-		return SPIN_ERROR;
+		set_last_error(EBUSY, AHCI_SPIN_ERROR, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
 	}
 
 	port->ci = 1 << slot;	// Issue command
@@ -462,20 +461,27 @@ AHCIResult ahci_send_identify(uint8 port_num, VOID* _buf)
 			break;
 		if (port->is & HBA_PxIS_TFES)	// Task file error
 		{
-			printf("TASK ERROR\n");
-			return TASK_ERROR;
+			set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+			return ERROR_OCCUR;
 		}
 	}
 
 	// Check again
 	if (port->is & HBA_PxIS_TFES)
 	{
-		printf("ERROR\n");
-		return TASK_ERROR;
+		set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+		return ERROR_OCCUR;
 	}
 
-	return AHCI_NO_ERROR;
+	return ERROR_OK;
 }
+
+void ahci_print_dmd(ahci_storage_info* info)
+{
+	printfln("size: %h, port: %u, serial: %s", info->storage_info.volume_size, info->volume_port, info->storage_info.serial_number);
+}
+
+/* misc functions for comfortable handling */
 
 inline bool ahci_is_64bit()
 {

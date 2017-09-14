@@ -38,9 +38,7 @@ list_node<T>* list_get_prev(list<T>* l, T item)
 		return 0;
 
 	if (l->count == 1)
-	{
 		return l->head;
-	}
 
 	list_node<T>* temp = l->head;
 
@@ -249,6 +247,8 @@ void list_clear(list<T>* l)
 {
 	while (l->count > 0)
 		list_remove_front(l);
+
+	l->head = l->tail = 0;
 }
 
 #endif

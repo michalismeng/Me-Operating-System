@@ -8,18 +8,26 @@
 #include "mmngr_virtual.h"
 #include "vfs.h"
 
-enum AHCIResult { AHCI_NO_ERROR = 0, CONTROLLER_DISABLED, PORT_NOT_IMPLEMENTED, PORT_ATAPI, SLOT_ERROR, SPIN_ERROR, TASK_ERROR, PORT_NOT_OK };
+enum AHCI_ERROR 
+{ 
+	AHCI_NONE = 0, 
+	AHCI_NO_PORT_AVAIL,
+	AHCI_CONTROLLER_DISABLED, 
+	AHCI_PORT_NOT_IMPLEMENTED, 
+	AHCI_CANT_STOP_PORT,
+	AHCI_CANT_START_PORT,
+	AHCI_PORT_ATAPI, 
+	AHCI_SLOT_ERROR, 
+	AHCI_SPIN_ERROR, 
+	AHCI_TASK_ERROR, 
+	AHCI_PORT_NOT_OK,
+	AHCI_BAD_NODE_STRUCTURE
+};
 
-void init_ahci(HBA_MEM_t* abar, uint32 base);
+error_t init_ahci(HBA_MEM_t* abar, uint32 base);
 
-void ahci_port_rebase(uint8 port_no);
-
-void* ahci_main(uint32 ahci_command, ...);
-
-AHCIResult ahci_read(uint8 port, DWORD startl, DWORD starth, DWORD count, VOID* buf);
-char* ahci_read(ahci_storage_info* info, DWORD startl, DWORD starth, DWORD count);
-AHCIResult ahci_write(uint8 port, DWORD startl, DWORD starth, DWORD count, VOID* buf);
-AHCIResult ahci_send_identify(uint8 port, VOID* buf);
+error_t ahci_port_rebase(uint8 port_no);
+error_t ahci_send_identify(uint8 port, VOID* buf);
 
 inline bool ahci_is_64bit();
 inline bool ahci_has_LED();
@@ -40,7 +48,7 @@ volatile inline bool ahci_is_port_implemented(uint8 port);
 inline bool ahci_is_port_ok(uint8 port);
 
 void ahci_print_caps();
-void ahci_setup_vfs_port(uint8 port_num);
+error_t ahci_setup_vfs_port(uint8 port_num);
 void ahci_print_dmd(ahci_storage_info* info);
 
 #endif

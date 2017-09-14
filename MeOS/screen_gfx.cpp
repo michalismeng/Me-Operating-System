@@ -9,7 +9,7 @@ const int FONT_CHAR_WIDTH = 8, FONT_CHAR_PAD = 1, FONT_CHAR_HEIGHT = 16, FONT_EN
 const int FONT_SIZE = (FONT_CHAR_WIDTH + FONT_CHAR_PAD) * FONT_CHAR_HEIGHT * FONT_ENTRIES;
 
 char font[FONT_SIZE];
-int font_fd;
+uint32 font_fd;
 
 vbe_mode_info_block* vbe;
 
@@ -19,10 +19,10 @@ uint32 foreground = 0, background = 0;
 
 bool screen_initialized = false;
 
-uint32 screen_gfx_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result screen_gfx_open(vfs_node* node);
-uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address);
-vfs_result screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
+error_t screen_gfx_open(vfs_node* node);
+size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
+error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
 
 
 // file operations
@@ -37,25 +37,25 @@ static fs_operations screen_gfx_operations =
 	screen_gfx_ioctl		// ioctl?
 };
 
-uint32 screen_gfx_read(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	serial_printf("WARNING: tried to read from screen\n");
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-vfs_result screen_gfx_open(vfs_node* node)
+error_t screen_gfx_open(vfs_node* node)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
-uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virtual_addr address)
+size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	uint8* ptr = ((uint8*)address) + start;
-	uint32 res;
+	size_t res;
 
 	if (count != 0)
 	{
-		for (uint32 i = 0; i < count; i++)
+		for (size_t i = 0; i < count; i++)
 			draw_char(ptr[i]);
 
 		res = count;
@@ -65,15 +65,15 @@ uint32 screen_gfx_write(int fd, vfs_node* file, uint32 start, uint32 count, virt
 		while (*ptr != 0)
 			draw_char(*ptr++);
 
-		res = (uint32)ptr - address;
+		res = (size_t)ptr - address;
 	}
 
 	return res;
 }
 
-vfs_result screen_gfx_ioctl(vfs_node* node, uint32 command, ...)
+error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...)
 {
-	return VFS_OK;
+	return ERROR_OK;
 }
 
 point make_point(uint16 x, uint16 y)
@@ -91,8 +91,8 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 
 	uint32 frame_length = vbe->pitch * vbe->height;
 
-	if (!mmap(vbe->framebuffer & (~0xFFF), INVALID_FD, 0, frame_length + PAGE_SIZE - (frame_length % PAGE_SIZE), 
-		MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
+	if (!vfs_mmap(vbe->framebuffer & (~0xFFF), INVALID_FD, 0, frame_length + PAGE_SIZE - (frame_length % PAGE_SIZE), 
+		PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE) == MAP_FAILED)
 		PANIC("Could not map screen region");
 
 	load_default_font();
@@ -147,7 +147,7 @@ void clear_screen()
 
 void load_default_font()
 {
-	if (open_file("sdc_mount/FONT.RAW", &font_fd) != VFS_OK)
+	if (open_file("sdc_mount/FONT.RAW", &font_fd, O_NOCACHE) != ERROR_OK)
 	{
 		serial_printf("Font could not be loaded. File not found.\n");
 		return;
@@ -256,6 +256,8 @@ void draw_char(char c)
 		cursor.y++;
 		break;	
 	default:
+		if (c == 0x09)			// TAB CHARACTER
+			c = 0x20;			// MAKE IT A SPACE
 		_draw_char(c, make_point(cursor.x * 8, cursor.y * 16));
 		cursor.x++;
 		break;
