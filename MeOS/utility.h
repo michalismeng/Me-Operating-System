@@ -44,6 +44,18 @@ extern "C" {
 	uint32 pow(uint32 base, uint32 exp);
 	uint32 ceil_division(uint32 value, uint32 divisor);
 
+	// returns the netowrk representation of the long host parameter
+	uint32 htonl(uint32 host);
+
+	// returns the network representation of the short host parameter
+	uint16 htons(uint16 host);
+
+	// returns the host representation of the long net parameter
+	uint32 ntohl(uint32 net);
+
+	// returns the host representation of the short net parameter
+	uint16 ntohs(uint16 net);
+
 #ifdef __cplusplus
 }
 #endif

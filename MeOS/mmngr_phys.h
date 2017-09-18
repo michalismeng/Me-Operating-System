@@ -16,8 +16,6 @@ extern "C" {
 		PMEM_BAD_ARGUMENT
 	};
 
-	typedef uint32 physical_addr;
-
 	struct physical_memory_region
 	{
 		physical_memory_region() {}

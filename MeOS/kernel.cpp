@@ -12,7 +12,6 @@
 #include "AHCI.h"
 
 #include "memory.h"
-#include "mngr_device.h"
 
 #include "process.h"
 #include "mutex.h"
@@ -39,6 +38,8 @@
 #include "VBEDefinitions.h"
 #include "screen_gfx.h"
 #include "print_utility.h"
+#include "ethernet.h"
+#include "arp.h"
 
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
@@ -330,6 +331,36 @@ void keyboard_fancy_function()
 				for (int i = 0; i < 50; i++)
 					printf("%c", __temp[i]);
 				printfln(".End");
+			}
+			else if (c == KEYCODE::KEY_N)
+			{
+				clear_screen();
+				char* ptr = (char*)page_cache_reserve_anonymous();
+
+				memset(ptr, 0, 300);
+
+				serial_printf("sending dummy packet\n");
+
+				uint16 bytes = 0x1234;
+				printfln("htons(%h) = %h", bytes, htons(bytes));
+
+				extern e1000* nic_dev;
+
+				uint8 src_mac[6] = { 0x98, 0x90, 0x96, 0xAA, 0x62, 0x7F };
+				uint8 dest_mac[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+				uint8 zero_mac[6] = { 0, 0, 0, 0, 0, 0 };
+				uint8 src_ip[4] = { 192, 168, 1, 16 };
+				uint8 dest_ip[4] = { 192, 168, 1, 11 };
+				uint8 gateway[4] = { 192, 168, 1, 254 };
+
+				eth_header* eth = eth_create((virtual_addr)ptr, dest_mac, nic_dev->mac, 0x806);
+				arp_create((virtual_addr)eth->eth_data, HW_ETHER, PROTO_IPv4, 6, 4, ARP_REQ, nic_dev->mac, src_ip, zero_mac, dest_ip);
+				//eth_print(eth);
+
+				uint16 arp_size = sizeof(arp_header) + sizeof(arp_ipv4);
+				e1000_sendPacket(nic_dev, (void*)vmmngr_get_phys_addr((virtual_addr)ptr), sizeof(eth_header) + arp_size + max(0, 60 - sizeof(eth_header) - arp_size));
+
+				serial_printf("send packet done!\n");
 			}
 		}
 	}

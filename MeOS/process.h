@@ -2,7 +2,6 @@
 #define PROCESS_H_28082016
 
 #include "queue.h"
-#include "Simple_fs.h"		// to be removed
 
 #include "vm_contract.h"
 #include "open_file_table.h"

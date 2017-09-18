@@ -2,6 +2,7 @@
 #define NETWORK_I217_H_09012017
 
 #include "types.h"
+#include "error.h"
 #include "utility.h"
 #include "system.h"
 
@@ -59,6 +60,8 @@
 #define RCTL_PMCF                       (1 << 23)   // Pass MAC Control Frames
 #define RCTL_SECRC                      (1 << 26)   // Strip Ethernet CRC
 
+#define CTRL_SLU			(1 << 6)
+
 // Buffer Sizes
 #define RCTL_BSIZE_256                  (3 << 16)
 #define RCTL_BSIZE_512                  (2 << 16)
@@ -99,8 +102,7 @@
 
 struct e1000_rx_desc
 {
-	volatile uint32 addr;
-	volatile uint32 addr_high;		// ??
+	volatile uint64 addr;
 
 	volatile uint16 length;
 	volatile uint16 checksum;
@@ -111,8 +113,8 @@ struct e1000_rx_desc
 
 struct e1000_tx_desc
 {
-	volatile uint32 addr;
-	volatile uint32 addr_high;		// ??
+	volatile uint64 addr;
+	volatile uint16 length;
 
 	volatile uint8 cso;
 	volatile uint8 cmd;
@@ -140,5 +142,11 @@ void e1000_write_command(e1000* dev, uint16 addr, uint32 value);
 uint32 e1000_read_command(e1000* dev, uint16 addr);
 bool e1000_detect_eeprom(e1000* dev);
 uint32 e1000_eeprom_read(e1000* dev, uint8 addr);
+
+bool e1000_read_mac_address(e1000* dev);
+void rx_init(e1000* dev, physical_addr base_rx);
+void tx_init(e1000* dev, physical_addr base_tx);
+e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physical_addr rx_base);
+int e1000_sendPacket(e1000* dev, void* p_data, uint16 p_len);
 
 #endif
