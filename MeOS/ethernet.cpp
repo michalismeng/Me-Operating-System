@@ -2,6 +2,7 @@
 #include "print_utility.h"
 #include "SerialDebugger.h"
 #include "i217.h"
+#include "arp.h"
 
 extern e1000* nic_dev;
 
@@ -76,5 +77,24 @@ eth_header* eth_create(virtual_addr header, uint8* dest_mac, uint8* src_mac, uin
 void eth_send(eth_header* eth, uint32 data_size)
 {
 	uint32 packet_size = sizeof(eth_header) + data_size;
-	e1000_sendPacket(nic_dev, eth, packet_size + max(0, 60 - packet_size));
+	e1000_sendPacket(nic_dev, eth, packet_size /*+ max(0, 60 - packet_size)*/);
+}
+
+void eth_recv(eth_header* eth)
+{
+	// check if this packet's destination is our pc
+	if (eth_cmp_mac(eth->dest_mac, nic_dev->mac) == false && eth_cmp_mac(eth->dest_mac, mac_broadcast) == false)
+		return;
+
+	uint16 eth_type = ntohs(eth->eth_type);
+
+	switch (ntohs(eth->eth_type))
+	{
+	case ETH_TYPE_ARP:
+		arp_recv((arp_header*)eth->eth_data);
+
+	case ETH_TYPE_IPv4:
+		//ip_recv
+		break;
+	}
 }

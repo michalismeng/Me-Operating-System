@@ -3,7 +3,6 @@
 #include "SerialDebugger.h"
 #include "isr.h"
 #include "ethernet.h"
-#include "arp.h"
 #include "mmngr_virtual.h"
 
 void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
@@ -156,11 +155,9 @@ int e1000_sendPacket(e1000* dev, void* data, uint16 p_len)
 	e1000_write_command(dev, REG_TXDESCTAIL, dev->tx_cur);
 
 	while (!(dev->tx_descs[old_cur]->status & 0xf));
-	serial_printf("packet sent\n");
 	return 0;
 }
 
-uint32 recv_packet = 0;
 
 void e1000_recv_packet(e1000* dev)
 {
@@ -172,22 +169,7 @@ void e1000_recv_packet(e1000* dev)
 	// write the tail to the device
 	e1000_write_command(dev, REG_RXDESCTAIL, dev->rx_cur);
 
-	eth_header* eth = (eth_header*)pkt;
-
-	//serial_printf("received packets: %u length: %u address: %h\n", recv_packet++, pktlen, pkt);
-
-	if (ntohs(eth->eth_type) == 0x0806 && (eth_cmp_mac(eth->dest_mac, dev->mac) || eth_cmp_mac(eth->dest_mac, mac_broadcast)))
-	{
-		arp_ipv4* arp = (arp_ipv4*)((arp_header*)eth->eth_data)->data;
-
-		arp_receive((arp_header*)eth->eth_data);
-
-		//eth_print(eth);
-		serial_printf("arp source mac: %x %x %x %x %x %x\n", arp->src_mac[0], arp->src_mac[1], arp->src_mac[2], arp->src_mac[3], arp->src_mac[4], arp->src_mac[5]);
-		serial_printf("arp source ip: %u.%u.%u.%u\n", arp->src_ip[0], arp->src_ip[1], arp->src_ip[2], arp->src_ip[3]);
-		serial_printf("arp destination ip: %u.%u.%u.%u----\n", arp->dest_ip[0], arp->dest_ip[1], arp->dest_ip[2], arp->dest_ip[3]);
-	}
-
+	eth_recv((eth_header*)pkt);
 }
 
 void e1000_callback(registers_t* regs)

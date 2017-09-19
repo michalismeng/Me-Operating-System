@@ -5,7 +5,7 @@
 
 extern e1000* nic_dev;
 
-uint8 static_ip[4] = { 192, 168, 1, 30 };
+uint8 my_ip[4] = { 192, 168, 1, 30 };
 
 bool protocol_addr_equal(uint8* proto1, uint8* proto2, uint8 len)
 {
@@ -25,25 +25,24 @@ void arp_receive_ipv4(arp_header* arp)
 	// if exists => merged = true + upddate the cache with src_mac
 
 	// check dest_ip with my own
-	if (protocol_addr_equal(arp4->dest_ip, static_ip, 4))
+	if (protocol_addr_equal(arp4->dest_ip, my_ip, 4))
 	{
 		// if not merged add into cache <ipv4, src_ip, src_mac>
 		if (ntohs(arp->opcode) == ARP_REQ)		// if this is a request then a reply is needed
 		{
 			// swap src and dest hardware/protocol addressed
 			// and send arp_reply
-			serial_printf("sending rep\n");
 			uint32 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
-			virtual_addr buffer = (virtual_addr)malloc(sizeof(eth_header) + arp_size);
+			virtual_addr buffer = (virtual_addr)calloc(sizeof(eth_header) + arp_size);
 			eth_header* eth = eth_create(buffer, arp4->src_mac, nic_dev->mac, 0x0806);
 			arp_create((virtual_addr)eth->eth_data, HW_ETHER, PROTO_IPv4, 6, 4, ARP_REP, nic_dev->mac, arp4->dest_ip, arp4->src_mac, arp4->src_ip);
 			eth_send(eth, arp_size);
-			serial_printf("rep sent\n");
+			free((void*)buffer);
 		}
 	}	
 }
 
-void arp_receive(arp_header* arp)
+void arp_recv(arp_header* arp)
 {
 	// check hardware supprt
 	if (arp->hw_type != htons(HW_ETHER))
