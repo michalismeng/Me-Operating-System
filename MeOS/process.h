@@ -57,7 +57,13 @@ _asm	mov esp, 0x90000
 		THREAD_ATTR_NONE,
 		THREAD_KERNEL = 1,					// thread is solely kernel => it does not have a user counter-part
 		THREAD_NONPREEMPT = 1 << 1,			// thread is non pre-emptible. This applies only to kernel threads. Preemption state may change during thread execution
-		THREAD_UNINTERRUPTIBLE = 1 << 2		// thread is uninterruptible on SIGNALS ! Interrupts affect this thread. (uninterruptible is not cli)
+		THREAD_UNINTERRUPTIBLE = 1 << 2,	// thread is uninterruptible on SIGNALS ! Interrupts affect this thread. (uninterruptible is not cli)
+	};
+
+	enum THREAD_LOCK {
+		THREAD_LOCK_NONE,
+		THREAD_LOCK_CRITICAL = 1 << 3,			// thread is in critical section, do not interrupt
+		THREAD_LOCK_YIELD = 1 << 4,				// thread must yield execution as soon as possible (mainly after exiting a critical section)
 	};
 
 #pragma pack(push, 1)
@@ -107,6 +113,7 @@ _asm	mov esp, 0x90000
 
 		THREAD_STATE state;							// the current state of the thread
 		THREAD_ATTRIBUTE attribute;					// thread's extra attribute info
+		uint32 thread_lock;							// thread lock status
 
 		queue_lf<thread_exception> exceptions;		// thread exception queue to be consumed and served by the kernel
 		uint32 exception_lock;						// lock for the exception consumption (to be used with CAS)

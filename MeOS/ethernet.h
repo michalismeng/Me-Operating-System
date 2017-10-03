@@ -1,8 +1,8 @@
 #ifndef ETHERNET_H_15092017
 #define ETHERNET_H_15092017
 
-#include "types.h"
-#include "utility.h"
+#include "net.h"
+#include "sock_buf.h"
 
 enum ETH_TYPE
 {
@@ -30,10 +30,10 @@ bool eth_cmp_mac(uint8* mac1, uint8* mac2);
 static uint8 mac_broadcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 // creates an ethernet packet at the given address and returns the created header
-eth_header* eth_create(virtual_addr header, uint8* dest_mac, uint8* src_mac, uint16 eth_type);
+eth_header* eth_create(sock_buf* buffer, uint8* dest_mac, uint8* src_mac, uint16 eth_type);
 
-void eth_send(eth_header* eth, uint32 data_size);
+void eth_send(sock_buf* eth);
 
-void eth_recv(eth_header* eth);
+void eth_recv(sock_buf* eth);
 
 #endif

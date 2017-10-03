@@ -2,7 +2,8 @@
 #define UDP_H_19092017
 
 #include "types.h"
-#include "utility.h"
+#include "net.h"
+#include "sock_buf.h"
 
 #pragma pack(push, 1)
 
@@ -21,6 +22,9 @@ struct udp_header
 uint16 udp_checksum(udp_header* header);
 
 // creates a udp header and returns it
-udp_header* udp_create(virtual_addr header, uint16 src_port, uint16 dest_port, uint16 data_len);
+udp_header* udp_create(sock_buf* buffer, uint16 src_port, uint16 dest_port, uint16 data_len);
+
+void udp_send(sock_buf* buffer);
+void udp_recv(sock_buf* buffer);
 
 #endif

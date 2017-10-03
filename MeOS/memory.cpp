@@ -1,12 +1,16 @@
 #include "memory.h"
 #include "spinlock.h"
 #include "thread_sched.h"
+#include "print_utility.h"
 
 extern heap* kernel_heap;
 spinlock kernel_heap_lock = 0;
 
 void* malloc(uint32 size)
 {
+	if (thread_get_current()->id == 2 && kernel_heap_lock == 1)
+		PANIC("malloc is not free");
+
 	spinlock_acquire(&kernel_heap_lock);
 	void* addr = heap_alloc(kernel_heap, size);
 	spinlock_release(&kernel_heap_lock);

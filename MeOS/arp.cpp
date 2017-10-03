@@ -32,12 +32,12 @@ void arp_receive_ipv4(arp_header* arp)
 		{
 			// swap src and dest hardware/protocol addressed
 			// and send arp_reply
-			uint32 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
+			/*uint32 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
 			virtual_addr buffer = (virtual_addr)calloc(sizeof(eth_header) + arp_size);
 			eth_header* eth = eth_create(buffer, arp4->src_mac, nic_dev->mac, 0x0806);
 			arp_create((virtual_addr)eth->eth_data, HW_ETHER, PROTO_IPv4, 6, 4, ARP_REP, nic_dev->mac, arp4->dest_ip, arp4->src_mac, arp4->src_ip);
 			eth_send(eth, arp_size);
-			free((void*)buffer);
+			free((void*)buffer);*/
 		}
 	}	
 }

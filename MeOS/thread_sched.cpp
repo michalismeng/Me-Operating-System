@@ -166,6 +166,13 @@ PCB* process_get_current()
 
 void scheduler_thread_switch()
 {
+	// if the current thread is in a critical section (critlock), do not change execution
+	if ((current_thread->thread_lock & THREAD_LOCK_CRITICAL) == THREAD_LOCK_CRITICAL)
+	{
+		current_thread->thread_lock |= THREAD_LOCK_YIELD;
+		return;
+	}
+
 	// assertions:
 	// thread's state is saved on its stack
 	// esp points to neutral stack

@@ -43,6 +43,10 @@
 #include "ip.h"
 #include "udp.h"
 
+#include "critlock.h"
+#include "net.h"
+#include "sock_buf.h"
+
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
 
@@ -79,18 +83,36 @@ void test1()
 {
 	printfln("executing test 1");
 
-	for (int i = 0; i < 100000; i++)
+	for (int i = 0; i < 10000000; i++)
 	{
+		critlock_acquire();
+
+		_asm
+		{
+			mov eax, a
+			inc eax
+			pause
+			pause
+			pause
+			pause
+			pause
+			mov a, eax
+		}
+
+		critlock_release();
+
 		//if (!queue_lf_insert(&q, (short)i))
 		//	fail_insert++;
 	}
 
-	printfln("fail insert: %u", fail_insert);
+	//printfln("fail insert: %u", fail_insert);
 
 	//thread_sleep(thread_get_current(), 1000);
-	printfln("queue:");
+	//printfln("queue:");
 	//for (int i = 0; i < 10; i++)
 	//	printf("%u ", q.buffer[i]);
+
+	serial_printf("test 1 finished: %u", a);
 	while (true);
 }
 
@@ -98,12 +120,31 @@ void test2()
 {
 	printfln("executing test 2");
 
-	char* x = (char*)0x800000;
+	for (int i = 0; i < 10000000; i++)
+	{
+		critlock_acquire();
+
+		_asm
+		{
+			mov eax, a
+			inc eax
+			mov a, eax
+		}
+
+		critlock_release();
+
+		//if (!queue_lf_insert(&q, (short)i))
+		//	fail_insert++;
+	}
+
+	/*char* x = (char*)0x800000;
 
 	for (int i = 0; i < 5; i++)
 		x[i] = 'b';
 
-	serial_printf("end of test2\n");
+	serial_printf("end of test2\n");*/
+
+	serial_printf("test 2 finished: %u\n", a);
 
 	while (true);
 }
@@ -337,10 +378,6 @@ void keyboard_fancy_function()
 			else if (c == KEYCODE::KEY_N)
 			{
 				clear_screen();
-				char* ptr = (char*)page_cache_reserve_anonymous();
-
-				memset(ptr, 0, 300);
-
 				serial_printf("sending dummy packet\n");
 
 				uint16 bytes = 0x1234;
@@ -358,19 +395,32 @@ void keyboard_fancy_function()
 				uint8 pc_ip[4] = { 192, 168, 1, 11 };
 				uint8 gateway[4] = { 192, 168, 1, 254 };
 				uint8 zamanis_ip[4] = { 0, 0, 0, 0 };
-				uint8 rafael_ip[4] = { 5, 55, 165, 116 };
+				uint8 rafael_ip[4] = { 5, 55, 107, 232 };
+				uint8 pipinis_ip[4] = { 94, 66, 17, 174 };
 
 				uint8 hello[] = "Hello world!!";
 				uint16 data_length = sizeof(hello);
 
-				eth_header* eth = eth_create((virtual_addr)ptr, pc_mac, nic_dev->mac, 0x800);
-				ipv4* ip = ipv4_create((virtual_addr)eth->eth_data, 0, 0, 0, 0, 0, 128, 17, my_ip, pc_ip, 0, 0,
+				SKB sock_main;
+				SKB* sock = &sock_main;
+
+				if (sock_buf_init(sock, 200) != ERROR_OK)
+					DEBUG("socket creation failed");
+
+				memset(sock->head, 0, 200);
+
+				eth_header* eth = eth_create(sock, pc_mac, nic_dev->mac, 0x800);
+
+				ipv4* ip = ipv4_create(sock, 0, 0, 0, 0, 0, 128, 17, my_ip, pc_ip, 0, 0,
 					data_length + sizeof(udp_header));
 
-				udp_header* packet = udp_create((virtual_addr)ipv4_get_data_addr(ip), 12345, 12345, data_length);
-				memcpy(packet->data, hello, data_length);
+				udp_header* packet = udp_create(sock, 12345, 12345, data_length);
+				sock_buf_put(sock, hello, data_length);
 
-				eth_send(eth, ntohs(ip->len));
+				udp_send(sock);
+
+				if(sock_buf_release(sock))
+					DEBUG("socket release failed");
 			}
 		}
 	}
@@ -508,6 +558,7 @@ multiboot_info* boot_info;
 
 void proc_init_thread()
 {
+	INT_OFF;
 	printfln("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
@@ -765,17 +816,16 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
-
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
-	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
-	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
+	/////*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
+	////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
-	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
-	thread_insert(thread);
-	thread_test_time = thread;
+	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
+	//thread_insert(thread);
+	thread_test_time = 0;//thread;
 	ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
@@ -785,7 +835,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 	clear_screen();
-
+	serial_printf("int on\n");
 	INT_ON;
 
 

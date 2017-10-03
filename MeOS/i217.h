@@ -147,6 +147,6 @@ bool e1000_read_mac_address(e1000* dev);
 void rx_init(e1000* dev, physical_addr base_rx);
 void tx_init(e1000* dev, physical_addr base_tx);
 e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physical_addr rx_base);
-int e1000_sendPacket(e1000* dev, void* p_data, uint16 p_len);
+int e1000_send(e1000* dev, void* p_data, uint16 p_len);
 
 #endif

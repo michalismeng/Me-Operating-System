@@ -4,6 +4,12 @@
 #include "isr.h"
 #include "ethernet.h"
 #include "mmngr_virtual.h"
+#include "process.h"
+#include "queue_lf.h"
+#include "thread_sched.h"
+
+TCB* net_daemon = 0;
+queue_lf<uint32> recv_queue;
 
 void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
 {
@@ -144,8 +150,10 @@ void tx_init(e1000* dev, physical_addr base_tx)
 	e1000_write_command(dev, REG_TIPG, 0x0060200A);
 }
 
-int e1000_sendPacket(e1000* dev, void* data, uint16 p_len)
+int e1000_send(e1000* dev, void* data, uint16 p_len)
 {
+	serial_printf("sending packet: %u bytes", p_len);
+
 	dev->tx_descs[dev->tx_cur]->addr = vmmngr_get_phys_addr((virtual_addr)data);
 	dev->tx_descs[dev->tx_cur]->length = p_len;
 	dev->tx_descs[dev->tx_cur]->cmd = /*((1 << 3) | (3));*/ CMD_EOP | CMD_IFCS | CMD_RS | CMD_RPS;
@@ -158,18 +166,56 @@ int e1000_sendPacket(e1000* dev, void* data, uint16 p_len)
 	return 0;
 }
 
+extern e1000* nic_dev;
+
+void e1000_recv_defered()
+{
+	while (true)
+	{
+		uint32 count = 0;
+		while (queue_lf_is_empty(&recv_queue) == false)
+		{
+			uint32 pkt_ind = queue_lf_peek(&recv_queue);
+			queue_lf_remove(&recv_queue);
+
+			uint8 *pkt = (uint8 *)nic_dev->rx_descs[pkt_ind]->addr;
+			uint16 pktlen = nic_dev->rx_descs[pkt_ind]->length;
+
+			sock_buf buffer;
+
+			buffer.head = pkt;
+			buffer.tail = pkt + pktlen;
+			buffer.data = pkt;
+
+			if (sock_buf_init_recv(&buffer, pktlen, pkt) != ERROR_OK)
+			{
+				DEBUG("net deferred context: could not init skb.");
+				serial_printf("error %e\n", get_last_error());
+			}
+
+			eth_recv(&buffer);
+			sock_buf_release(&buffer);
+		}
+
+		thread_block(thread_get_current());
+	}
+}
 
 void e1000_recv_packet(e1000* dev)
 {
-	uint8 *pkt = (uint8 *)dev->rx_descs[dev->rx_cur]->addr;
-	uint16 pktlen = dev->rx_descs[dev->rx_cur]->length;
-
+	uint32 recv_index = dev->rx_cur;
+	// increment and write the tail to the device
 	dev->rx_cur = (dev->rx_cur + 1) % E1000_NUM_RX_DESC;
-
-	// write the tail to the device
 	e1000_write_command(dev, REG_RXDESCTAIL, dev->rx_cur);
 
-	eth_recv((eth_header*)pkt);
+	// this should be done i separate thread
+	//e1000_recv_defered(dev, recv_index);
+	queue_lf_insert(&recv_queue, recv_index);
+
+	if (net_daemon != 0)
+		thread_notify(net_daemon);
+	else
+		DEBUG("net daemon is null");
 }
 
 void e1000_callback(registers_t* regs)
@@ -214,6 +260,12 @@ e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physi
 		e1000_write_command(dev, 0x5200 + i * 4, 0);
 
 	serial_printf("MAC address: %x %x %x %x %x %x\n", dev->mac[0], dev->mac[1], dev->mac[2], dev->mac[3], dev->mac[4], dev->mac[5]);
+
+	queue_lf_init(&recv_queue, 32);
+	net_daemon = thread_create(thread_get_current()->parent, (uint32)e1000_recv_defered, 3 GB + 10 MB + 496 KB, 4 KB, 1);
+	serial_printf("net daemon id: %u\n\n", net_daemon->id);
+	thread_insert(net_daemon);
+	thread_block(net_daemon);
 
 	e1000_enable_interrupts(dev);
 

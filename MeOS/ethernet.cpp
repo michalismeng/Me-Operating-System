@@ -62,33 +62,43 @@ bool eth_cmp_mac(uint8* mac1, uint8* mac2)
 	return true;
 }
 
-eth_header* eth_create(virtual_addr header, uint8* dest_mac, uint8* src_mac, uint16 eth_type)
+eth_header* eth_create(sock_buf* buffer, uint8* dest_mac, uint8* src_mac, uint16 eth_type)
 {
-	eth_header* eth = (eth_header*)header;
+	eth_header* eth = (eth_header*)buffer->data;
 
 	memcpy(eth->dest_mac, dest_mac, 6);
 	memcpy(eth->src_mac, src_mac, 6);
 
 	eth->eth_type = htons(eth_type);
 
+	sock_buf_push(buffer, sizeof(eth_header));
+
 	return eth;
 }
 
-void eth_send(eth_header* eth, uint32 data_size)
+void eth_send(sock_buf* buffer)
 {
-	uint32 packet_size = sizeof(eth_header) + data_size;
-	e1000_sendPacket(nic_dev, eth, packet_size /*+ max(0, 60 - packet_size)*/);
+	eth_header* eth = (eth_header*)buffer->head;
+
+	uint32 packet_size = sock_buf_get_data_len(buffer);
+	e1000_send(nic_dev, eth, packet_size /*+ max(0, 60 - packet_size)*/);
 }
 
-void eth_recv(eth_header* eth)
+void eth_recv(sock_buf* buffer)
 {
+	eth_header* eth = (eth_header*)buffer->data;
+
 	// check if this packet's destination is our pc
 	if (eth_cmp_mac(eth->dest_mac, nic_dev->mac) == false && eth_cmp_mac(eth->dest_mac, mac_broadcast) == false)
 		return;
 
+	printf("received ethernet packet. Type is: %h\n", ntohs(eth->eth_type));
+
 	uint16 eth_type = ntohs(eth->eth_type);
 
-	switch (ntohs(eth->eth_type))
+	sock_buf_push(buffer, sizeof(eth_header));
+
+	switch (eth_type)
 	{
 	case ETH_TYPE_ARP:
 		arp_recv((arp_header*)eth->eth_data);
