@@ -14,8 +14,6 @@ enum VMEM_ERROR
 	VMEM_BAD_ARGUMENT
 };
 
-typedef uint32 virtual_addr;
-
 #define PAGES_PER_TABLE 1024	// intel arch definitions
 #define TABLES_PER_DIR	1024
 #define PAGE_SIZE 4096

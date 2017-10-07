@@ -166,6 +166,13 @@ PCB* process_get_current()
 
 void scheduler_thread_switch()
 {
+	// if the current thread is in a critical section (critlock), do not change execution
+	if ((current_thread->thread_lock & THREAD_LOCK_CRITICAL) == THREAD_LOCK_CRITICAL)
+	{
+		current_thread->thread_lock |= THREAD_LOCK_YIELD;
+		return;
+	}
+
 	// assertions:
 	// thread's state is saved on its stack
 	// esp points to neutral stack
@@ -276,6 +283,7 @@ __declspec(naked) void thread_current_yield()
 
 __declspec(naked) void thread_block(TCB* thread)
 {
+
 	// TODO: Perhaps we will need to disable interrupts throughout this function to control the reading of the thread's state
 	_asm push ebp
 	_asm mov ebp, esp	// create a new stack frame, but destroy it immediatelly before messing with th thread stack

@@ -12,7 +12,6 @@
 #include "AHCI.h"
 
 #include "memory.h"
-#include "mngr_device.h"
 
 #include "process.h"
 #include "mutex.h"
@@ -39,6 +38,15 @@
 #include "VBEDefinitions.h"
 #include "screen_gfx.h"
 #include "print_utility.h"
+#include "ethernet.h"
+#include "arp.h"
+#include "ip.h"
+#include "udp.h"
+#include "icmp.h"
+
+#include "critlock.h"
+#include "net.h"
+#include "sock_buf.h"
 
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
@@ -76,18 +84,36 @@ void test1()
 {
 	printfln("executing test 1");
 
-	for (int i = 0; i < 100000; i++)
+	for (int i = 0; i < 10000000; i++)
 	{
+		critlock_acquire();
+
+		_asm
+		{
+			mov eax, a
+			inc eax
+			pause
+			pause
+			pause
+			pause
+			pause
+			mov a, eax
+		}
+
+		critlock_release();
+
 		//if (!queue_lf_insert(&q, (short)i))
 		//	fail_insert++;
 	}
 
-	printfln("fail insert: %u", fail_insert);
+	//printfln("fail insert: %u", fail_insert);
 
 	//thread_sleep(thread_get_current(), 1000);
-	printfln("queue:");
+	//printfln("queue:");
 	//for (int i = 0; i < 10; i++)
 	//	printf("%u ", q.buffer[i]);
+
+	serial_printf("test 1 finished: %u", a);
 	while (true);
 }
 
@@ -95,12 +121,31 @@ void test2()
 {
 	printfln("executing test 2");
 
-	char* x = (char*)0x800000;
+	for (int i = 0; i < 10000000; i++)
+	{
+		critlock_acquire();
+
+		_asm
+		{
+			mov eax, a
+			inc eax
+			mov a, eax
+		}
+
+		critlock_release();
+
+		//if (!queue_lf_insert(&q, (short)i))
+		//	fail_insert++;
+	}
+
+	/*char* x = (char*)0x800000;
 
 	for (int i = 0; i < 5; i++)
 		x[i] = 'b';
 
-	serial_printf("end of test2\n");
+	serial_printf("end of test2\n");*/
+
+	serial_printf("test 2 finished: %u\n", a);
 
 	while (true);
 }
@@ -298,7 +343,7 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_H)
 			{
-				printfln("sleeping thread %u at %u", thread_test_time->id, millis());
+				/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
 				thread_sleep(thread_test_time, 2000);
 
 				printfln("sleeping me %u at %u", thread_get_current()->id, millis());
@@ -307,7 +352,7 @@ void keyboard_fancy_function()
 				printfln("blocking thread %u at %u", thread_test_time->id, millis());
 				ClearScreen();
 
-				thread_block(thread_test_time);
+				thread_block(thread_test_time);*/
 				scheduler_print_queues();
 				printfln("hello");
 			}
@@ -330,6 +375,55 @@ void keyboard_fancy_function()
 				for (int i = 0; i < 50; i++)
 					printf("%c", __temp[i]);
 				printfln(".End");
+			}
+			else if (c == KEYCODE::KEY_N)
+			{
+				clear_screen();
+				serial_printf("sending dummy packet\n");
+
+				extern e1000* nic_dev;
+
+				uint8 pc_mac[6] = { 0x98, 0x90, 0x96, 0xAA, 0x62, 0x7F };
+				uint8 dest_mac[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+				uint8 router_mac[6] = { 0x74, 0xa7, 0x8e, 0xeb, 0xe5, 0xca };
+				uint8 zero_mac[6] = { 0, 0, 0, 0, 0, 0 };
+
+				extern uint8 my_ip[4];
+				uint8 google_ip[4] = { 172, 217, 22, 99 };
+				uint8 pc_ip[4] = { 192, 168, 1, 11 };
+				uint8 gateway[4] = { 192, 168, 1, 254 };
+				uint8 zamanis_ip[4] = { 0, 0, 0, 0 };
+				uint8 rafael_ip[4] = { 5, 55, 107, 232 };
+				uint8 pipinis_ip[4] = { 94, 66, 17, 174 };
+
+				uint8 hello[] = "Hello world!!";
+				uint16 data_length = sizeof(hello);
+
+				SKB sock_main;
+				SKB* sock = &sock_main;
+
+				if (sock_buf_init(sock, 200) != ERROR_OK)
+					DEBUG("socket creation failed");
+
+				memset(sock->head, 0, 200);
+
+				eth_header* eth = eth_create(sock, pc_mac, nic_dev->mac, 0x800);
+
+				ipv4* ip = ipv4_create(sock, 0, 0, 0, 0, 0, 128, 17, my_ip, pc_ip, 0, 0,
+					data_length + sizeof(udp_header));
+
+				udp_header* packet = udp_create(sock, 12345, 12345, data_length);
+				sock_buf_put(sock, hello, data_length);
+
+				udp_send(sock);
+
+				if(sock_buf_release(sock))
+					DEBUG("socket release failed");
+			}
+			else if (c == KEYCODE::KEY_B)
+			{
+				extern uint32 udp_recved;
+				printfln("received packets: %u", udp_recved);
 			}
 		}
 	}
@@ -467,6 +561,7 @@ multiboot_info* boot_info;
 
 void proc_init_thread()
 {
+	INT_OFF;
 	printfln("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
@@ -491,6 +586,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 
+	
 	init_vfs();
 
 	_abar = PCIFindAHCI();
@@ -500,6 +596,12 @@ void proc_init_thread()
 
 	page_cache_init(2 GB, 20, 16);
 	init_global_file_table(16);
+
+	init_net();
+	init_arp(NETWORK_LAYER);
+	//init_ipv4(NETWORK_LAYER);
+	//init_icmp(TRANSPORT_LAYER);
+	//init_udp(TRANSPORT_LAYER);
 
 	page_cache_print();
 
@@ -724,17 +826,16 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
-
 	TCB* c;
 	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
-	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
-	//////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));
+	/////*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
+	////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
-	TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
-	thread_insert(thread);
-	thread_test_time = thread;
+	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
+	//thread_insert(thread);
+	thread_test_time = 0;//thread;
 	ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
@@ -744,7 +845,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 	clear_screen();
-
+	serial_printf("int on\n");
 	INT_ON;
 
 

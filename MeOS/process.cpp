@@ -190,6 +190,7 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	t->base_priority = priority;
 	t->plus_priority = 0;
 	t->attribute = THREAD_ATTRIBUTE::THREAD_KERNEL;
+	t->thread_lock = THREAD_LOCK_NONE;
 
 	queue_lf_init(&t->exceptions, 10);
 	t->exception_lock = 0;

@@ -35,6 +35,9 @@ typedef uint32 DWORD;
 typedef uint64 QWORD;
 typedef void   VOID;
 
+typedef uint32 virtual_addr;
+typedef uint32 physical_addr;
+
 #define CHK_BIT(x, bit) ( ( (x) & (bit) ) == (bit) )
 
 #define KB *1024

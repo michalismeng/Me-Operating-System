@@ -115,6 +115,7 @@ void printfln(char* fmt, ...)
 
 void PANIC(char* str)
 {
+	_asm cli
 	serial_printf("\n%s", str);
 	__asm
 	{

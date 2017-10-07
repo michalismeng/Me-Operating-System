@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "error.h"
+#include "print_utility.h"
 
 #define find_predicate_test(T, name) bool(*name)(T*)
 
