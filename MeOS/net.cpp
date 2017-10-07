@@ -1,4 +1,18 @@
 #include "net.h"
+#include "net_protocol.h"
+
+
+error_t init_net()
+{
+	for (uint8 i = 0; i < NET_STACK_LAYERS; i++)
+		if (net_layer_init(i, 2) != ERROR_OK)
+			return ERROR_OCCUR;
+
+	// initialize protocols
+
+	return ERROR_OK;
+}
+
 
 #ifdef		LITTLE_ENDIAN
 

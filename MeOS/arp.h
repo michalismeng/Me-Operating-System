@@ -2,7 +2,9 @@
 #define ARP_H_17092017
 
 #include "types.h"
-#include "utility.h"
+#include "net.h"
+#include "net_protocol.h"
+#include "sock_buf.h"
 
 /* hardware (link layer) type values */
 #define HW_ETHER	0x1
@@ -41,13 +43,16 @@ struct arp_ipv4
 #pragma pack(pop, 1)
 
 // called when an arp packet is received by the link layer
-void arp_recv(arp_header* arp);
+error_t arp_recv(sock_buf* buffer);
 
 // creates an arp packet at the address given (usually the link layer data field)
-void arp_create(virtual_addr header, uint16 hw_type, uint16 prot_type, uint8 hw_len, uint8 prot_len, uint16 opcode, uint8* src_hw, uint8* src_prot,
+void arp_create(sock_buf* buffer, uint16 hw_type, uint16 prot_type, uint8 hw_len, uint8 prot_len, uint16 opcode, uint8* src_hw, uint8* src_prot,
 	uint8* dest_hw, uint8* dest_prot);
 
 // sends an arp header over the network
-void arp_send(arp_header* arp);
+error_t arp_send(sock_buf* buffer);
+
+error_t init_arp(uint32 layer);
+bool protocol_addr_equal(uint8* proto1, uint8* proto2, uint8 len);
 
 #endif

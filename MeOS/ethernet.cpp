@@ -2,6 +2,7 @@
 #include "print_utility.h"
 #include "SerialDebugger.h"
 #include "i217.h"
+#include "ip.h"
 #include "arp.h"
 
 extern e1000* nic_dev;
@@ -70,7 +71,7 @@ eth_header* eth_create(sock_buf* buffer, uint8* dest_mac, uint8* src_mac, uint16
 	memcpy(eth->src_mac, src_mac, 6);
 
 	eth->eth_type = htons(eth_type);
-
+	if(buffer)
 	sock_buf_push(buffer, sizeof(eth_header));
 
 	return eth;
@@ -80,7 +81,10 @@ void eth_send(sock_buf* buffer)
 {
 	eth_header* eth = (eth_header*)buffer->head;
 
-	uint32 packet_size = sock_buf_get_data_len(buffer);
+	if (eth->eth_type == ETH_TYPE_ARP)
+		eth_print(eth);
+
+	uint32 packet_size = sock_buf_get_header_len(buffer);
 	e1000_send(nic_dev, eth, packet_size /*+ max(0, 60 - packet_size)*/);
 }
 
@@ -92,19 +96,24 @@ void eth_recv(sock_buf* buffer)
 	if (eth_cmp_mac(eth->dest_mac, nic_dev->mac) == false && eth_cmp_mac(eth->dest_mac, mac_broadcast) == false)
 		return;
 
-	printf("received ethernet packet. Type is: %h\n", ntohs(eth->eth_type));
+	//printf("received ethernet packet. Type is: %h\n", ntohs(eth->eth_type));
+
+	memcpy(buffer->dst_addrs[0].addr, eth->dest_mac, 6);
+	memcpy(buffer->src_addrs[0].addr, eth->src_mac, 6);
 
 	uint16 eth_type = ntohs(eth->eth_type);
 
 	sock_buf_push(buffer, sizeof(eth_header));
 
-	switch (eth_type)
+	/*net_protocol* proto = net_layer_get_proto(NETWORK_LAYER, eth_type);
+	if (proto == 0)
 	{
-	case ETH_TYPE_ARP:
-		arp_recv((arp_header*)eth->eth_data);
-
-	case ETH_TYPE_IPv4:
-		//ip_recv
-		break;
+		DEBUG("ETHER PROTO NULL");
+		return;
 	}
+	if (proto->ops.recv(buffer) != ERROR_OK)
+		printfln("error occured!");*/
+
+	if (eth_type == 0x0806)
+		arp_recv(buffer);
 }

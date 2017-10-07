@@ -3,10 +3,17 @@
 
 #include "types.h"
 
-#define STACK_LAYERS 4
-#define MAX_NET_ADDRLEN 24
+#define NET_STACK_LAYERS 4
+#define MAX_NET_ADDRLEN 16
 
-typedef struct { char value[MAX_NET_ADDRLEN]; } net_addr;
+#define LINK_LAYER		0
+#define NETWORK_LAYER	1
+#define TRANSPORT_LAYER 2
+#define SOCK_LAYER		3
+
+typedef struct { uint8 addr[MAX_NET_ADDRLEN]; } net_addr;
+
+error_t init_net();
 
 // returns the netowrk representation of the long host parameter
 uint32 htonl(uint32 host);

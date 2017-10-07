@@ -2,17 +2,20 @@
 #include "spinlock.h"
 #include "thread_sched.h"
 #include "print_utility.h"
+#include "critlock.h"
 
 extern heap* kernel_heap;
 spinlock kernel_heap_lock = 0;
 
 void* malloc(uint32 size)
 {
-	if (thread_get_current()->id == 2 && kernel_heap_lock == 1)
-		PANIC("malloc is not free");
+	if (kernel_heap_lock)
+		PANIC("HEAP ACQUIRED");
 
 	spinlock_acquire(&kernel_heap_lock);
+	//critlock_acquire();
 	void* addr = heap_alloc(kernel_heap, size);
+	//critlock_release();
 	spinlock_release(&kernel_heap_lock);
 
 	return addr;
@@ -28,7 +31,9 @@ void* calloc(uint32 size)
 error_t free(void* ptr)
 {
 	spinlock_acquire(&kernel_heap_lock);
+	//critlock_acquire();
 	error_t res = heap_free(kernel_heap, ptr);
+	//critlock_release();
 	spinlock_release(&kernel_heap_lock);
 
 	return res;
@@ -37,7 +42,9 @@ error_t free(void* ptr)
 void* realloc(void* ptr, uint32 new_size)
 {
 	spinlock_acquire(&kernel_heap_lock);
+	//critlock_acquire();
 	void* addr = heap_realloc(kernel_heap, ptr, new_size);
+	//critlock_release();
 	spinlock_release(&kernel_heap_lock);
 
 	return addr;

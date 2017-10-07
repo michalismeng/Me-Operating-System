@@ -283,6 +283,7 @@ __declspec(naked) void thread_current_yield()
 
 __declspec(naked) void thread_block(TCB* thread)
 {
+
 	// TODO: Perhaps we will need to disable interrupts throughout this function to control the reading of the thread's state
 	_asm push ebp
 	_asm mov ebp, esp	// create a new stack frame, but destroy it immediatelly before messing with th thread stack

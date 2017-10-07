@@ -45,11 +45,11 @@ uint16 ipv4_checksum(ipv4* header);
 ipv4* ipv4_create(sock_buf* buffer, uint8 ecn, uint8 dscp, uint16 id, uint16 frag_offset, uint8 flags, uint8 ttl,
 					uint8 protocol, uint8* src_ip, uint8* dest_ip, uint8* options, uint8 options_len, uint16 data_len);
 
-// returns the address of the ip header to start placing data
-//void* ipv4_get_data_addr(ipv4* header);
 
-void ipv4_send(sock_buf* buffer);
-void ipv4_recv(sock_buf* buffer);
+error_t ipv4_send(sock_buf* buffer);
+error_t ipv4_recv(sock_buf* buffer);
+
+error_t init_ipv4(uint32 layer);
 
 
 #endif

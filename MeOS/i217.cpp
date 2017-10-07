@@ -152,11 +152,9 @@ void tx_init(e1000* dev, physical_addr base_tx)
 
 int e1000_send(e1000* dev, void* data, uint16 p_len)
 {
-	serial_printf("sending packet: %u bytes", p_len);
-
 	dev->tx_descs[dev->tx_cur]->addr = vmmngr_get_phys_addr((virtual_addr)data);
 	dev->tx_descs[dev->tx_cur]->length = p_len;
-	dev->tx_descs[dev->tx_cur]->cmd = /*((1 << 3) | (3));*/ CMD_EOP | CMD_IFCS | CMD_RS | CMD_RPS;
+	dev->tx_descs[dev->tx_cur]->cmd = CMD_EOP | CMD_IFCS | CMD_RS | CMD_RPS;
 	dev->tx_descs[dev->tx_cur]->status = 0;
 	uint8 old_cur = dev->tx_cur;
 	dev->tx_cur = (dev->tx_cur + 1) % E1000_NUM_TX_DESC;
@@ -167,14 +165,16 @@ int e1000_send(e1000* dev, void* data, uint16 p_len)
 }
 
 extern e1000* nic_dev;
+bool packet_in_process = false;
 
 void e1000_recv_defered()
 {
 	while (true)
 	{
-		uint32 count = 0;
 		while (queue_lf_is_empty(&recv_queue) == false)
 		{
+			packet_in_process = true;
+
 			uint32 pkt_ind = queue_lf_peek(&recv_queue);
 			queue_lf_remove(&recv_queue);
 
@@ -182,10 +182,6 @@ void e1000_recv_defered()
 			uint16 pktlen = nic_dev->rx_descs[pkt_ind]->length;
 
 			sock_buf buffer;
-
-			buffer.head = pkt;
-			buffer.tail = pkt + pktlen;
-			buffer.data = pkt;
 
 			if (sock_buf_init_recv(&buffer, pktlen, pkt) != ERROR_OK)
 			{
@@ -195,11 +191,121 @@ void e1000_recv_defered()
 
 			eth_recv(&buffer);
 			sock_buf_release(&buffer);
+
+			packet_in_process = false;
 		}
 
 		thread_block(thread_get_current());
 	}
 }
+
+#pragma region receive text
+
+#include "timer.h"
+#include "arp.h"
+extern uint8 my_ip[4];
+
+void arp_receive_ipv4(arp_header* arp)
+{
+	arp_ipv4* arp4 = (arp_ipv4*)arp->data;
+
+	bool merged = false;
+
+	// check arp cache for <ipv4, src_ip>
+	// if exists => merged = true + upddate the cache with src_mac
+	//printfln("arp proc: %u", millis());
+
+	// check dest_ip with my own
+	if (protocol_addr_equal(arp4->dest_ip, my_ip, 4))
+	{
+		// if not merged add into cache <ipv4, src_ip, src_mac>
+		if (ntohs(arp->opcode) == ARP_REQ)		// if this is a request then a reply is needed
+		{
+			// swap src and dest hardware/protocol addressed and send arp_reply
+
+			// reuse the same sock buffer to send the reply
+			//sock_buf_reset(buffer);
+
+			eth_header* eth = (eth_header*)malloc(60);
+			memcpy(eth->dest_mac, arp4->src_mac, 6);
+			memcpy(eth->src_mac, nic_dev->mac, 6);
+
+			eth->eth_type = htons(0x0806);
+
+			arp_header* arp = (arp_header*)eth->eth_data;
+
+			arp->hw_type = htons(HW_ETHER);
+			arp->prot_type = htons(PROTO_IPv4);
+			arp->hw_len = 6;
+			arp->prot_len = 4;
+			arp->opcode = htons(ARP_REP);
+			printfln("here1");
+
+
+			uint8* ptr = (uint8*)arp->data;
+			memcpy(ptr, nic_dev->mac, 6);
+			ptr += 6;
+
+			memcpy(ptr, arp4->dest_ip, 4);
+			ptr += 4;
+
+			memcpy(ptr, arp4->src_mac, 6);
+			ptr += 6;
+
+			memcpy(ptr, arp4->dest_mac, 4);
+
+			uint16 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
+
+			uint32 packet_size = 42;
+			e1000_send(nic_dev, eth, packet_size /*+ max(0, 60 - packet_size)*/);
+			printfln("here2");
+
+		}
+	}
+}
+
+// this is a test receive function for the driver to check the - not solved - problem of slow packet reception
+void test_recv_function(uint32 recv_index)
+{
+	eth_header* eth = (eth_header*)nic_dev->rx_descs[recv_index]->addr;
+
+	// check if this packet's destination is our pc
+	if (eth_cmp_mac(eth->dest_mac, nic_dev->mac) == false && eth_cmp_mac(eth->dest_mac, mac_broadcast) == false)
+		return;
+
+	uint16 eth_type = ntohs(eth->eth_type);
+
+	if (eth->eth_type == htons(0x0806))
+	{
+		arp_header* arp = (arp_header*)eth->eth_data;
+
+		// check hardware supprt
+		if (arp->hw_type != htons(HW_ETHER))
+			return;
+
+		uint16 prot_type = ntohs(arp->prot_type);
+
+		// the arp receive functions require the arp header. so do not push sock buf
+		// sock_buf_push(buffer, sizeof(arp_header));
+
+		switch (prot_type)
+		{
+		case PROTO_IPv4:
+			if (arp->prot_len != 4)		// validate protocol length
+				return;
+
+			arp_receive_ipv4(arp);
+			break;
+		default:
+			return;
+		}
+	}
+}
+
+
+
+#pragma endregion
+
 
 void e1000_recv_packet(e1000* dev)
 {
@@ -208,9 +314,11 @@ void e1000_recv_packet(e1000* dev)
 	dev->rx_cur = (dev->rx_cur + 1) % E1000_NUM_RX_DESC;
 	e1000_write_command(dev, REG_RXDESCTAIL, dev->rx_cur);
 
-	// this should be done i separate thread
-	//e1000_recv_defered(dev, recv_index);
-	queue_lf_insert(&recv_queue, recv_index);
+	
+
+	// insert the reception index for deferred processing
+	if (!queue_lf_insert(&recv_queue, recv_index))
+		printfln("queue is full");
 
 	if (net_daemon != 0)
 		thread_notify(net_daemon);
@@ -228,7 +336,12 @@ void e1000_callback(registers_t* regs)
 		printfln("link status changed");
 
 	if (icr & 0x80)
+	{
+		if (packet_in_process)
+			serial_printf("---------packet in process------------\n");
+
 		e1000_recv_packet(nic_dev);
+	}
 }
 
 

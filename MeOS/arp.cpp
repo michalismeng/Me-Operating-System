@@ -1,7 +1,10 @@
 #include "arp.h"
 #include "ethernet.h"
 #include "memory.h"
+#include "print_utility.h"
 #include "i217.h"
+
+#include "timer.h"
 
 extern e1000* nic_dev;
 
@@ -16,13 +19,20 @@ bool protocol_addr_equal(uint8* proto1, uint8* proto2, uint8 len)
 	return true;
 }
 
-void arp_receive_ipv4(arp_header* arp)
+void arp_receive_ipv4(sock_buf* buffer)
 {
-	bool merged = false;
+	arp_header* arp = (arp_header*)buffer->data;
 	arp_ipv4* arp4 = (arp_ipv4*)arp->data;
+
+	bool merged = false;
+
+	// setup buffer header addresses
+	memcpy(buffer->src_addrs[1].addr, arp4->src_ip, 4);
+	memcpy(buffer->dst_addrs[1].addr, arp4->dest_ip, 4);
 
 	// check arp cache for <ipv4, src_ip>
 	// if exists => merged = true + upddate the cache with src_mac
+	printfln("arp proc: %u", millis());
 
 	// check dest_ip with my own
 	if (protocol_addr_equal(arp4->dest_ip, my_ip, 4))
@@ -30,41 +40,56 @@ void arp_receive_ipv4(arp_header* arp)
 		// if not merged add into cache <ipv4, src_ip, src_mac>
 		if (ntohs(arp->opcode) == ARP_REQ)		// if this is a request then a reply is needed
 		{
-			// swap src and dest hardware/protocol addressed
-			// and send arp_reply
-			/*uint32 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
-			virtual_addr buffer = (virtual_addr)calloc(sizeof(eth_header) + arp_size);
-			eth_header* eth = eth_create(buffer, arp4->src_mac, nic_dev->mac, 0x0806);
-			arp_create((virtual_addr)eth->eth_data, HW_ETHER, PROTO_IPv4, 6, 4, ARP_REP, nic_dev->mac, arp4->dest_ip, arp4->src_mac, arp4->src_ip);
-			eth_send(eth, arp_size);
-			free((void*)buffer);*/
+			// swap src and dest hardware/protocol addressed and send arp_reply
+
+			// reuse the same sock buffer to send the reply
+			sock_buf_reset(buffer);
+			eth_create(buffer, buffer->src_addrs[0].addr, nic_dev->mac, 0x0806);
+			arp_create(buffer, HW_ETHER, PROTO_IPv4, 6, 4, ARP_REP, nic_dev->mac, buffer->dst_addrs[1].addr,
+																	buffer->src_addrs[0].addr, buffer->src_addrs[1].addr);		
+
+			/*printfln("arping to: %u.%u.%u.%u",
+				buffer->src_addrs[1].addr[0], buffer->src_addrs[1].addr[1], buffer->src_addrs[1].addr[2], buffer->src_addrs[1].addr[3]);*/
+
+			arp_send(buffer);
 		}
 	}	
 }
 
-void arp_recv(arp_header* arp)
+// TODO: add errors
+error_t arp_recv(sock_buf* buffer)
 {
+	arp_header* arp = (arp_header*)buffer->data;
+
 	// check hardware supprt
 	if (arp->hw_type != htons(HW_ETHER))
-		return;
+		return ERROR_OCCUR;
 
-	switch (ntohs(arp->prot_type))
+	uint16 prot_type = ntohs(arp->prot_type);
+
+	// the arp receive functions require the arp header. so do not push sock buf
+	// sock_buf_push(buffer, sizeof(arp_header));
+
+	switch (prot_type)
 	{
 	case PROTO_IPv4:
 		if (arp->prot_len != 4)		// validate protocol length
-			return;
+			return ERROR_OCCUR;
 
-		arp_receive_ipv4(arp);
+		arp_receive_ipv4(buffer);
 		break;
 	default:
-		return;
+		return ERROR_OK;
 	}
+
+	return ERROR_OK;
 }
 
-void arp_create(virtual_addr header, uint16 hw_type, uint16 prot_type, uint8 hw_len, uint8 prot_len, uint16 opcode, uint8* src_hw, uint8* src_prot, 
+void arp_create(sock_buf* buffer, uint16 hw_type, uint16 prot_type, uint8 hw_len, uint8 prot_len, uint16 opcode, uint8* src_hw, uint8* src_prot, 
 	uint8* dest_hw, uint8* dest_prot)
 {
-	arp_header* arp = (arp_header*)header;
+	arp_header* arp = (arp_header*)buffer->data;
+
 	arp->hw_type = htons(hw_type);
 	arp->prot_type = htons(prot_type);
 	arp->hw_len = hw_len;
@@ -82,12 +107,23 @@ void arp_create(virtual_addr header, uint16 hw_type, uint16 prot_type, uint8 hw_
 	ptr += hw_len;
 
 	memcpy(ptr, dest_prot, prot_len);
+
+	uint16 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;
+	if(buffer)
+	sock_buf_push(buffer, arp_size);
 }
 
-void arp_send(arp_header* arp)
+error_t arp_send(sock_buf* buffer)
 {
-	// total length of variable header is twice the hardware and protocol address lengths
-	/*uint16 arp_size = sizeof(arp_header) + 2 * arp->hw_len + 2 * arp->prot_len;	
-	eth_header* eth = eth_create((virtual_addr)arp - sizeof(eth_header), );
-	eth_send(eth, arp_size);*/
+	eth_send(buffer);
+	return ERROR_OK;
+}
+
+error_t init_arp(uint32 layer)
+{
+	net_operations ops;
+	ops.recv = arp_recv;
+	ops.send = arp_send;
+
+	return net_layer_register_proto(layer, net_protocol_create(0x0806, ops));
 }

@@ -6,7 +6,9 @@
 
 struct sock_buf
 {
-	net_addr layer_addresses[STACK_LAYERS];	 // addresses for each layer of the stack
+	net_addr src_addrs[NET_STACK_LAYERS];	 // source addresses for each layer of the stack
+	net_addr dst_addrs[NET_STACK_LAYERS];	 // destination addresses for each layer of the stack
+
 	void* head;
 	void* data;
 	void* tail;
@@ -30,7 +32,9 @@ void sock_buf_pop(sock_buf* buf, uint32 len);
 
 uint32 sock_buf_get_len(sock_buf* buf);
 uint32 sock_buf_get_data_len(sock_buf* buf);
+uint32 sock_buf_get_header_len(sock_buf* buf);
 
 error_t sock_buf_release(sock_buf* buf);
+void sock_buf_reset(sock_buf* buf);
 
 #endif

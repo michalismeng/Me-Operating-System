@@ -42,6 +42,7 @@
 #include "arp.h"
 #include "ip.h"
 #include "udp.h"
+#include "icmp.h"
 
 #include "critlock.h"
 #include "net.h"
@@ -342,7 +343,7 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_H)
 			{
-				printfln("sleeping thread %u at %u", thread_test_time->id, millis());
+				/*printfln("sleeping thread %u at %u", thread_test_time->id, millis());
 				thread_sleep(thread_test_time, 2000);
 
 				printfln("sleeping me %u at %u", thread_get_current()->id, millis());
@@ -351,7 +352,7 @@ void keyboard_fancy_function()
 				printfln("blocking thread %u at %u", thread_test_time->id, millis());
 				ClearScreen();
 
-				thread_block(thread_test_time);
+				thread_block(thread_test_time);*/
 				scheduler_print_queues();
 				printfln("hello");
 			}
@@ -379,9 +380,6 @@ void keyboard_fancy_function()
 			{
 				clear_screen();
 				serial_printf("sending dummy packet\n");
-
-				uint16 bytes = 0x1234;
-				printfln("htons(%h) = %h", bytes, htons(bytes));
 
 				extern e1000* nic_dev;
 
@@ -421,6 +419,11 @@ void keyboard_fancy_function()
 
 				if(sock_buf_release(sock))
 					DEBUG("socket release failed");
+			}
+			else if (c == KEYCODE::KEY_B)
+			{
+				extern uint32 udp_recved;
+				printfln("received packets: %u", udp_recved);
 			}
 		}
 	}
@@ -583,6 +586,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 
+	
 	init_vfs();
 
 	_abar = PCIFindAHCI();
@@ -592,6 +596,12 @@ void proc_init_thread()
 
 	page_cache_init(2 GB, 20, 16);
 	init_global_file_table(16);
+
+	init_net();
+	init_arp(NETWORK_LAYER);
+	//init_ipv4(NETWORK_LAYER);
+	//init_icmp(TRANSPORT_LAYER);
+	//init_udp(TRANSPORT_LAYER);
 
 	page_cache_print();
 
