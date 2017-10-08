@@ -48,6 +48,8 @@
 #include "net.h"
 #include "sock_buf.h"
 
+#include "kernel_stack.h"
+
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
 
@@ -359,26 +361,25 @@ void keyboard_fancy_function()
 			else if (c == KEYCODE::KEY_D)
 			{
 				uint32 __fd;
-				if (open_file("sdc_mount/TEXT.TXT", &__fd, 0) != VFS_OK)
-					PANIC("could not open text.exe");
-
-				if (read_file(__fd, 0, 50, (virtual_addr)__temp) != 50)
+				if (open_file("sdc_mount/TESTDLL.DLL", &__fd, 0) != ERROR_OK)
 				{
-					serial_printf("error %u", get_last_error());
-					PANIC("could not read text.txt");
+					printfln("open file error: %e", get_last_error());
+					return;
 				}
 
-				page_cache_print();
-
-				printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, __fd)->gfd, 0));
-
-				for (int i = 0; i < 50; i++)
-					printf("%c", __temp[i]);
-				printfln(".End");
+				TCB* proc = create_test_process(__fd);
+				INT_OFF;
+				serial_printf("executing");
+				thread_insert(proc);
+				INT_ON;
+				
 			}
 			else if (c == KEYCODE::KEY_N)
 			{
 				clear_screen();
+				printfln("networking has been disabled... please enable adapter and remove this message.");
+				return;
+
 				serial_printf("sending dummy packet\n");
 
 				extern e1000* nic_dev;
@@ -425,6 +426,11 @@ void keyboard_fancy_function()
 				extern uint32 udp_recved;
 				printfln("received packets: %u", udp_recved);
 			}
+			else if (c == KEYCODE::KEY_E)
+			{
+				serial_printf("error location: %h\n", thread_get_error(thread_get_current()));
+				page_cache_print();
+			}
 		}
 	}
 }
@@ -465,14 +471,15 @@ struct kernel_info
 	idt_entry_t* idt_base;
 };
 
-uint32 entry;
+_declspec(naked)
 void enter_user_mode(uint32 stack, uint32 entry)
 {
 	uint32 kernel_esp;
 	_asm mov [kernel_esp], esp
 
-	set_tss(0x10, kernel_esp);
+	//set_tss(0x10, kernel_esp);
 	serial_printf("entering user mode %h, kernel stack: %h %h\n", entry, kernel_esp, stack);
+	_asm ret
 
 	_asm {
 		cli
@@ -496,16 +503,52 @@ void enter_user_mode(uint32 stack, uint32 entry)
 }
 
 // sets up a process and initializes the first thread and its stacks (kernel + user)
-void kernel_setup_process()
+void kernel_setup_process(uint32 stack, uint32 entry)
 {
-	if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER) == MAP_FAILED)
+	/*if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER) == MAP_FAILED)
 		PANIC("Cannot map stack");
 
 	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
-	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);
+	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);*/
 
-	enter_user_mode(1 GB - 8 KB, (uint32)entry);
+	// fix the stack
+	_asm sub ebp, 4				// compiler offsets arguments by 8 (due to ebp push and return value on the stack?). we have not the return value so fake it
+
+	serial_printf("executing process: %u\n\n", process_get_current()->id);
+
+	serial_printf("executed testdll with stack: %u\n", stack);
+
+	typedef void(*fptr)();
+	((fptr)entry)();
+
+	//_asm call enter_user_mode
+
+	serial_printf("end of execution\n");
+
+	//enter_user_mode(1 GB - 8 KB, (uint32)entry);
 	for (;;);
+}
+//Added kernel stack reservation - bare bones for dll eport table parsing.
+
+virtual_addr pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 image_base, char* name)
+{
+	char** names = (char**)((uint32)export_directory->AddressOfNames + image_base);
+	uint16* ordinals = (uint16*)((uint32)export_directory->AddressOfNameOrdinal + image_base);
+	virtual_addr* addrs = (virtual_addr*)((uint32)export_directory->AddressOfFunctions + image_base);
+
+	for (int i = 0; i < export_directory->NumberOfFunctions; i++)
+	{
+		char* func_name = names[i] + image_base;
+
+		if (strcmp(func_name, name) == 0)
+		{
+			uint16 ordinal = ordinals[i];
+			virtual_addr address = addrs[ordinal] + image_base;
+			return address;
+		}
+	}
+
+	return 0;
 }
 
 TCB* create_test_process(uint32 fd)
@@ -514,12 +557,12 @@ TCB* create_test_process(uint32 fd)
 
 	for (uint32 i = 0; i < 1; i++)
 	{
-		uint32 error = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
-		if (error != PAGE_SIZE)
-			printfln("read error: %u", error);
+		size_t read = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
+		if (read != PAGE_SIZE)
+			printfln("read error: %e", get_last_error());
 	}
 
-	if (!validate_PE_image(___buffer))
+	if (!validate_PE_image((void*)___buffer))
 	{
 		DEBUG("Could not load PE image. Corrupt image or data.");
 		return 0;
@@ -529,6 +572,9 @@ TCB* create_test_process(uint32 fd)
 	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)___buffer);
 	IMAGE_SECTION_HEADER* section = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
 
+	IMAGE_DATA_DIRECTORY* DataDirectory = &nt_header->OptionalHeader.DataDirectory[0];
+	IMAGE_EXPORT_DIRECTORY* exportDirectory = (IMAGE_EXPORT_DIRECTORY*)(DataDirectory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
+
 	serial_printf("section name\n");
 	for (int x = 0; x < nt_header->FileHeader.NumberOfSections; x++)
 	{
@@ -536,23 +582,32 @@ TCB* create_test_process(uint32 fd)
 			serial_printf("%c", section[x].Name[i]);
 		serial_printf("\n");
 
-		serial_printf("mmaping fd: %u to %h, size of raw: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
-			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
+		serial_printf("mmaping fd: %u to %h, size of raw: %h, raw offset: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
+			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData, section[x].PointerToRawData);
 
 		// TODO: Remember vfs_map_p prot and flags were reversed in the definition and this function is not cheched if working.
-		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
-			lft_get(&process_get_current()->lft, fd)->gfd, section->PointerToRawData, 4096,
+		if (vfs_mmap_p(process_get_current(), section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
+			lft_get(&process_get_current()->lft, fd)->gfd, section[x].PointerToRawData, 4096,
 			PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_USER) == MAP_FAILED)
 		{
 			serial_printf("address: %h size %h", section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 			PANIC("Could not map for process");
 		}
-
 	}
 
-	serial_printf("kernel stack: %h\n\n", pmmngr_get_next_align((uint32)___buffer) + 4096 * 2);
-	entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
-	TCB* thread = thread_create(proc, (uint32)kernel_setup_process, pmmngr_get_next_align((uint32)___buffer) + 4096 * 2, 4 KB, 3);
+	typedef int(*add)(int, int);
+	add func = (add)pe_get_export_function(exportDirectory, nt_header->OptionalHeader.ImageBase, "?add@@YAHHH@Z");
+
+	serial_printf("add(10, 20) = %u\n\n", func(10, 20));
+
+	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
+	virtual_addr krnl_stack = kernel_stack_reserve();
+	TCB* thread = 0;
+
+	if (krnl_stack == 0)
+		serial_printf("process creation failed: cannot allocate stack: %e\n", krnl_stack);
+	else
+		thread = thread_create(proc, (uint32)kernel_setup_process, krnl_stack, 4 KB, 3, 2, entry, 4096);
 
 	return thread;
 }
@@ -826,9 +881,26 @@ void proc_init_thread()
 
 	serial_printf("screen ready...\n");
 
+	virtual_addr krnl_stack = kernel_stack_reserve();
+	if (krnl_stack == 0)
+	{
+		serial_printf("kernel stack allocation failed: %e", get_last_error());
+		PANIC("");
+	}
+	serial_printf("kernel stack top for kybd_fancy: %h", krnl_stack);
+
 	TCB* c;
-	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
-	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, 3 GB + 10 MB + 516 KB, 4 KB, 7));
+	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));
+
+	krnl_stack = kernel_stack_reserve();
+	if (krnl_stack == 0)
+	{
+		serial_printf("kernel stack allocation failed: %e", get_last_error());
+		PANIC("");
+	}
+	serial_printf("kernel stack top for idle: %h", krnl_stack);
+
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, krnl_stack, 4 KB, 7, 0));
 	/////*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
 	////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
@@ -1017,7 +1089,7 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	PCB* proc = process_create(0, vmmngr_get_directory(), 0, 0xFFFFF000/*4 GB - 4 KB*/);	// 4 GB is 0 in DWORD
 	uint32 thread_stack = (uint32)malloc(4050);		// allocate enough space for page aligned stack
 	// just for this thread, space is not malloc
-	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 3);	// page align stack
+	TCB* t = thread_create(proc, (uint32)proc_init_thread, pmmngr_get_next_align(thread_stack + 4096), 4096, 3, 0);	// page align stack
 	thread_insert(t);
 
 	INT_OFF;

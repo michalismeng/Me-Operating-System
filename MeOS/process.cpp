@@ -7,15 +7,11 @@
 
 static uint32 lastID = 0;
 
-void thread_setup_stack(TCB* t, uint32 entry, uint32 esp, uint32 stack_size)
+void thread_setup_execution_stack(TCB* t, uint32 entry)
 {
-	if (esp % vmmngr_get_page_size() != 0)
-		PANIC("stack must be page-aligned");
-
 	trap_frame* f;
-	esp -= sizeof(trap_frame);		// prepare esp for manual data push
-	esp -= 4;						// this goes for the thread error variable
-	f = (trap_frame*)esp;
+	t->esp -= sizeof(trap_frame);		// prepare esp for manual data push
+	f = (trap_frame*)t->esp;
 
 	/* manual setup of the thread's stack */
 	f->flags = 0x202;		// IF set along with some ?reserved? bit
@@ -33,12 +29,6 @@ void thread_setup_stack(TCB* t, uint32 entry, uint32 esp, uint32 stack_size)
 	f->esp = 0;
 	f->fs = 0x10;
 	f->gs = 0x10;
-
-	// init the first 4 bytes of the stack -- the thread last error
-	*((char*)f + sizeof(trap_frame)) = 0;
-
-	t->ss = 0x10;
-	t->esp = esp;
 }
 
 // public functions
@@ -96,8 +86,8 @@ uint32 process_create_s(char* app_name)
 	t->id = ++lastID;
 	//t->priority = 1;
 	t->state = THREAD_READY;
-	t->stack_base = 0;
-	t->stack_limit = (void*)4096;
+	t->stack_top = 0;
+	////t->stack_limit = (void*)4096;
 	t->parent = p;
 
 	/* copy image to memory */
@@ -138,15 +128,15 @@ uint32 process_create_s(char* app_name)
 
 	vmmngr_map_page(p->page_dir, (physical_addr)stack_phys, (virtual_addr)stack, DEFAULT_FLAGS);
 
-	t->stack_base = stack;
-	t->stack_limit = (void*)((uint32)t->stack_base + 4096);
+	//t->stack_top = stack;
+	//t->stack_limit = (void*)((uint32)t->stack_top + 4096);
 
 	pdirectory* old_dir = vmmngr_get_directory();
 
 	vmmngr_switch_directory(address_space, (physical_addr)address_space);
 
-	thread_setup_stack(t, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase,
-		(uint32)t->stack_base, 4096);
+	/*thread_setup_stack(t, nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase,
+		(uint32)t->stack_base, 4096);*/
 
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
 
@@ -158,7 +148,7 @@ PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 hi
 {
 	PCB* proc = (PCB*)malloc(sizeof(PCB));
 
-	proc->id = 0;
+	proc->id = ++lastID;
 	proc->parent = parent;
 
 	if (pdir == 0)
@@ -176,21 +166,27 @@ PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 hi
 	return proc;
 }
 
-TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority)
+// stack top is the top-most exclusive (last_valid + 1) value for stack.
+TCB* thread_create(PCB* parent, uint32 entry, virtual_addr stack_top, uint32 stack_size, uint32 priority, uint32 param_count, ...)
 {
 	//printfln("creating thread at: %h with id: %u", esp, lastID + 1);
+	if (stack_top % vmmngr_get_page_size() != 0)
+		PANIC("stack must be page-aligned");
+
 	TCB* t;
 	queue_insert(&parent->threads, TCB());
 	t = &parent->threads.tail->data;
 
 	t->id = ++lastID;
 	t->parent = parent;
-	t->stack_base = (void*)esp;
+	t->stack_top = stack_top;
 	t->state = THREAD_STATE::THREAD_READY;
 	t->base_priority = priority;
 	t->plus_priority = 0;
 	t->attribute = THREAD_ATTRIBUTE::THREAD_KERNEL;
 	t->thread_lock = THREAD_LOCK_NONE;
+	t->ss = 0x10;
+	t->esp = stack_top;
 
 	queue_lf_init(&t->exceptions, 10);
 	t->exception_lock = 0;
@@ -198,11 +194,27 @@ TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uin
 	// TODO: Replace the directory switches by a simple kernel page map
 	pdirectory* old_dir = vmmngr_get_directory();
 	vmmngr_switch_directory(parent->page_dir, (physical_addr)parent->page_dir);
-	//printfln("sqitched old dir");
-	thread_setup_stack(t, entry, esp, stack_size);
-	//printfln("stack setup");
+
+	// add the error variable at the bottom of the stack
+	thread_add_parameter(t, 0);
+
+	// copy the parameter list
+	va_list params;
+	va_start(params, param_count);
+
+	for (uint32 i = 0; i < param_count; i++)
+	{
+		uint32 arg = va_arg(params, uint32);
+		serial_printf("adding %h to stack\n", arg);
+		thread_add_parameter(t, arg);
+	}
+
+	va_end(params);
+
+	// finally setup the execution variables in the stack
+	thread_setup_execution_stack(t, entry);
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);
-	//printfln("returning");
+
 	return t;
 }
 
@@ -213,12 +225,18 @@ int32 thread_get_priority(TCB* thread)
 
 uint32* thread_get_error(TCB* thread)
 {
-	return (uint32*)((char*)thread->stack_base - 4);
+	return (uint32*)((char*)thread->stack_top - 4);
 }
 
 bool thread_is_preemptible(TCB* thread)
 {
 	return ((thread->attribute & THREAD_NONPREEMPT) != THREAD_NONPREEMPT);
+}
+
+void thread_add_parameter(TCB* thread, uint32 param)
+{
+	thread->esp -= 4;
+	*((uint32*)thread->esp) = param;
 }
 
 TCB* thread_get_lower_priority(TCB* thread1, TCB* thread2)
@@ -247,6 +265,9 @@ bool validate_PE_image(void* image)
 
 	/* make sure this is an executable image and that it is built for 32-bit arch */
 	if (nt_headers->FileHeader.Characteristics & (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE) == 0)
+		return false;
+
+	if ((nt_headers->FileHeader.Characteristics & 1) == 0)
 		return false;
 
 	/* make sure the image base is between 4MB and 2GB as this is the user land */

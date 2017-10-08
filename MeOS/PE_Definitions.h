@@ -113,4 +113,18 @@ typedef struct _IMAGE_SECTION_HEADER {
 	uint32 Characteristics;
 }IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
+typedef struct _IMAGE_EXPORT_DIRECTORY {
+	uint32 Characteristics;
+	uint32 TimeDateStamp;
+	uint16 MajorVersion;
+	uint16 MinorVersion;
+	uint32 Name;
+	uint32 Base;
+	uint32 NumberOfFunctions;
+	uint32 NumberOfNames;
+	uint32** AddressOfFunctions;
+	uint32** AddressOfNames;
+	uint16** AddressOfNameOrdinal;
+}IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+
 #endif

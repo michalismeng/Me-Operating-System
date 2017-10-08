@@ -7,6 +7,7 @@
 #include "process.h"
 #include "queue_lf.h"
 #include "thread_sched.h"
+#include "kernel_stack.h"
 
 TCB* net_daemon = 0;
 queue_lf<uint32> recv_queue;
@@ -199,7 +200,7 @@ void e1000_recv_defered()
 	}
 }
 
-#pragma region receive text
+#pragma region receive test
 
 #include "timer.h"
 #include "arp.h"
@@ -314,8 +315,6 @@ void e1000_recv_packet(e1000* dev)
 	dev->rx_cur = (dev->rx_cur + 1) % E1000_NUM_RX_DESC;
 	e1000_write_command(dev, REG_RXDESCTAIL, dev->rx_cur);
 
-	
-
 	// insert the reception index for deferred processing
 	if (!queue_lf_insert(&recv_queue, recv_index))
 		printfln("queue is full");
@@ -375,7 +374,12 @@ e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physi
 	serial_printf("MAC address: %x %x %x %x %x %x\n", dev->mac[0], dev->mac[1], dev->mac[2], dev->mac[3], dev->mac[4], dev->mac[5]);
 
 	queue_lf_init(&recv_queue, 32);
-	net_daemon = thread_create(thread_get_current()->parent, (uint32)e1000_recv_defered, 3 GB + 10 MB + 496 KB, 4 KB, 1);
+
+	virtual_addr krnl_stack = kernel_stack_reserve();
+	if (krnl_stack == 0)
+		PANIC("i217 kernel stack 0");
+
+	net_daemon = thread_create(thread_get_current()->parent, (uint32)e1000_recv_defered, krnl_stack, 4 KB, 1, 0);
 	serial_printf("net daemon id: %u\n\n", net_daemon->id);
 	thread_insert(net_daemon);
 	thread_block(net_daemon);

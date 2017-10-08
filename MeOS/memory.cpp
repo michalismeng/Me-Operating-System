@@ -9,8 +9,8 @@ spinlock kernel_heap_lock = 0;
 
 void* malloc(uint32 size)
 {
-	if (kernel_heap_lock)
-		PANIC("HEAP ACQUIRED");
+	/*if (kernel_heap_lock)
+		PANIC("HEAP ACQUIRED");*/
 
 	spinlock_acquire(&kernel_heap_lock);
 	//critlock_acquire();

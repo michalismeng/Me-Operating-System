@@ -4,6 +4,7 @@
 #include "thread_sched.h"
 #include "queue_lf.h"
 #include "print_utility.h"
+#include "kernel_stack.h"
 
 // driver private data
 
@@ -510,8 +511,12 @@ void init_keyboard()
 
 	kybrd_set_leds(false, false, false);
 
+	virtual_addr krnl_stack = kernel_stack_reserve();
+	if (krnl_stack == 0)
+		PANIC("keyboard stack allocation failed");
+
 	// parent is the kernel init thread
-	keyboard_daemon = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, 3 GB + 10 MB + 500 KB, 4 KB, 1);
+	keyboard_daemon = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, krnl_stack, 4 KB, 1, 0);
 	thread_insert(keyboard_daemon);
 	thread_block(keyboard_daemon);
 }

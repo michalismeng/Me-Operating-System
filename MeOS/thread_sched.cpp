@@ -193,7 +193,7 @@ void scheduler_thread_switch()
 
 	if (to_execute->state != THREAD_STATE::THREAD_READY)
 	{
-		printfln("thread at %h id: %u stack_base: %h", to_execute, to_execute->id, to_execute->stack_base);
+		printfln("thread at %h id: %u stack_base: %h", to_execute, to_execute->id, to_execute->stack_top);
 		PANIC("Received non ready thread to execute");
 	}
 
@@ -283,7 +283,6 @@ __declspec(naked) void thread_current_yield()
 
 __declspec(naked) void thread_block(TCB* thread)
 {
-
 	// TODO: Perhaps we will need to disable interrupts throughout this function to control the reading of the thread's state
 	_asm push ebp
 	_asm mov ebp, esp	// create a new stack frame, but destroy it immediatelly before messing with th thread stack

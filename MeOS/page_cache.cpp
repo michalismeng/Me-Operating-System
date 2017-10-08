@@ -1,4 +1,5 @@
 #include "page_cache.h"
+#include "open_file_table.h"
 #include "print_utility.h"
 
 // private data
@@ -307,9 +308,10 @@ void page_cache_print()
 {
 	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
 	{
-		printf("gfd %u:", page_cache.cached_files[i].gfd);
+		
+		printf("gfd %u %s:", page_cache.cached_files[i].gfd, gft_get(page_cache.cached_files[i].gfd)->file_node->name);
 		for (auto temp = page_cache.cached_files[i].pages.head; temp != 0; temp = temp->next)
-			printf("%u ", temp->data);
+			printf("%u ", temp->data.buffer_index);
 
 		printfln("");
 	}

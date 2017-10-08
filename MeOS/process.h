@@ -108,8 +108,10 @@ _asm	mov esp, 0x90000
 		int32 plus_priority;						// priority gained due to different factors such as waiting in the queues
 		int32 base_priority;						// base priority given at the thread creation time
 
-		void* stack_base;							// address of the base of the thread's stack
-		void* stack_limit;							// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
+		virtual_addr stack_top;						// address of the base of the thread's stack
+
+		// TODO: this should be removed
+		//void* stack_limit;						// end address of the thread's stack incremented by 1. stack_base <= valid_stack < stack_limit
 
 		THREAD_STATE state;							// the current state of the thread
 		THREAD_ATTRIBUTE attribute;					// thread's extra attribute info
@@ -139,13 +141,16 @@ _asm	mov esp, 0x90000
 
 	uint32 process_create_s(char* app_name);
 	PCB* process_create(PCB* parent, pdirectory* pdir, uint32 low_address, uint32 high_address);
-	TCB* thread_create(PCB* parent, uint32 entry, uint32 esp, uint32 stack_size, uint32 priority);
+	TCB* thread_create(PCB* parent, uint32 entry, virtual_addr stack_top, uint32 stack_size, uint32 priority, uint32 param_count, ...);
 
 	int32 thread_get_priority(TCB* thread);
 
 	uint32* thread_get_error(TCB* thread);
 
 	bool thread_is_preemptible(TCB* thread);
+
+	// add a 4-byte value to the stack so the awaken thread can receive it (like args)
+	void thread_add_parameter(TCB* thread, uint32 param);
 
 	// returns the thread with the lowest priority between the two.
 	TCB* thread_get_lower_priority(TCB* thread1, TCB* thread2);

@@ -154,11 +154,13 @@ void page_fault_bottom(thread_exception te)
 			{
 				vmmngr_alloc_page_f(addr & (~0xFFF), flags);
 
-				uint32 read_start = area.offset + (addr - area.start_addr);
-				uint32 read_size = PAGE_SIZE;
+				uint32 read_start = area.offset + ((addr - area.start_addr) / PAGE_SIZE) * PAGE_SIZE;		// file read start
+				uint32 read_size = PAGE_SIZE;		// we read one page at a time (not the whole area as this may not be necessary)
 
-				if (read_start < area.start_addr + PAGE_SIZE)	// we are reading the first page so subtract offset from read_size
-					read_size -= area.offset;
+				//if (read_start < area.start_addr + PAGE_SIZE)	// we are reading the first page so subtract offset from read_size
+				//	read_size -= area.offset;
+
+				serial_printf("reading at mem: %h, file: %h, size: %u\n", addr & (~0xfff), read_start, read_size);
 
 				gfe* entry = gft_get(area.fd);
 				if (entry == 0)
@@ -167,8 +169,12 @@ void page_fault_bottom(thread_exception te)
 					PANIC("page fault gfd entry = 0");
 				}
 
+				// read one page from the file offset given at the 4KB-aligned fault address 
 				if (vfs_read_file(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF)) != read_size)
+				{
+					serial_printf("read fd: %u\n", area.fd);
 					PANIC("mmap anonymous file read less bytes than expected");
+				}
 			}
 		}
 	}
@@ -483,7 +489,7 @@ pdirectory* vmmngr_create_address_space()
 	if (!dir)
 		return 0;
 
-	//printfln("creating addr space at: %h", dir);
+	serial_printf("creating addr space at: %h\n", dir);
 
 	memset(dir, 0, sizeof(pdirectory));
 	return dir;
