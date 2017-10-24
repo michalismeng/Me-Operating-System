@@ -211,6 +211,8 @@ TCB* thread_create(PCB* parent, uint32 entry, virtual_addr stack_top, uint32 sta
 
 	va_end(params);
 
+	thread_add_parameter(t, 0);	// add the return address. The thread should never return there, but it should properly call its destroy method.
+
 	// finally setup the execution variables in the stack
 	thread_setup_execution_stack(t, entry);
 	vmmngr_switch_directory(old_dir, (physical_addr)old_dir);

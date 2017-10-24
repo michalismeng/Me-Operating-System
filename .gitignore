@@ -2,4 +2,10 @@
 !*.xmind
 !MeOS/
 !Boot/
+!Builds
+!Builds/*.exe
 !MeOSLDR/
+/MeOSLdr/Debug
+!MeOS.vcxproj
+!MeOS.vcxproj.filters
+!*.png

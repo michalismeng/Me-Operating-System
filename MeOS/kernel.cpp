@@ -184,9 +184,6 @@ char __temp[4096] = {'a', 'b', 'c', 'd', 0};
 
 void keyboard_fancy_function()
 {
-	for (int i = 0; i < 255; i++)
-		printf("%c", i);
-	printfln("");
 	uint32 fd;
 	if (open_file("dev/keyboard", &fd, 0) != ERROR_OK)
 	{
@@ -335,6 +332,7 @@ void keyboard_fancy_function()
 			{
 				uint32 colors[2] = { 0xFFFFFF, 0xFF0000 };
 				uint8 ind = 0;
+
 				while (true)
 				{
 					read_file(fd, 0, 1, (virtual_addr)&c);
@@ -356,7 +354,7 @@ void keyboard_fancy_function()
 
 				thread_block(thread_test_time);*/
 				scheduler_print_queues();
-				printfln("hello");
+				printfln("this is a new build!");
 			}
 			else if (c == KEYCODE::KEY_D)
 			{
@@ -511,8 +509,8 @@ void kernel_setup_process(uint32 stack, uint32 entry)
 	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
 	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);*/
 
-	// fix the stack
-	_asm sub ebp, 4				// compiler offsets arguments by 8 (due to ebp push and return value on the stack?). we have not the return value so fake it
+	// fix the stack	NOT NEEDED AS THE RETURN VALUE IS PLACED IN THE STACK
+	//_asm sub ebp, 4				// compiler offsets arguments by 8 (due to ebp push and return value on the stack?). we have not the return value so fake it
 
 	serial_printf("executing process: %u\n\n", process_get_current()->id);
 
@@ -528,7 +526,6 @@ void kernel_setup_process(uint32 stack, uint32 entry)
 	//enter_user_mode(1 GB - 8 KB, (uint32)entry);
 	for (;;);
 }
-//Added kernel stack reservation - bare bones for dll eport table parsing.
 
 virtual_addr pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 image_base, char* name)
 {
@@ -586,7 +583,7 @@ TCB* create_test_process(uint32 fd)
 			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData, section[x].PointerToRawData);
 
 		// TODO: Remember vfs_map_p prot and flags were reversed in the definition and this function is not cheched if working.
-		if (vfs_mmap_p(process_get_current(), section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
+		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
 			lft_get(&process_get_current()->lft, fd)->gfd, section[x].PointerToRawData, 4096,
 			PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_USER) == MAP_FAILED)
 		{
@@ -595,10 +592,10 @@ TCB* create_test_process(uint32 fd)
 		}
 	}
 
-	typedef int(*add)(int, int);
+	/*typedef int(*add)(int, int);
 	add func = (add)pe_get_export_function(exportDirectory, nt_header->OptionalHeader.ImageBase, "?add@@YAHHH@Z");
 
-	serial_printf("add(10, 20) = %u\n\n", func(10, 20));
+	serial_printf("add(10, 20) = %u\n\n", func(10, 20));*/
 
 	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
 	virtual_addr krnl_stack = kernel_stack_reserve();
@@ -917,6 +914,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 	clear_screen();
+	printfln("Welcome to Me Operating System");
 	serial_printf("int on\n");
 	INT_ON;
 

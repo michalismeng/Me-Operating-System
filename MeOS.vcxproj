@@ -1,0 +1,331 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7B919060-AD16-4CEE-BD54-597430A46460}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>MeOS</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <GenerateManifest>false</GenerateManifest>
+    <LibraryPath>C:\Users\Michalis\Documents\Git Repositories\MeOS\Debug;$(LibraryPath)</LibraryPath>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <OutDir>$(SolutionDir)Builds-dev\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>LITTLE_ENDIAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <SDLCheck>true</SDLCheck>
+      <IgnoreStandardIncludePath>true</IgnoreStandardIncludePath>
+      <MinimalRebuild>false</MinimalRebuild>
+      <ExceptionHandling>false</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <StructMemberAlignment>1Byte</StructMemberAlignment>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <ShowIncludes>true</ShowIncludes>
+      <AdditionalOptions>/arch:IA32 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Native</SubSystem>
+      <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
+      <Driver>Driver</Driver>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <EntryPointSymbol>kmain</EntryPointSymbol>
+      <BaseAddress>0xC0000000</BaseAddress>
+      <FixedBaseAddress>false</FixedBaseAddress>
+      <AdditionalOptions>/ALIGN:512 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>cd Scripts
+call format-light.bat"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="MeOS\AHCI.h" />
+    <ClInclude Include="MeOS\AHCIDefinitions.h" />
+    <ClInclude Include="MeOS\arp.h" />
+    <ClInclude Include="MeOS\atomic.h" />
+    <ClInclude Include="MeOS\boot_info.h" />
+    <ClInclude Include="MeOS\critlock.h" />
+    <ClInclude Include="MeOS\cstring.h" />
+    <ClInclude Include="MeOS\Debugger.h" />
+    <ClInclude Include="MeOS\descriptor_tables.h" />
+    <ClInclude Include="MeOS\dl_list.h" />
+    <ClInclude Include="MeOS\error.h" />
+    <ClInclude Include="MeOS\ethernet.h" />
+    <ClInclude Include="MeOS\FAT32_fs.h" />
+    <ClInclude Include="MeOS\file.h" />
+    <ClInclude Include="MeOS\i217.h" />
+    <ClInclude Include="MeOS\icmp.h" />
+    <ClInclude Include="MeOS\ip.h" />
+    <ClInclude Include="MeOS\kernel_stack.h" />
+    <ClInclude Include="MeOS\list.h" />
+    <ClInclude Include="MeOS\memory_definitions.h" />
+    <ClInclude Include="MeOS\net.h" />
+    <ClInclude Include="MeOS\net_protocol.h" />
+    <ClInclude Include="MeOS\pipe.h" />
+    <ClInclude Include="MeOS\print_utility.h" />
+    <ClInclude Include="MeOS\queue_lf.h" />
+    <ClInclude Include="MeOS\screen_gfx.h" />
+    <ClInclude Include="MeOS\semaphore.h" />
+    <ClInclude Include="MeOS\sock_buf.h" />
+    <ClInclude Include="MeOS\spinlock.h" />
+    <ClInclude Include="MeOS\isr.h" />
+    <ClInclude Include="MeOS\MassStorageDefinitions.h" />
+    <ClInclude Include="MeOS\mutex.h" />
+    <ClInclude Include="MeOS\open_file_table.h" />
+    <ClInclude Include="MeOS\ordered_vector.h" />
+    <ClInclude Include="MeOS\page_cache.h" />
+    <ClInclude Include="MeOS\queue.h" />
+    <ClInclude Include="MeOS\keyboard.h" />
+    <ClInclude Include="MeOS\memory.h" />
+    <ClInclude Include="MeOS\mmngr_heap.h" />
+    <ClInclude Include="MeOS\mmngr_phys.h" />
+    <ClInclude Include="MeOS\mmngr_virtual.h" />
+    <ClInclude Include="MeOS\PCI.h" />
+    <ClInclude Include="MeOS\PE_Definitions.h" />
+    <ClInclude Include="MeOS\pic.h" />
+    <ClInclude Include="MeOS\pit.h" />
+    <ClInclude Include="MeOS\process.h" />
+    <ClInclude Include="MeOS\screen.h" />
+    <ClInclude Include="MeOS\SerialDebugger.h" />
+    <ClInclude Include="MeOS\system.h" />
+    <ClInclude Include="MeOS\thread_exception.h" />
+    <ClInclude Include="MeOS\thread_sched.h" />
+    <ClInclude Include="MeOS\timer.h" />
+    <ClInclude Include="MeOS\tuple.h" />
+    <ClInclude Include="MeOS\types.h" />
+    <ClInclude Include="MeOS\udp.h" />
+    <ClInclude Include="MeOS\utility.h" />
+    <ClInclude Include="MeOS\VBEDefinitions.h" />
+    <ClInclude Include="MeOS\vector.h" />
+    <ClInclude Include="MeOS\vfs.h" />
+    <ClInclude Include="MeOS\vmmngr_pde.h" />
+    <ClInclude Include="MeOS\vmmngr_pte.h" />
+    <ClInclude Include="MeOS\vm_area.h" />
+    <ClInclude Include="MeOS\vm_contract.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="MeOS\AHCI.cpp" />
+    <ClCompile Include="MeOS\arp.cpp" />
+    <ClCompile Include="MeOS\critlock.cpp" />
+    <ClCompile Include="MeOS\cstring.c" />
+    <ClCompile Include="MeOS\Debugger.cpp" />
+    <ClCompile Include="MeOS\descriptor_tables.c" />
+    <ClCompile Include="MeOS\error.cpp" />
+    <ClCompile Include="MeOS\ethernet.cpp" />
+    <ClCompile Include="MeOS\FAT32_fs.cpp" />
+    <ClCompile Include="MeOS\file.cpp" />
+    <ClCompile Include="MeOS\i217.cpp" />
+    <ClCompile Include="MeOS\ip.cpp" />
+    <ClCompile Include="MeOS\kernel_stack.cpp" />
+    <ClCompile Include="MeOS\MassStorageDefinitions.cpp" />
+    <ClCompile Include="MeOS\mutex.cpp" />
+    <ClCompile Include="MeOS\isr.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\kernel.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\keyboard.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\memory.cpp" />
+    <ClCompile Include="MeOS\mmngr_heap.cpp" />
+    <ClCompile Include="MeOS\mmngr_phys.cpp" />
+    <ClCompile Include="MeOS\mmngr_virtual.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\net.cpp" />
+    <ClCompile Include="MeOS\net_protocol.cpp" />
+    <ClCompile Include="MeOS\open_file_table.cpp" />
+    <ClCompile Include="MeOS\page_cache.cpp" />
+    <ClCompile Include="MeOS\PCI.cpp" />
+    <ClCompile Include="MeOS\pic.c" />
+    <ClCompile Include="MeOS\pipe.cpp" />
+    <ClCompile Include="MeOS\pit.c" />
+    <ClCompile Include="MeOS\print_utility.cpp" />
+    <ClCompile Include="MeOS\process.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">All</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\screen.c">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\screen_gfx.cpp" />
+    <ClCompile Include="MeOS\semaphore.cpp" />
+    <ClCompile Include="MeOS\SerialDebugger.cpp" />
+    <ClCompile Include="MeOS\sock_buf.cpp" />
+    <ClCompile Include="MeOS\icmp.cpp" />
+    <ClCompile Include="MeOS\spinlock.cpp" />
+    <ClCompile Include="MeOS\system.c" />
+    <ClCompile Include="MeOS\thread_exception.cpp" />
+    <ClCompile Include="MeOS\thread_sched.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\timer.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="MeOS\udp.cpp" />
+    <ClCompile Include="MeOS\utility.cpp" />
+    <ClCompile Include="MeOS\vfs.cpp" />
+    <ClCompile Include="MeOS\vmmngr_pde.cpp" />
+    <ClCompile Include="MeOS\vmmngr_pte.cpp" />
+    <ClCompile Include="MeOS\vm_area.cpp" />
+    <ClCompile Include="MeOS\vm_contract.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Boot\boot.asm">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</DeploymentContent>
+    </None>
+    <None Include="Boot\BootCommon.inc" />
+    <None Include="Boot\BootInfo.inc" />
+    <None Include="Boot\common16.inc" />
+    <None Include="Boot\common32.inc" />
+    <None Include="Boot\GDT.inc" />
+    <None Include="Boot\memory.inc" />
+    <None Include="Boot\paging.inc" />
+    <None Include="Boot\stage2.asm" />
+    <MASM Include="MeOS\kasm.asm">
+      <FileType>Document</FileType>
+    </MASM>
+    <None Include="Boot\vbe.inc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

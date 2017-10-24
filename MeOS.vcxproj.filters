@@ -1,0 +1,420 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Boot">
+      <UniqueIdentifier>{93214468-2d0e-4294-84f8-073dc1187f75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CPU Scheduling">
+      <UniqueIdentifier>{2bd6e940-4582-42a1-b491-d88eda9d9a42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CPU Scheduling\Headers">
+      <UniqueIdentifier>{129754aa-359b-4d65-a70d-f875aa9b4a4a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CPU Scheduling\Sources">
+      <UniqueIdentifier>{aa2702b3-f804-4dc1-9fef-e93cf9689ef2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{2b43591a-5641-4bf6-bbae-9549114820a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="atomic">
+      <UniqueIdentifier>{7541823a-9ef4-4bcc-a37f-9bf1afed2e09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="atomic\Headers">
+      <UniqueIdentifier>{5cb44f1b-0ae5-4fe9-92ab-36ab812ec34e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="atomic\Sources">
+      <UniqueIdentifier>{36ed27cc-0ef8-45a9-8998-0fa0712246c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Services">
+      <UniqueIdentifier>{1d3ee532-49f1-45b8-824f-b787a78d92bd}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MeOS\boot_info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\cstring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\descriptor_tables.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\keyboard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\mmngr_phys.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\mmngr_virtual.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\pic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\pit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\screen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\utility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vmmngr_pde.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vmmngr_pte.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\SerialDebugger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\AHCI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\AHCIDefinitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\PCI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\mmngr_heap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\PE_Definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vfs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\MassStorageDefinitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\FAT32_fs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\ordered_vector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vm_area.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vm_contract.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\open_file_table.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\vector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\page_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\tuple.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\isr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\process.h">
+      <Filter>CPU Scheduling\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\thread_sched.h">
+      <Filter>CPU Scheduling\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\pipe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\i217.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\Debugger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\error.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\file.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\queue_lf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\atomic.h">
+      <Filter>atomic\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\mutex.h">
+      <Filter>atomic\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\semaphore.h">
+      <Filter>atomic\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\spinlock.h">
+      <Filter>atomic\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\memory_definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\thread_exception.h">
+      <Filter>CPU Scheduling\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\dl_list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\screen_gfx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\VBEDefinitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\print_utility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\ethernet.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\arp.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\ip.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\udp.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\critlock.h">
+      <Filter>atomic\Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\net_protocol.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\net.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\sock_buf.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\icmp.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\kernel_stack.h">
+      <Filter>Services</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="MeOS\cstring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\descriptor_tables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\kernel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\keyboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\mmngr_phys.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\mmngr_virtual.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\pic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\pit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\system.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\timer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\utility.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\SerialDebugger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\PCI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\AHCI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\vmmngr_pde.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\vmmngr_pte.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\mmngr_heap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\memory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\vfs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\FAT32_fs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\vm_area.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\vm_contract.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\open_file_table.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\page_cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\MassStorageDefinitions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\process.cpp">
+      <Filter>CPU Scheduling\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\thread_sched.cpp">
+      <Filter>CPU Scheduling\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\pipe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\i217.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\Debugger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\error.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\mutex.cpp">
+      <Filter>atomic\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\spinlock.cpp">
+      <Filter>atomic\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\semaphore.cpp">
+      <Filter>atomic\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\isr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\thread_exception.cpp">
+      <Filter>CPU Scheduling\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\screen_gfx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\screen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\print_utility.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\ethernet.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\arp.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\ip.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\udp.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\critlock.cpp">
+      <Filter>atomic\Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\net.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\sock_buf.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\net_protocol.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\icmp.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\kernel_stack.cpp">
+      <Filter>Services</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Boot\boot.asm">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\BootCommon.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\BootInfo.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\common16.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\common32.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\GDT.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\memory.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\stage2.asm">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\paging.inc">
+      <Filter>Boot</Filter>
+    </None>
+    <None Include="Boot\vbe.inc">
+      <Filter>Boot</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="MeOS\kasm.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>
