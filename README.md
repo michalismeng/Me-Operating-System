@@ -136,7 +136,7 @@ In addition, you can add this script to Visual Studio's post-build events in ord
 After the configuration procedure you can hit the start button and expect the kernel to boot.<br>
 Assuming everything went right you should see a blue screen with a welcome message and a tick+millisecond counter at the bottom like the picture below.
 
-(TODO ADD IMAGE)
+![Alt boot_image](kernel_boot.png?raw=true "Title")
 
 ## Running the kernel without compiling <a name="runimed"></a>
 
