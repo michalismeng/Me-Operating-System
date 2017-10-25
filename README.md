@@ -10,6 +10,8 @@ We use the tutorials at [brokenthorn](http://www.brokenthorn.com/Resources/OSDev
 * [Project Files Structure](#filestruct)
 * [Compiling the kernel files](#compiling)
 * [Preparing the virtual machine](#prepvm)
+* [Getting Serial Output](#serout)
+* [Adding Resources (Add a font for the kernel)](#res)
 * [Running the kernel](#runkrnl)
 * [Running the kernel without compiling (Jump here if you wish to run the kernel without code modifications)](#runimed)
 
@@ -40,7 +42,7 @@ The default structure used in this project is the following:
 ├── MeOS            Kernel files
 ├── Builds          Output directory for compiled kernel images and utility programs
 ├── MeOSLDR         Kernel loader files (uses SATA driver to load the kernel)
-├── .gitignore
+├── Resources       Supplementary files for testing (like fonts, text files, shared libraries...)
 └── README.md
 ```
 
@@ -131,15 +133,41 @@ Apart from the two Visual Studio projects, the rest of the build procedure (asse
 
 In addition, you can add this script to Visual Studio's post-build events in order to execute it after each succesful build. This way you can build the kernel in a single click!
 
+## Getting Serial Output <a name="serout"></a>
+
+Before launching the operating system, it is useful to run a serial reader program since the kernel constantly outputs serial data about different events that take place.
+
+Firstly, you need to modify the virtual machine settings. In the VirtualBox panel, open the Settings window and navigate to `Serial Ports`. Then enable `Port 1` assigning it a port number (COM1 for Windows) and set the mode to `Host Pipe`. Finally, set the Path/Address to `\\.\pipe\test` (this is an example of the virtual pipe name that is used by SerialDump).
+
+Now you can use a software to connect to the serial pipe and read incoming data.
+
+### SerialDump
+
+You can use the `SerialDump.exe` utility program located in the `Builds` folder. This program outputs the serial data sent by the kernel on a console and in addition, after closing the session it dumps the serial output at some folder.  To run it, execute the following:
+```
+cd Builds
+start "meOsDumper" "SerialDump.exe" dump "path\to\dumps"
+```
+If you use this software, note that you have to set the VirtualBox Path/Address value to the one provided above. 
+
+### Other Software
+
+You can use any other program to get the serial output (like [putty](http://www.putty.org/)). Make sure to set the serial baud rate to 9600.
+
+## Adding Resources <a name="res"></a>
+
+The kernel comes with some resource/supplementary files that are not needed to boot, but are essential for development and testing. Currently, there are two such files, a full ascii raw font used by the VGA graphics and a text file used for test reading and writing. You can find these files inside the `Resources` folder. 
+
+In order for these files to become accessible to the kernel at runtime, we are currently using a third FAT32 virtual hard drive where these files are stored and loaded when needed. So to use them, create a new 280MB virtual drive and format it with a FAT32 filesystem using a 4096-byte allocation unit (this is imporant for the FAT kernel driver). Then copy the resource files inside the virtual disk and attach it to the VirtualBox SATA controller.
+
+
 ## Running the kernel <a name="runkrnl"></a>
 
 After the configuration procedure you can hit the start button and expect the kernel to boot.<br>
-Assuming everything went right you should see a blue screen with a welcome message and a tick+millisecond counter at the bottom like the picture below.
+Assuming everything went right you should see a blue screen with a white box almost at its center. In addition, if you have included the kernel resources, a welcome message and a tick+millisecond counter at the bottom should be displayed, like in the picture below.
 
-(TODO ADD IMAGE)
+![Alt boot_image](kernel_boot.png?raw=true "MeOS Boot screen")
 
 ## Running the kernel without compiling <a name="runimed"></a>
 
 If you want to run the kernel but you don't want to modify the existing code, you can skip the build procedure and use the binaries provided in the `Builds` folder. These are the executables that match the most recently commited code. After [configuring the virtual machine](#prepvm), run the `build.bat` script located in the `Builds` folder and start your machine.
-
-

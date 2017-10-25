@@ -95,12 +95,13 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 		PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP | MMAP_ALLOC_IMMEDIATE) == MAP_FAILED)
 		PANIC("Could not map screen region");
 
-	load_default_font();
-
 	cursor = make_point(0, 0);
 
 	charsHorizontal = vbe->width / 8;
 	charsVertical = vbe->height / 16;
+
+	//clear_screen();
+	load_default_font();
 
 	// print diagnostics
 	screen_gfx_print();
@@ -149,14 +150,15 @@ void load_default_font()
 {
 	if (open_file("sdc_mount/FONT.RAW", &font_fd, O_NOCACHE) != ERROR_OK)
 	{
-		serial_printf("Font could not be loaded. File not found.\n");
+		serial_printf("**************Font could not be loaded. File not found.*******************\n");
+		//PANIC("");
 		return;
 	}
 
 	if (read_file(font_fd, 0, FONT_SIZE, (virtual_addr)font) != FONT_SIZE)
 	{
 		serial_printf("Font could not be read %u.\n", get_last_error());
-		return;
+		PANIC("");
 	}
 }
 

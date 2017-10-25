@@ -3,6 +3,7 @@
 !MeOS/
 !Boot/
 !Builds
+!Resources
 !Builds/*.exe
 !MeOSLDR/
 /MeOSLdr/Debug

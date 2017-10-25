@@ -914,6 +914,7 @@ void proc_init_thread()
 
 	//ClearScreen();
 	clear_screen();
+	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
 	printfln("Welcome to Me Operating System");
 	serial_printf("int on\n");
 	INT_ON;
