@@ -186,4 +186,7 @@ uint32 get_last_error();
 // retrieves the most recent error for the currently executing thread without clearing the field to zero (error remains)
 uint32 get_raw_error();
 
+// clears the last error, by setting it to zero
+void clear_last_error();
+
 #endif

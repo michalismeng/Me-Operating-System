@@ -155,20 +155,25 @@ virtual_addr page_cache_reserve_anonymous()
 	
 	// Pages are not freed so always check to see if they are already present
 	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
-	if (vmmngr_alloc_page(address) != ERROR_OK)
-		return 0;
+	//if (vmmngr_alloc_page(address) != ERROR_OK)
+		//return 0;
 	// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
 
 	return address;
 }
-
+// TODO: APPLY NEW FIX
 void page_cache_release_anonymous(virtual_addr address)
 {
 	uint32 index = page_cache_index_by_addr(address);
-	page_cache_index_release_buffer(index);
-	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
-}
 
+	if (index >= page_cache_num_buffers())
+		return;
+
+	page_cache_index_release_buffer(index);
+	//vmmngr_free_page_addr(buffer); 
+	// TODO: The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
+}
+// TODO: APPLY NEW FIX
 virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 {
 	if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)
@@ -197,6 +202,7 @@ virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 }
 
 // TODO: Replace common functionality with release anonymous
+// TODO: APPLY NEW FIX
 error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 {
 	if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
@@ -308,21 +314,20 @@ void page_cache_print()
 {
 	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
 	{
-		
-		printf("gfd %u %s:", page_cache.cached_files[i].gfd, gft_get(page_cache.cached_files[i].gfd)->file_node->name);
+		serial_printf("gfd %u %s:", page_cache.cached_files[i].gfd, gft_get(page_cache.cached_files[i].gfd)->file_node->name);
 		for (auto temp = page_cache.cached_files[i].pages.head; temp != 0; temp = temp->next)
-			printf("%u ", temp->data.buffer_index);
+			serial_printf("%u ", temp->data.buffer_index);
 
-		printfln("");
+		serial_printf("\n");
 	}
 
-	printfln("alloced: ");
+	serial_printf("alloced: \n");
 	
 	for (uint32 i = 0; i < page_cache_num_buffers(); i++)
 		if (alloced_bitmap[i])
-			printf("%u ", i);
+			serial_printf("%u ", i);
 
-	printfln("\n");
+	serial_printf("\n\n");
 }
 
 _page_cache* page_cache_get()

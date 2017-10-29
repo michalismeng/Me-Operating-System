@@ -36,6 +36,9 @@
     <Filter Include="Services">
       <UniqueIdentifier>{1d3ee532-49f1-45b8-824f-b787a78d92bd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="tests">
+      <UniqueIdentifier>{a515e00c-3f1f-4b76-9101-50af320ff4c0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MeOS\boot_info.h">
@@ -227,6 +230,18 @@
     <ClInclude Include="MeOS\kernel_stack.h">
       <Filter>Services</Filter>
     </ClInclude>
+    <ClInclude Include="MeOS\test_Fat32.h">
+      <Filter>tests</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\test_open_file_table.h">
+      <Filter>tests</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\test_base.h">
+      <Filter>tests</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\test_page_cache.h">
+      <Filter>tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MeOS\cstring.c">
@@ -299,9 +314,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MeOS\page_cache.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MeOS\MassStorageDefinitions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MeOS\process.cpp">
@@ -378,6 +390,15 @@
     </ClCompile>
     <ClCompile Include="MeOS\kernel_stack.cpp">
       <Filter>Services</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\test_FAT32.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\test_open_file_table.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\test_page_cache.cpp">
+      <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

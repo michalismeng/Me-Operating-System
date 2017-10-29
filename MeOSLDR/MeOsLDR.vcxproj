@@ -76,7 +76,7 @@
     <IncludePath>
     </IncludePath>
     <LibraryPath />
-    <OutDir>$(SolutionDir)Builds-dev\</OutDir>
+    <OutDir>$(SolutionDir)Builds\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>

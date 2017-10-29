@@ -8,7 +8,7 @@ vfs_node* root;
 size_t vfs_default_read(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 size_t vfs_default_write(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 error_t vfs_default_sync(uint32 fd, vfs_node* node, uint32 start_page, uint32 end_page);
-error_t vfs_default_open(vfs_node* node);
+error_t vfs_default_open(vfs_node* node, uint32 capabilities);
 error_t vfs_default_lookup(vfs_node* parent, char* path, vfs_node** result);
 
 static fs_operations default_fs_operations =
@@ -41,48 +41,26 @@ vfs_node* vfs_find_child(vfs_node* node, char* name)
 
 size_t vfs_default_read(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
 {
-	if (!node->tag)
-	{
-		set_last_error(EINVAL, VFS_INVALID_NODE_STRUCTURE, EO_VFS);
-		return 0;
-	}
-
-	// return the node's tag (that is the mount point) read function
-	return node->tag->fs_ops->fs_read(fd, node, start, count, address);
+	clear_last_error();
+	return 0;
 }
 
 size_t vfs_default_write(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
 {
-	if (!node->tag)
-	{
-		set_last_error(EINVAL, VFS_INVALID_NODE_STRUCTURE, EO_VFS);
-		return 0;
-	}
-
-	return node->tag->fs_ops->fs_write(fd, node, start, count, address);
+	clear_last_error();
+	return 0;
 }
 
 error_t vfs_default_sync(uint32 fd, vfs_node* node, uint32 start_page, uint32 end_page)
 {
-	if (!node->tag)
-	{
-		set_last_error(EINVAL, VFS_INVALID_NODE_STRUCTURE, EO_VFS);
-		return ERROR_OCCUR;
-	}
-
-	return node->tag->fs_ops->fs_sync(fd, node, start_page, end_page);
+	clear_last_error();
+	return ERROR_OK;
 }
 
-error_t vfs_default_open(vfs_node* node)
+error_t vfs_default_open(vfs_node* node, uint32 capabilities)
 {
-	if (!node->tag)
-	{
-		set_last_error(EINVAL, VFS_INVALID_NODE_STRUCTURE, EO_VFS);
-		return ERROR_OCCUR;
-	}
-
-	// TODO: update open_count + register in open file
-	return node->tag->fs_ops->fs_open(node);
+	clear_last_error();
+	return ERROR_OK;
 }
 
 error_t vfs_default_lookup(vfs_node* parent, char* path, vfs_node** result)
@@ -100,7 +78,7 @@ error_t vfs_default_lookup(vfs_node* parent, char* path, vfs_node** result)
 
 // public functions
 
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 capabilities, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
 							vfs_node* parent, fs_operations* file_fncs)
 {
 	vfs_node* n = (vfs_node*)malloc(sizeof(vfs_node) + deep_metadata_length);
@@ -134,7 +112,6 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 	if (file_fncs->fs_sync == 0)
 		file_fncs->fs_sync = default_fs_operations.fs_sync;
 
-
 	if (copy_name)
 	{
 		n->name = (char*)malloc(n->name_length + 1);		// deep copy name
@@ -150,6 +127,7 @@ vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 
 		n->name = name;										// shallow copy name
 
 	n->attributes = attributes;
+	n->capabilities = capabilities;
 	n->file_length = file_length;
 	//n->is_open = false;									// by default file is closed and no operations can be done upon it
 
@@ -234,9 +212,9 @@ vfs_node* vfs_find_node(char* path)
 	return vfs_find_relative_node(vfs_get_root(), path);
 }
 
-vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs)
+vfs_node* vfs_create_device(char* name, uint32 capabilities, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs)
 {
-	vfs_node* node = vfs_create_node(name, true, VFS_DEVICE | VFS_READ, 0, deep_metadata_length, tag, vfs_get_dev(), dev_fncs);
+	vfs_node* node = vfs_create_node(name, true, VFS_DEVICE | VFS_READ, capabilities, 0, deep_metadata_length, tag, vfs_get_dev(), dev_fncs);
 
 	if (node == 0)
 		return 0;
@@ -254,8 +232,8 @@ void vfs_add_child(vfs_node* parent, vfs_node* child)
 void init_vfs()
 {
 	// create root - /dev
-	root = vfs_create_node("root", false, VFS_DIRECTORY, 0, 0, NULL, NULL, NULL);
-	vfs_add_child(root, vfs_create_node("dev", false, 0, 0, 0, NULL, root, NULL));
+	root = vfs_create_node("root", false, VFS_DIRECTORY, VFS_CAP_READ, 0, 0, NULL, NULL, NULL);
+	vfs_add_child(root, vfs_create_node("dev", false, 0, VFS_CAP_READ, 0, 0, NULL, root, NULL));
 }
 
 void print_vfs(vfs_node* node, int level)
@@ -342,12 +320,17 @@ void vfs_print_all()
 	}
 }
 
+/* VFS Wrapper functions to node specific calls */
+
 size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
 {
 	if (!node)
 		return VFS_INVALID_NODE;
 
+	// TODO: check for caching
+
 	// TODO: Check read permissions
+
 	return node->fs_ops->fs_read(fd, node, start, count, address);
 }
 
@@ -355,6 +338,8 @@ size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, vir
 {
 	if (!node)
 		return VFS_INVALID_NODE;
+
+	// TODO: Check for caching
 
 	// TODO: Check read permissions
 	uint32 written = node->fs_ops->fs_write(fd, node, start, count, address);
@@ -368,36 +353,33 @@ size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, vir
 	return written;
 }
 
-error_t vfs_sync(uint32 fd, vfs_node* node, uint32 page_start, uint32 page_end)
-{
-	if (!node)
-		return VFS_INVALID_NODE;
+//error_t vfs_sync(uint32 fd, vfs_node* node, uint32 page_start, uint32 page_end)
+//{
+//	if (!node)
+//		return VFS_INVALID_NODE;
+//
+//	// TODO: Check read permissions
+//	return node->fs_ops->fs_sync(fd, node, page_start, page_end);
+//}
 
-	// TODO: Check read permissions
-	return node->fs_ops->fs_sync(fd, node, page_start, page_end);
-}
+//inline error_t vfs_open_file(vfs_node* node, uint32 capabilities)
+//{
+//	return node->fs_ops->fs_open(node, capabilities);
+//}
 
-error_t vfs_open_file(vfs_node* node)
-{
-	if (!node)
-		return VFS_INVALID_NODE;
-
-	return node->fs_ops->fs_open(node);
-}
-
-error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result)
-{
-	if (!parent)
-	{
-		set_last_error(EINVAL, VFS_INVALID_NODE, EO_VFS);
-		return ERROR_OCCUR;
-	}
-
-	if (parent->fs_ops->fs_lookup == 0)
-		return vfs_default_lookup(parent, path, result);
-
-	return parent->fs_ops->fs_lookup(parent, path, result);
-}
+//error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result)
+//{
+//	if (!parent)
+//	{
+//		set_last_error(EINVAL, VFS_INVALID_NODE, EO_VFS);
+//		return ERROR_OCCUR;
+//	}
+//
+//	if (parent->fs_ops->fs_lookup == 0)
+//		return vfs_default_lookup(parent, path, result);
+//
+//	return parent->fs_ops->fs_lookup(parent, path, result);
+//}
 
 error_t vfs_root_lookup(char* path, vfs_node** result)
 {

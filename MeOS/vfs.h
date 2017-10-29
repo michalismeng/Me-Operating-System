@@ -9,6 +9,8 @@
 #include "Debugger.h"
 #include "error.h"
 
+#define DEVICE_DEFAULT_CAPS VFS_CAP_READ
+
 // TODO: formalize error here!
 
 enum VFS_ATTRIBUTES
@@ -23,6 +25,18 @@ enum VFS_ATTRIBUTES
 	VFS_READ = 8,			// 01000
 	VFS_WRITE = 16,			// 10000
 	VFS_HIDDEN = 32,
+	//VFS_BLOCK_FILE = 64		// This is a block file (if not set then character file)
+};
+
+// file capabilities
+enum VFS_CAPABILITIES
+{
+	VFS_CAP_NONE	= 1 << 0,
+	VFS_CAP_READ	= 1 << 1,		// File can be read
+	VFS_CAP_WRITE	= 1 << 2,		// File can be written
+	VFS_CAP_CACHE	= 1 << 3,		// File can use the page cache
+
+	VFS_CAP_MAX		= 0xFFFF,		// The maximum capabilities for vfs files is 16. The other 16 bits are for file-specific usage
 };
 
 enum VFS_ERROR
@@ -36,7 +50,8 @@ enum VFS_ERROR
 	VFS_FILE_NOT_OPEN,
 	VFS_CACHE_FULL,
 	VFS_BAD_ARGUMENTS,
-	VFS_GENERAL_ERROR
+	VFS_GENERAL_ERROR,
+	VFS_CAPABILITIES_ERROR,
 };
 
 // vfs node structures
@@ -54,8 +69,8 @@ struct fs_operations
 	// A value of zero may imply full buffer. Use get_last_error to check for errors.
 	size_t(*fs_write)(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 
-	// Opens the file pointed by node
-	error_t(*fs_open)(vfs_node* node);
+	// Opens the file pointed by node using the requested capabilities
+	error_t(*fs_open)(vfs_node* node, uint32 capabilities);
 
 	// TODO: Closes the file. Implement...
 	error_t(*fs_close)();
@@ -77,9 +92,11 @@ struct vfs_node
 	char* name;						// file name
 	uint32 name_length;				// name length
 	uint32 attributes;				// file attributes
+	uint32 capabilities;			// file capabilities
 	uint32 file_length;				// file length (bytes)
 	vfs_node* tag;					// tag node associated with this node
 	vfs_node* parent;				// the parent node
+
 	uint32 flags;					// file flags
 
 	fs_operations* fs_ops;			// file basic operations
@@ -93,11 +110,11 @@ struct vfs_node
 // vfs node list definitions
 
 // create a virtual file system node. Parameter name should be null terminated.
-vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
+vfs_node* vfs_create_node(char* name, bool copy_name, uint32 attributes, uint32 capabilities, uint32 file_length, uint32 deep_metadata_length, vfs_node* tag, 
 							vfs_node* parent, fs_operations* file_fncs);
 
 // create a virtual file system device node and return it's deep metadata ptr
-vfs_node* vfs_create_device(char* name, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs);
+vfs_node* vfs_create_device(char* name, uint32 capabilities, uint32 deep_metadata_length, vfs_node* tag, fs_operations* dev_fncs);
 
 // attaches a child node to its parent
 void vfs_add_child(vfs_node* parent, vfs_node* child);
@@ -126,8 +143,8 @@ vfs_node* vfs_find_node(char* path);
 // initialize the virtual file system
 void init_vfs();
 
-// opens a file for operations. (Loads its drive layout)
-error_t vfs_open_file(vfs_node* node);
+// opens a file for operations.
+inline error_t vfs_open_file(vfs_node* node, uint32 capabilities) { return node->fs_ops->fs_open(node, capabilities); }
 
 // include read and write to and from page-cache functions
 size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
@@ -136,10 +153,10 @@ size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virt
 size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
 
 // syncs the in memory changes to the underlying drive
-error_t vfs_sync(uint32 fd, vfs_node* file, uint32 page_start, uint32 page_end);
+inline error_t vfs_sync(uint32 fd, vfs_node* node, uint32 page_start, uint32 page_end) { return node->fs_ops->fs_sync(fd, node, page_start, page_end); }
 
 // looks down the path from parent until found or returns failure
-error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result);
+inline error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result) { return parent->fs_ops->fs_lookup(parent, path, result); }
 
 // begins a vfs_lookup operation at the root node
 error_t vfs_root_lookup(char* path, vfs_node** result);

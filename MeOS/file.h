@@ -16,16 +16,23 @@ enum FILE_OPEN_FLAGS
 enum FILE_ERROR
 {
 	FILE_NONE,
-	FILE_GFD_NOT_FOUND
+	FILE_GFD_NOT_FOUND,
+	FILE_BAD_GFD,
+	FILE_CAPABILITIES_ERROR,
+	FILE_READ_ACCESS_DENIED,
+	FILE_WRITE_ACCESS_DENIED,
+	FILE_UNALIGED_ADDRESS
 };
 
 	/* Defines the standard file io API */
 
 	// opens a file and associates a local file descriptor with it
-	error_t open_file(char* path, uint32* fd, uint32 flags);
+	error_t open_file(char* path, uint32* fd, uint32 capabilities);
 
 	// opens a file indicated by the given node and associates a local and a global file descriptor with it
-	error_t open_file_by_node(vfs_node* node, uint32* fd);
+	error_t open_file_by_node(vfs_node* node, uint32* fd, uint32 capabilities);
+
+	//error_t close_file(uint32 gfd);
 
 	// reads the file, given its global file descriptor, to the given buffer
 	size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);

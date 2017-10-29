@@ -34,7 +34,7 @@ struct _page_cache_file
 // represents a page in the page cache
 struct _cache_cell
 {
-	char array[4096];						// 4KB array.
+	char array[PAGE_CACHE_SIZE];				// 4KB array.
 };
 
 struct _page_cache

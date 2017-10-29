@@ -1,6 +1,8 @@
 #ifndef PIPE_H_08012017
 #define PIPE_H_08012017
 
+// TODO: Check capabilities argument
+
 #include "types.h"
 #include "utility.h"
 #include "vfs.h"
@@ -24,7 +26,7 @@ void create_vfs_pipe(char* buf, uint32 size, uint32 fd[2]);
 
 void pipe_close();
 
-error_t pipe_vfs_open(vfs_node* node);
+error_t pipe_vfs_open(vfs_node* node, uint32 capabilities);
 size_t pipe_vfs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 size_t pipe_vfs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 

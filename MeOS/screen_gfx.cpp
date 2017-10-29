@@ -19,7 +19,7 @@ uint32 foreground = 0, background = 0;
 
 bool screen_initialized = false;
 
-error_t screen_gfx_open(vfs_node* node);
+error_t screen_gfx_open(vfs_node* node, uint32 capabilities);
 size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 error_t screen_gfx_ioctl(vfs_node* node, uint32 command, ...);
@@ -43,7 +43,7 @@ size_t screen_gfx_read(uint32 fd, vfs_node* file, uint32 start, size_t count, vi
 	return ERROR_OK;
 }
 
-error_t screen_gfx_open(vfs_node* node)
+error_t screen_gfx_open(vfs_node* node, uint32 capabilities)
 {
 	return ERROR_OK;
 }
@@ -106,7 +106,7 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 	// print diagnostics
 	screen_gfx_print();
 
-	vfs_create_device("screen", 0, 0, &screen_gfx_operations);
+	vfs_create_device("screen", DEVICE_DEFAULT_CAPS, 0, 0, &screen_gfx_operations);
 
 	screen_initialized = true;
 }

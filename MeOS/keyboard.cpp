@@ -23,7 +23,7 @@ bool _kybrd_disable = false;
 TCB* keyboard_daemon = 0;
 TCB* active = 0;
 size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
-error_t kybd_open(vfs_node* node);
+error_t kybd_open(vfs_node* node, uint32 capabilities);
 error_t kybd_ioctl(vfs_node* node, uint32 command, ...);
 
 static fs_operations kybd_operations =
@@ -39,18 +39,18 @@ static fs_operations kybd_operations =
 
 size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
+	size_t temp_count = count;
 	uint8* buffer = (uint8*)address;
 	active = thread_get_current();
-
 	// perhaps we will need to empty the user_buffer at some point
 
-	while (count > 0)
+	while (temp_count > 0)
 	{
 		if (queue_lf_is_empty(&user_buffer) == false)
 		{
 			*buffer = queue_lf_peek(&user_buffer);
 			queue_lf_remove(&user_buffer);
-			count--;
+			temp_count--;
 			buffer++;
 		}
 		else
@@ -61,7 +61,7 @@ size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_
 	return count;
 }
 
-error_t kybd_open(vfs_node* node)
+error_t kybd_open(vfs_node* node, uint32 capabilities)
 {
 	return ERROR_OK;
 }
@@ -498,8 +498,7 @@ void keyboard_irq()
 void init_keyboard()
 {
 	register_interrupt_handler(33, keyboard_callback);
-
-	vfs_create_device("keyboard", 0, 0, &kybd_operations);
+	vfs_create_device("keyboard", DEVICE_DEFAULT_CAPS, 0, 0, &kybd_operations);
 
 	queue_lf_init(&keycode_buffer, 10);
 	queue_lf_init(&user_buffer, 10);

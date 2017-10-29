@@ -27,16 +27,16 @@ _pipe create_pipe(char* buf, uint32 size)
 // TODO: FIX THAT
 void create_vfs_pipe(char* buf, uint32 size, uint32 fd[2])
 {
-	vfs_node* n = vfs_create_device("pipe", sizeof(_pipe), NULL, &pipe_operations);
+	vfs_node* n = vfs_create_device("pipe", DEVICE_DEFAULT_CAPS, sizeof(_pipe), NULL, &pipe_operations);
 	*(_pipe*)n->deep_md = create_pipe(buf, size);
 
-	vfs_open_file(n);
+	vfs_open_file(n, 0);
 
 	fd[0] = gft_insert_s(create_gfe(n));
 	fd[1] = fd[0];
 }
 
-error_t pipe_vfs_open(vfs_node* node)
+error_t pipe_vfs_open(vfs_node* node, uint32 capabilities)
 {
 	return ERROR_OK;
 }

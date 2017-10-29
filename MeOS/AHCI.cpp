@@ -323,7 +323,7 @@ error_t ahci_setup_vfs_port(uint8 port_num)
 	name[0] = 's'; name[1] = 'd';		// to be safe
 
 	uitoalpha(port_num, name + 2);
-	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, sizeof(ahci_storage_info), NULL, &AHCI_fs_operations)->deep_md;
+	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, DEVICE_DEFAULT_CAPS, sizeof(ahci_storage_info), NULL, &AHCI_fs_operations)->deep_md;
 
 	// populate storage struct
 	uint16* ptr = (uint16*)buf;

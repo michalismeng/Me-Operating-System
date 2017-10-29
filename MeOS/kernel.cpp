@@ -50,6 +50,10 @@
 
 #include "kernel_stack.h"
 
+#include "test_Fat32.h"
+#include "test_open_file_table.h"
+
+
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
 
@@ -631,6 +635,9 @@ void proc_init_thread()
 	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
 	printfln("heap start: %h %h", kernel_heap->start_address, kernel_heap);
 
+	// re-init this processe's local file table against the new heap
+	init_local_file_table(&process_get_current()->lft, 10);
+
 	___buffer = (char*)(3 GB + 10 MB + 10 KB);
 
 	// TODO: standardize this!
@@ -649,21 +656,32 @@ void proc_init_thread()
 	page_cache_init(2 GB, 20, 16);
 	init_global_file_table(16);
 
-	init_net();
-	init_arp(NETWORK_LAYER);
+	/*init_net();
+	init_arp(NETWORK_LAYER);*/
 	//init_ipv4(NETWORK_LAYER);
 	//init_icmp(TRANSPORT_LAYER);
 	//init_udp(TRANSPORT_LAYER);
 
-	page_cache_print();
 
-	vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
-	if (disk)
-	{
-		vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
-		vfs_node* folder = 0;
-		vfs_add_child(vfs_get_root(), hierarchy);
-	}
+	/*if (test_FAT32_init() == false)
+		PANIC("paniced");
+
+	if (test_FAT32_create_file() == false)
+		PANIC("");
+
+	serial_printf("\n\ntesting finished\n\n");
+
+	PANIC("");*/
+
+	//page_cache_print();
+
+	//vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
+	//if (disk)
+	//{
+	//	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
+	//	vfs_node* folder = 0;
+	//	vfs_add_child(vfs_get_root(), hierarchy);
+	//}
 
 	//vfs_print_all();
 
@@ -865,20 +883,41 @@ void proc_init_thread()
 
 	//PANIC("");
 
-	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
-	init_screen_gfx(vbe);
+	if (test_open_file_table_open() == false)
+	{
+		serial_printf("test failed...\n");
+		PANIC("");
+	}
 
-	set_foreground_color(0x00FFFFFF);
-	set_background_color(0x000000FF);
+	if (test_vfs_open_file() == false)
+	{
+		serial_printf("vfs open file test failed...\n");
+		PANIC("");
+	}
 
-	init_print_utility();
+	if (test_open_file() == false)
+	{
+		serial_printf("open file test failed...\n");
+		PANIC("");
+	}
+
+	/*serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
+	init_screen_gfx(vbe);*/
+
+	/*set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);*/
+
+	//set_foreground_color(0x000FF00);
+	//set_background_color(0);
+
+	/*init_print_utility();
 
 	printfln("hello");
 	printfln("hello %u", 3);
 
-	serial_printf("screen ready...\n");
+	serial_printf("screen ready...\n");*/
 
-	virtual_addr krnl_stack = kernel_stack_reserve();
+	/*virtual_addr krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)
 	{
 		serial_printf("kernel stack allocation failed: %e", get_last_error());
@@ -887,15 +926,15 @@ void proc_init_thread()
 	serial_printf("kernel stack top for kybd_fancy: %h", krnl_stack);
 
 	TCB* c;
-	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));
+	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));*/
 
-	krnl_stack = kernel_stack_reserve();
+	virtual_addr krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)
 	{
 		serial_printf("kernel stack allocation failed: %e", get_last_error());
 		PANIC("");
 	}
-	serial_printf("kernel stack top for idle: %h", krnl_stack);
+	serial_printf("kernel stack top for idle: %h\n", krnl_stack);
 
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, krnl_stack, 4 KB, 7, 0));
 	/////*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
@@ -905,7 +944,7 @@ void proc_init_thread()
 	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
 	//thread_insert(thread);
 	thread_test_time = 0;//thread;
-	ClearScreen();
+	//ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
 	// create new test process to run keyboard fancy function.
@@ -913,11 +952,21 @@ void proc_init_thread()
 	//thread_insert(c = thread_create(p, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 
 	//ClearScreen();
-	clear_screen();
-	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
-	printfln("Welcome to Me Operating System");
-	serial_printf("int on\n");
+	//clear_screen();
+	//draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
+	//printfln("Welcome to Me Operating System");
+	//serial_printf("int on\n");
 	INT_ON;
+
+	if (test_read_file() == false)
+	{
+		serial_printf("read file test failed...\n");
+		PANIC("");
+	}
+
+	page_cache_print();
+
+	PANIC("Test end");
 
 
 	while (true)
@@ -1032,10 +1081,6 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 	uint32 memoryKB = 1024 + boot_info->m_memoryLo + boot_info->m_memoryHi * 64;
 	pmmngr_init(memoryKB, 0xC0000000 + k_info->kernel_size);
 
-	/*serial_printf("Memory detected: %h KB %h MB\n", memoryKB, memoryKB / 1024);
-	serial_printf("Kernel size: %u bytes\n", k_info->kernel_size);
-	serial_printf("Boot device: %h\n", boot_info->m_bootDevice);*/
-
 	bios_memory_region* region = (bios_memory_region*)boot_info->m_mmap_addr;
 
 	for (uint32 i = 0; i < boot_info->m_mmap_length; i++)
@@ -1057,19 +1102,12 @@ int kmain(multiboot_info* _boot_info, kernel_info* k_info)
 
 	pmmngr_reserve_region(&physical_memory_region(0x100000, pmmngr_get_next_align(k_info->kernel_size + 1)));
 
-	//GetMemoryStats();
-
 	vmmngr_initialize(pmmngr_get_next_align(k_info->kernel_size + 1) / 4096);
 	pmmngr_paging_enable(true);
-
-	//fsysSimpleInitialize();
-
-	//ClearScreen();
 
 	// create a minimal multihtreaded environment to work with
 
 	virtual_addr space = pmmngr_get_next_align(0xC0000000 + k_info->kernel_size + 4096);
-	printfln("allocating 4KB at %h", space);
 
 	if (vmmngr_is_page_present(space))
 		printfln("space: %h alloced", space);
