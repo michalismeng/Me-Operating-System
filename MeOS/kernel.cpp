@@ -50,8 +50,9 @@
 
 #include "kernel_stack.h"
 
-#include "test_Fat32.h"
-#include "test_open_file_table.h"
+#include "test/test_Fat32.h"
+#include "test/test_open_file_table.h"
+#include "test/test_page_cache.h"
 
 
 extern "C" uint8 canOutput = 1;
@@ -59,13 +60,6 @@ extern "C" int _fltused = 1;
 
 heap* kernel_heap = 0;
 HBA_MEM_t* _abar;
-
-void GetMemoryStats()
-{
-	serial_printf("Max blocks: %u\n", pmmngr_get_block_count());
-	serial_printf("Available blocks: %u\n", pmmngr_get_free_block_count());
-	serial_printf("Used blocks: %u\n", pmmngr_get_block_use_count());
-}
 
 KEYCODE getch()
 {
@@ -628,7 +622,7 @@ void proc_init_thread()
 	if (vfs_mmap(0xF0000000, INVALID_FD, 0, 0x0FFFE000, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_IDENTITY_MAP) == MAP_FAILED)
 		PANIC("Could not map MMIO");
 
-	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes on read only page
+	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes to read only page
 	enable_write_protection();
 
 	// create a 16KB heap
@@ -642,9 +636,6 @@ void proc_init_thread()
 
 	// TODO: standardize this!
 	vbe_mode_info_block* vbe = (vbe_mode_info_block*)(0x2000);
-
-	//ClearScreen();
-
 	
 	init_vfs();
 
@@ -653,7 +644,7 @@ void proc_init_thread()
 	uint32 ahci_base = 0x200000;
 	init_ahci(_abar, ahci_base);
 
-	page_cache_init(2 GB, 20, 16);
+	page_cache_init(2 GB, 20);
 	init_global_file_table(16);
 
 	/*init_net();
@@ -661,19 +652,6 @@ void proc_init_thread()
 	//init_ipv4(NETWORK_LAYER);
 	//init_icmp(TRANSPORT_LAYER);
 	//init_udp(TRANSPORT_LAYER);
-
-
-	/*if (test_FAT32_init() == false)
-		PANIC("paniced");
-
-	if (test_FAT32_create_file() == false)
-		PANIC("");
-
-	serial_printf("\n\ntesting finished\n\n");
-
-	PANIC("");*/
-
-	//page_cache_print();
 
 	//vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
 	//if (disk)
@@ -829,43 +807,8 @@ void proc_init_thread()
 	//debugf("");
 	INT_OFF;
 
-	/*int test_fd = 0;
-	page_cache_register_file(test_fd);
-
-	page_cache_reserve_buffer(test_fd, 0);
-	page_cache_reserve_buffer(test_fd, 1);
-	page_cache_reserve_buffer(test_fd, 2);
-
-	page_cache_print();
-
-	page_cache_register_file(1);
-
-	page_cache_reserve_buffer(1, 10);
-	page_cache_reserve_buffer(1, 11);
-	page_cache_reserve_buffer(1, 12);
-
-	page_cache_print();
-
-	page_cache_release_buffer(test_fd, 1);
-
-	page_cache_print();
-
-	page_cache_unregister_file(test_fd);
-
-	page_cache_reserve_buffer(1, 13);
-
-	page_cache_print();*/
-
-	//while (true);
-
 	uint32 error;
 	vfs_node* n;
-
-		//while (true);
-
-		//mutex_init(&m);
-		//spinlock_init(&s);
-		//semaphore_init(&sem, 1);
 
 
 	init_keyboard();	
@@ -901,21 +844,41 @@ void proc_init_thread()
 		PANIC("");
 	}
 
-	/*serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
-	init_screen_gfx(vbe);*/
+	if (test_page_cache_reserve_anonymous() == false)
+	{
+		serial_printf("page cache reserve anonymous test failed...\n");
+		PANIC("");
+	}
 
-	/*set_foreground_color(0x00FFFFFF);
-	set_background_color(0x000000FF);*/
+	if (test_page_cache_reserve() == false)
+	{
+		serial_printf("page cache reserve test failed");
+		PANIC("");
+	}
+
+	if (test_page_cache_find_buffer() == false)
+	{
+		serial_printf("page cache find buffer test failed");
+		PANIC("");
+	}
+
+	//PANIC("Test End");
+
+	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
+	init_screen_gfx(vbe);
+
+	set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);
 
 	//set_foreground_color(0x000FF00);
 	//set_background_color(0);
 
-	/*init_print_utility();
+	init_print_utility();
 
 	printfln("hello");
 	printfln("hello %u", 3);
 
-	serial_printf("screen ready...\n");*/
+	serial_printf("screen ready...\n");
 
 	/*virtual_addr krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)
@@ -944,29 +907,17 @@ void proc_init_thread()
 	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
 	//thread_insert(thread);
 	thread_test_time = 0;//thread;
-	//ClearScreen();
 	//create_vfs_pipe(___buffer, 512, fd);
 
 	// create new test process to run keyboard fancy function.
 	//PCB* p = process_create(process_get_current(), 0, 0, 0xFFFFFFFF);
 	//thread_insert(c = thread_create(p, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 
-	//ClearScreen();
-	//clear_screen();
-	//draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
-	//printfln("Welcome to Me Operating System");
+	clear_screen();
+	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
+	printfln("Welcome to Me Operating System");
 	//serial_printf("int on\n");
 	INT_ON;
-
-	if (test_read_file() == false)
-	{
-		serial_printf("read file test failed...\n");
-		PANIC("");
-	}
-
-	page_cache_print();
-
-	PANIC("Test end");
 
 
 	while (true)

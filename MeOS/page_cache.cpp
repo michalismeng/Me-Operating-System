@@ -66,15 +66,17 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 	return finfo;
 }
 
+// TODO: TO BE DELETED
 _page_cache_file* page_cache_get_file(uint32 fd)
 {
-	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
+	/*for (uint32 i = 0; i < page_cache.cached_files.count; i++)
 		if (page_cache.cached_files[i].gfd == fd)
-			return &page_cache.cached_files[i];
+			return &page_cache.cached_files[i];*/
 
 	return 0;
 }
 
+// TODO: TO BE DELETED
 _page_cache_file* page_cache_get_first_unused()
 {
 	// trick here.
@@ -83,13 +85,11 @@ _page_cache_file* page_cache_get_first_unused()
 
 // public functions
 
-error_t page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_count)
+error_t page_cache_init(virtual_addr start, uint32 no_buffers)
 {
 	page_cache.cache_size = no_buffers * PAGE_CACHE_SIZE;		// size entries = size pages
 
 	page_cache.cache = (_cache_cell*)start;
-	if (vector_init(&page_cache.cached_files, initial_file_count) != ERROR_OK)
-		return ERROR_OCCUR;
 
 	// Here we assume that alloced bitmap fits into just one page buffer. 
 	// TODO: Perhaps change this in the future.
@@ -107,21 +107,19 @@ error_t page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_fi
 
 virtual_addr page_cache_get_buffer(uint32 gfd, uint32 page)
 {
-	if (gfd >= page_cache.cached_files.count)
+	if (gfd >= gft_get_table()->count)
 	{
-		//set_last_error(EBADF, PAGE_CACHE_OUT_OF_BOUNDS, EO_PAGE_CACHE);
+		set_last_error(EBADF, PAGE_CACHE_OUT_OF_BOUNDS, EO_PAGE_CACHE);
 		return 0;
 	}
 
-	_page_cache_file* file = &page_cache.cached_files[gfd];
-
-	if (file->gfd == INVALID_FD)
+	if (gft_get_table()->data[gfd].file_node == 0)
 	{
-		//set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
+		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
 		return 0;
 	}
 
-	auto temp = file->pages.head;
+	auto temp = gft_get_table()->data[gfd].pages.head;
 	while (temp != 0)
 	{
 		if (temp->data.page == page)
@@ -152,6 +150,8 @@ virtual_addr page_cache_reserve_anonymous()
 	// reserve the found buffer
 	page_cache_index_reserve_buffer(free_buf);
 	virtual_addr address = page_cache_addr_by_index(free_buf);
+
+	// virtual memory allocation is now done through the page fault handler (29/10/2017). But the bug below is important as a note.
 	
 	// Pages are not freed so always check to see if they are already present
 	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
@@ -161,7 +161,7 @@ virtual_addr page_cache_reserve_anonymous()
 
 	return address;
 }
-// TODO: APPLY NEW FIX
+
 void page_cache_release_anonymous(virtual_addr address)
 {
 	uint32 index = page_cache_index_by_addr(address);
@@ -171,17 +171,18 @@ void page_cache_release_anonymous(virtual_addr address)
 
 	page_cache_index_release_buffer(index);
 	//vmmngr_free_page_addr(buffer); 
-	// TODO: The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
+	// The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
 }
-// TODO: APPLY NEW FIX
+
 virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 {
-	if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)
+	/*if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)
 	{
 		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
 		return 0;
-	}
+	}*/
 
+	// check if page is already allocated
 	virtual_addr address = page_cache_reserve_anonymous();
 	
 	if (address == 0)
@@ -196,26 +197,25 @@ virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)
 	// assume gfd entry exists but file info doesn't
 
 	_page_cache_file_info finfo = page_cache_file_info_create(page, free_buf);
-	list_insert_back(&page_cache.cached_files[gfd].pages, finfo);				// TODO: Check errors in this line
+
+	list_insert_back(&gft_get(gfd)->pages, finfo);	// TODO : Check for errors in this line
 
 	return address;
 }
 
-// TODO: Replace common functionality with release anonymous
 // TODO: APPLY NEW FIX
 error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 {
-	if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
-	{
-		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
-		return ERROR_OCCUR;
-	}
+	//if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
+	//{
+	//	set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
+	//	return ERROR_OCCUR;
+	//}
 
-	virtual_addr buffer = page_cache_get_buffer(gfd, page);
-	uint32 index = page_cache_index_by_addr(buffer);
+	uint32 index = -1;
 
 	// remove index from page list
-	auto list = &page_cache.cached_files[gfd].pages;
+	auto list = &gft_get_table()->data[gfd].pages;
 	auto prev = list->head;
 
 	if (prev == 0)
@@ -225,12 +225,10 @@ error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 		return ERROR_OCCUR;
 	}
 
-	bool found = false;
-
 	if (prev->data.page == page)
 	{
+		index = prev->data.buffer_index;
 		list_remove_front(list);					// TODO: Check this line for errors
-		found = true;
 	}
 	else
 	{
@@ -238,27 +236,27 @@ error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 		{
 			if (prev->next->data.page == page)
 			{
+				index = prev->next->data.buffer_index;
 				list_remove(list, prev);			// TODO: Check this line for errors
-				found = true;
 				break;
 			}
 			prev = prev->next;
 		}
 	}
 	
-	if (!found)
+	if (index == -1)
 	{
 		DEBUG("Page not found to release");
 		set_last_error(EINVAL, PAGE_CACHE_PAGE_NOT_FOUND, EO_PAGE_CACHE);
 		return ERROR_OCCUR;
 	}
-	// release from page cache
-	page_cache_index_release_buffer(index);
-	//vmmngr_free_page_addr(buffer);  // TODO: Decide if we need to include this cleaning line. Perhaps the cache will eat up space until it reaches a lethal point
+
+	page_cache_release_anonymous(page_cache_addr_by_index(index));
 
 	return ERROR_OK;
 }
 
+// TODO: TO BE DELETED
 error_t page_cache_register_file(uint32 gfd)
 {	
 	// if the file doesnt exist then we must create an entry for it either add a new one, or consume an unused one.
@@ -271,8 +269,8 @@ error_t page_cache_register_file(uint32 gfd)
 			file.gfd = gfd;
 			list_init(&file.pages);
 
-			if (vector_insert_back(&page_cache.cached_files, file) != ERROR_OK)
-				return ERROR_OCCUR;
+			//if (vector_insert_back(&page_cache.cached_files, file) != ERROR_OK)
+				//return ERROR_OCCUR;
 		}
 		else					// replace the empty entry found with the new one
 		{
@@ -286,39 +284,43 @@ error_t page_cache_register_file(uint32 gfd)
 	// if the file exists, we do nothing.
 }
 
+// TODO: TO BE DELETED
 error_t page_cache_unregister_file(uint32 gfd)
 {
-	if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
-	{
-		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
-		return ERROR_OCCUR;
-	}
+	//if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
+	//{
+	//	set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
+	//	return ERROR_OCCUR;
+	//}
 
-	page_cache.cached_files[gfd].gfd = INVALID_FD;				// invalid global descriptor
+	//page_cache.cached_files[gfd].gfd = INVALID_FD;				// invalid global descriptor
 
 	// release all buffers associated with this file
-	auto temp = page_cache.cached_files[gfd].pages.head;
-	while (temp != 0)
-	{
-		page_cache_index_release_buffer(temp->data.buffer_index);
-		temp = temp->next;
-	}
+	//auto temp = page_cache.cached_files[gfd].pages.head;
+	//while (temp != 0)
+	//{
+	//	page_cache_index_release_buffer(temp->data.buffer_index);
+	//	temp = temp->next;
+	//}
 
-	// TODO: Check errors for this line
-	list_clear(&page_cache.cached_files[gfd].pages);	// empty page list.	
+	//// TODO: Check errors for this line
+	//list_clear(&page_cache.cached_files[gfd].pages);	// empty page list.	
 
 	return ERROR_OK;
 }
 
 void page_cache_print()
 {
-	for (uint32 i = 0; i < page_cache.cached_files.count; i++)
+	for (uint32 i = 0; i < gft_get_table()->count; i++)
 	{
-		serial_printf("gfd %u %s:", page_cache.cached_files[i].gfd, gft_get(page_cache.cached_files[i].gfd)->file_node->name);
-		for (auto temp = page_cache.cached_files[i].pages.head; temp != 0; temp = temp->next)
-			serial_printf("%u ", temp->data.buffer_index);
+		if (gft_get_table()->data[i].pages.count > 0)
+		{
+			serial_printf("gfd %u %s (page, buf_ind):", i, gft_get_table()->data[i].file_node->name);
+			for (auto temp = gft_get_table()->data[i].pages.head; temp != 0; temp = temp->next)
+				serial_printf("(%u, %u)", temp->data.page, temp->data.buffer_index);
 
-		serial_printf("\n");
+			serial_printf("\n");
+		}
 	}
 
 	serial_printf("alloced: \n");

@@ -975,13 +975,17 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 	}
 
 	uint32 cache;
-	if (!(cache = page_cache_reserve_buffer(fd, 0)))
+	/*if (!(cache = page_cache_reserve_buffer(fd, 0)))
+		return ERROR_OCCUR;*/
+
+	// changed the above t use anonymous cache
+	if (!(cache = page_cache_reserve_anonymous()))
 		return ERROR_OCCUR;
 
 	/* read the node's metadata cluster */
 	if (fat_fs_read_by_data_cluster(mount_point, NODE_DATA(node)->metadata_cluster, cache) == false)
 	{
-		page_cache_release_buffer(fd, 0);
+		page_cache_release_anonymous(cache);
 		return ERROR_OCCUR;
 	}
 
@@ -1000,7 +1004,7 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 	/* write metadata cluster back to disk */
 	if (fat_fs_write_by_data_cluster(mount_point, NODE_DATA(node)->metadata_cluster, cache) == false)
 	{
-		page_cache_release_buffer(fd, 0);
+		page_cache_release_anonymous(cache);
 		return ERROR_OCCUR;
 	}
 
@@ -1014,7 +1018,7 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 
 		if (fat_fs_write_by_data_cluster(mount_point, metadata_cluster, cache) == false)
 		{
-			page_cache_release_buffer(fd, 0);
+			page_cache_release_anonymous(cache);
 			return ERROR_OCCUR;
 		}
 
@@ -1028,7 +1032,7 @@ error_t fat_fs_move_node(vfs_node* mount_point, vfs_node* node, vfs_node* direct
 		// TODO: Add new cluster to the chain and continue
 	}
 
-	page_cache_release_buffer(fd, 0);
+	page_cache_release_anonymous(cache);
 	return ERROR_OK;
 }
 

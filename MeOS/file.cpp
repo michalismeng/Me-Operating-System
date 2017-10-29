@@ -87,20 +87,30 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 			return 0;
 		}
 
-		uint32 segments = count / PAGE_SIZE;
+		uint32 total_pages = count / PAGE_SIZE;
 		size_t bytes_read = 0;
 
 		// TODO: Detect end of file
-		for (uint32 i = 0; i < segments; i++)
+		for (uint32 i = 0; i < total_pages; i++)
 		{
-			virtual_addr cache = page_cache_reserve_anonymous();	// TODO: replace with reserve_buffer function to associate read data with file
+			uint32 page = start / PAGE_SIZE + i;
 
-			if (vfs_read_file(global_fd, entry->file_node, start + i * PAGE_SIZE, PAGE_SIZE, cache) != PAGE_SIZE)
-				return bytes_read;
+			virtual_addr cache = page_cache_get_buffer(global_fd, page);
+
+			// if the area hasn't been read => read it
+			if (cache == 0)
+			{
+				cache = page_cache_reserve_buffer(global_fd, page);
+
+				if (vfs_read_file(global_fd, entry->file_node, start + i * PAGE_SIZE, PAGE_SIZE, cache) != PAGE_SIZE)
+					return bytes_read;
+			}
 
 			bytes_read += PAGE_SIZE;
 			memcpy((uint8*)buffer + i * PAGE_SIZE, (void*)cache, PAGE_SIZE);
 		}
+
+		return bytes_read;
 	}
 	else
 	{
@@ -109,7 +119,6 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 		return vfs_read_file(global_fd, entry->file_node, start, count, buffer);
 	}
 
-	//return vfs_read_file(global_fd, entry->file_node, start, count, buffer);
 	return 0;
 }
 

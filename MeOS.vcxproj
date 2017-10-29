@@ -73,9 +73,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <GenerateManifest>false</GenerateManifest>
-    <LibraryPath>C:\Users\Michalis\Documents\Git Repositories\MeOS\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
     <OutDir>$(SolutionDir)Builds\</OutDir>
+    <IncludePath>
+    </IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -224,10 +226,10 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\screen.h" />
     <ClInclude Include="MeOS\SerialDebugger.h" />
     <ClInclude Include="MeOS\system.h" />
-    <ClInclude Include="MeOS\test_base.h" />
-    <ClInclude Include="MeOS\test_Fat32.h" />
-    <ClInclude Include="MeOS\test_open_file_table.h" />
-    <ClInclude Include="MeOS\test_page_cache.h" />
+    <ClInclude Include="MeOS\test\test_base.h" />
+    <ClInclude Include="MeOS\test\test_Fat32.h" />
+    <ClInclude Include="MeOS\test\test_open_file_table.h" />
+    <ClInclude Include="MeOS\test\test_page_cache.h" />
     <ClInclude Include="MeOS\thread_exception.h" />
     <ClInclude Include="MeOS\thread_sched.h" />
     <ClInclude Include="MeOS\timer.h" />
@@ -295,9 +297,9 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\icmp.cpp" />
     <ClCompile Include="MeOS\spinlock.cpp" />
     <ClCompile Include="MeOS\system.c" />
-    <ClCompile Include="MeOS\test_FAT32.cpp" />
-    <ClCompile Include="MeOS\test_open_file_table.cpp" />
-    <ClCompile Include="MeOS\test_page_cache.cpp" />
+    <ClCompile Include="MeOS\test\test_FAT32.cpp" />
+    <ClCompile Include="MeOS\test\test_open_file_table.cpp" />
+    <ClCompile Include="MeOS\test\test_page_cache.cpp" />
     <ClCompile Include="MeOS\thread_exception.cpp" />
     <ClCompile Include="MeOS\thread_sched.cpp">
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
@@ -329,6 +331,8 @@ call format-light.bat"</Command>
       <FileType>Document</FileType>
     </MASM>
     <None Include="Boot\vbe.inc" />
+    <None Include="MeOS\test\README.md" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -22,7 +22,9 @@ const char* ERROR_ORIGIN_STR[] =
 	"MASS STORAGE DEV",
 	"FILE INTERFACE",
 	"VM AREA",
-	"VM CONTRACT"
+	"VM CONTRACT",
+	"OPEN FILE TBL",
+	"PAGE CACHE"
 };
 
 const char* BASE_ERROR_STR[] =

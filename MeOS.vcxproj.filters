@@ -39,6 +39,9 @@
     <Filter Include="tests">
       <UniqueIdentifier>{a515e00c-3f1f-4b76-9101-50af320ff4c0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Readme">
+      <UniqueIdentifier>{de57e174-fff4-4d68-976b-03241e53e84d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MeOS\boot_info.h">
@@ -230,16 +233,16 @@
     <ClInclude Include="MeOS\kernel_stack.h">
       <Filter>Services</Filter>
     </ClInclude>
-    <ClInclude Include="MeOS\test_Fat32.h">
+    <ClInclude Include="MeOS\test\test_base.h">
       <Filter>tests</Filter>
     </ClInclude>
-    <ClInclude Include="MeOS\test_open_file_table.h">
+    <ClInclude Include="MeOS\test\test_Fat32.h">
       <Filter>tests</Filter>
     </ClInclude>
-    <ClInclude Include="MeOS\test_base.h">
+    <ClInclude Include="MeOS\test\test_open_file_table.h">
       <Filter>tests</Filter>
     </ClInclude>
-    <ClInclude Include="MeOS\test_page_cache.h">
+    <ClInclude Include="MeOS\test\test_page_cache.h">
       <Filter>tests</Filter>
     </ClInclude>
   </ItemGroup>
@@ -391,13 +394,13 @@
     <ClCompile Include="MeOS\kernel_stack.cpp">
       <Filter>Services</Filter>
     </ClCompile>
-    <ClCompile Include="MeOS\test_FAT32.cpp">
+    <ClCompile Include="MeOS\test\test_FAT32.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="MeOS\test_open_file_table.cpp">
+    <ClCompile Include="MeOS\test\test_open_file_table.cpp">
       <Filter>tests</Filter>
     </ClCompile>
-    <ClCompile Include="MeOS\test_page_cache.cpp">
+    <ClCompile Include="MeOS\test\test_page_cache.cpp">
       <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>
@@ -431,6 +434,12 @@
     </None>
     <None Include="Boot\vbe.inc">
       <Filter>Boot</Filter>
+    </None>
+    <None Include="README.md">
+      <Filter>Readme</Filter>
+    </None>
+    <None Include="MeOS\test\README.md">
+      <Filter>Readme</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

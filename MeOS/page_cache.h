@@ -39,13 +39,13 @@ struct _cache_cell
 
 struct _page_cache
 {
-	vector<_page_cache_file> cached_files;		// all the cached files descriptors
+	//vector<_page_cache_file> cached_files;		// all the cached files descriptors
 	_cache_cell* cache;							// cached data
 	uint32 cache_size;							// page cache size
 };
 
 // initialize the page cache
-error_t page_cache_init(virtual_addr start, uint32 no_buffers, uint32 initial_file_count);
+error_t page_cache_init(virtual_addr start, uint32 no_buffers);
 
 // returns the virtual address of the buffer assigned to the given page in the given file.
 virtual_addr page_cache_get_buffer(uint32 gfd, uint32 page);

@@ -2,6 +2,7 @@
 #include "print_utility.h"
 #include "critlock.h"
 #include "atomic.h"
+#include "thread_sched.h"
 
 // private data
 
@@ -251,13 +252,21 @@ uint32 gft_get_n(vfs_node* node)
 	return (uint32)-1;
 }
 
+uint32 gft_get_by_fd(uint32 fd)
+{
+	if (fd >= process_get_current()->lft.entries.count)
+		return INVALID_FD;
+
+	return process_get_current()->lft.entries[fd].gfd;
+}
+
 void gft_print()
 {
 	for (uint32 i = 0; i < gft.count; i++)
 		serial_printf("node: %h %s, open count: %u\n", gft[i].file_node, gft[i].file_node->name, gft[i].open_count);
 }
 
-global_file_table* gft_get()
+global_file_table* gft_get_table()
 {
 	return &gft;
 }

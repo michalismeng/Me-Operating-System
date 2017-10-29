@@ -1,7 +1,7 @@
 #include "test_open_file_table.h"
-#include "vfs.h"
-#include "file.h"
-#include "thread_sched.h"
+#include "../vfs.h"
+#include "../file.h"
+#include "../thread_sched.h"
 
 bool test_open_file_table_open()
 {
@@ -125,3 +125,4 @@ bool test_read_file()
 
 	RET_SUCCESS;
 }
+

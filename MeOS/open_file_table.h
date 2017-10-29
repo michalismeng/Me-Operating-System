@@ -102,11 +102,14 @@ gfe* gft_get(uint32 index);
 // get the index of the global file entry associated with the given node or UINT_MAX if it doesn't exist.
 uint32 gft_get_n(vfs_node* node);
 
+// get the index of the global file entry pointed by the given local file descriptor
+uint32 gft_get_by_fd(uint32 fd);
+
 // prints all the global file table
 void gft_print();
 
 // return the global open file table
-global_file_table* gft_get();
+global_file_table* gft_get_table();
 
 
 
