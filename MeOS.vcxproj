@@ -230,6 +230,7 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\test\test_Fat32.h" />
     <ClInclude Include="MeOS\test\test_open_file_table.h" />
     <ClInclude Include="MeOS\test\test_page_cache.h" />
+    <ClInclude Include="MeOS\test_dev.h" />
     <ClInclude Include="MeOS\thread_exception.h" />
     <ClInclude Include="MeOS\thread_sched.h" />
     <ClInclude Include="MeOS\timer.h" />
@@ -300,6 +301,7 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\test\test_FAT32.cpp" />
     <ClCompile Include="MeOS\test\test_open_file_table.cpp" />
     <ClCompile Include="MeOS\test\test_page_cache.cpp" />
+    <ClCompile Include="MeOS\test_dev.cpp" />
     <ClCompile Include="MeOS\thread_exception.cpp" />
     <ClCompile Include="MeOS\thread_sched.cpp">
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>

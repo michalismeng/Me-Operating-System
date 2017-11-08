@@ -8,5 +8,8 @@ bool test_open_file_table_open();
 bool test_vfs_open_file();
 bool test_open_file();
 bool test_read_file();
+bool test_read_file_cached();
+bool test_write_file_cached();
+bool test_sync_file();
 
 #endif

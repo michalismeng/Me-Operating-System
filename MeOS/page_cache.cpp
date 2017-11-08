@@ -155,8 +155,8 @@ virtual_addr page_cache_reserve_anonymous()
 	
 	// Pages are not freed so always check to see if they are already present
 	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
-	//if (vmmngr_alloc_page(address) != ERROR_OK)
-		//return 0;
+	/*if (vmmngr_alloc_page(address) != ERROR_OK)
+		return 0;*/
 	// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
 
 	return address;

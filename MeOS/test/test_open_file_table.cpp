@@ -126,3 +126,90 @@ bool test_read_file()
 	RET_SUCCESS;
 }
 
+uint8 test_buffer_read[4096] = { 0 };
+uint8 test_buffer_write[4096] = { 0 };
+
+bool test_read_file_cached()
+{
+	serial_printf("page cache: \n");
+	page_cache_print();
+
+	uint32 fd;
+	if (open_file("dev/test_dev", &fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+		FAIL("Could not open test device: %e\n");
+
+	serial_printf("reading bytes 4096 + 512\n");
+
+	if (read_file(fd, 4096, 512, (virtual_addr)test_buffer_read) != 512)
+		FAIL("Could not read test device: %e\n");
+
+	serial_printf("read 512 bytes\n");
+	serial_printf("buffer[511] = %u\nbuffer[512] = %u\n", test_buffer_read[511], test_buffer_read[512]);
+
+	serial_printf("page cache: \n");
+	page_cache_print();
+
+	serial_printf("reading once first 4KB\n");
+
+	if (read_file(fd, 0, 4096, (virtual_addr)test_buffer_read) != 4096)
+		FAIL("Could not read test device: %e\n");
+
+	serial_printf("reading bytes 4096 + 512 * 2\n");
+
+	page_cache_print();
+
+	RET_SUCCESS;
+}
+
+bool test_write_file_cached()
+{
+	uint32 fd;
+	if (open_file("dev/test_dev", &fd, VFS_CAP_WRITE | VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+		FAIL("Could not open test device: %e\n");
+
+	for (int i = 0; i < 512; i++)
+		test_buffer_write[i] = 255 - i;
+
+	serial_printf("writing 512 bytes at first 'page'\n");
+
+	if (write_file(fd, 0, 512, (virtual_addr)test_buffer_write) != 512)
+		FAIL("Could not write test dev: %e\n");
+
+	serial_printf("reading 4096 bytes from first page (not fetched from actual driver)\n");
+
+	if (read_file(fd, 0, 4096, (virtual_addr)test_buffer_read) != 4096)
+		FAIL("Could not read test dev: %e\n");
+
+	serial_printf("page cache: \n");
+	page_cache_print();
+
+	// expect buffer[513] = 0 even though actual data is different as we have written 512 zero-padded bytes first !
+	// buffer[512] should equal 0 but test_dev already places a zero there and this cannot be checked.
+	serial_printf("buffer[510] = %u\nbuffer[511] = %u\nbuffer[512] = %u\nbuffer[513] = %u\n", test_buffer_read[510], test_buffer_read[511], test_buffer_read[512], test_buffer_read[513]);
+
+	serial_printf("old test dev file length: %u\n", gft_get(gft_get_by_fd(fd))->file_node->file_length);
+	serial_printf("writing past the end of file\n");
+
+	if (write_file(fd, 4 * 4096, 512, (virtual_addr)test_buffer_write) != 512)
+		FAIL("Could not write test dev: %e\n");
+
+	serial_printf("new test dev file length: %u\n", gft_get(gft_get_by_fd(fd))->file_node->file_length);
+
+	RET_SUCCESS;
+}
+
+bool test_sync_file()
+{
+	uint32 fd;
+	if (open_file("dev/test_dev", &fd, VFS_CAP_WRITE | VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+		FAIL("Could not open test device: %e\n");
+
+	serial_printf("syncing test device\n");
+
+	if (sync_file(fd, 0, 0) != ERROR_OK)
+		FAIL("Could not sync test device: %e\n");
+
+	// expect to see test dev write
+
+	RET_SUCCESS;
+}

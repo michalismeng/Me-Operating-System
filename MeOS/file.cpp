@@ -1,6 +1,7 @@
 #include "file.h"
 #include "thread_sched.h"
 #include "print_utility.h"
+#include "atomic.h"
 
 // private functions
 
@@ -20,7 +21,7 @@ error_t open_file(char* path, uint32* fd, uint32 capabilities)
 	if (vfs_root_lookup(path, &node) != ERROR_OK)
 		return ERROR_OCCUR;
 
-	node->flags = 0;//flags;
+	node->flags = 0;
 
 	return open_file_by_node(node, fd, capabilities);
 }
@@ -58,56 +59,78 @@ error_t open_file_by_node(vfs_node* node, uint32* local_fd, uint32 capabilities)
 
 size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 {
+	if (count > MAX_IO)
+	{
+		set_last_error(EINVAL, FILE_BIG_REQUEST, EO_FILE_INTERFACE);
+		return INVALID_IO;
+	}
+
 	// TODO: Lock local entry
 	lfe* local_entry = lft_get(&process_get_current()->lft, fd);
+	if (local_entry == 0)
+		return INVALID_IO;
+
 	uint32 global_fd = local_entry->gfd;
 
 	gfe* entry = gft_get(global_fd);
 	if (!entry || gfe_is_invalid(entry))
 	{
 		set_last_error(EBADF, FILE_GFD_NOT_FOUND, EO_FILE_INTERFACE);
-		return 0;
+		return INVALID_IO;
 	}
 
 	// check read capabilities
-	if (file_validate_capabilities(VFS_CAP_READ, local_entry->flags) == false)
+	if (!CHK_BIT(local_entry->flags, VFS_CAP_READ))
 	{
 		set_last_error(EACCES, FILE_READ_ACCESS_DENIED, EO_FILE_INTERFACE);
-		return 0;
+		return INVALID_IO;
 	}
 
-	if (file_validate_capabilities(VFS_CAP_CACHE, local_entry->flags) == true)
+	if (CHK_BIT(local_entry->flags, VFS_CAP_CACHE))
 	{
 		// initiate caching and do 4KB chunks of data
 		// segment the 'count' bytes into 4KB regions => read them to the page cache => copy to user buffer
 
-		if ((count % PAGE_SIZE != 0) || (start % PAGE_SIZE != 0))
+		if (start % PAGE_CACHE_SIZE != 0)
 		{
 			set_last_error(EINVAL, FILE_UNALIGED_ADDRESS, EO_FILE_INTERFACE);
-			return 0;
+			return INVALID_IO;
 		}
 
-		uint32 total_pages = count / PAGE_SIZE;
+		uint32 total_pages = ceil_division(count, PAGE_CACHE_SIZE);
 		size_t bytes_read = 0;
 
 		// TODO: Detect end of file
 		for (uint32 i = 0; i < total_pages; i++)
 		{
-			uint32 page = start / PAGE_SIZE + i;
-
+			uint32 page = start / PAGE_CACHE_SIZE + i;
 			virtual_addr cache = page_cache_get_buffer(global_fd, page);
 
 			// if the area hasn't been read => read it
 			if (cache == 0)
 			{
 				cache = page_cache_reserve_buffer(global_fd, page);
-
-				if (vfs_read_file(global_fd, entry->file_node, start + i * PAGE_SIZE, PAGE_SIZE, cache) != PAGE_SIZE)
+				if (cache == 0)
 					return bytes_read;
+
+				if (vfs_read_file(global_fd, entry->file_node, start + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) == INVALID_IO)
+				{
+					page_cache_release_buffer(global_fd, page);
+					return bytes_read;
+				}
 			}
 
-			bytes_read += PAGE_SIZE;
-			memcpy((uint8*)buffer + i * PAGE_SIZE, (void*)cache, PAGE_SIZE);
+			if (count - bytes_read >= PAGE_CACHE_SIZE)
+			{
+				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, PAGE_CACHE_SIZE);
+				bytes_read += PAGE_CACHE_SIZE;
+			}
+			else
+			{
+				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, count - bytes_read);
+				bytes_read += count - bytes_read;
+			}
+
 		}
 
 		return bytes_read;
@@ -119,26 +142,101 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 		return vfs_read_file(global_fd, entry->file_node, start, count, buffer);
 	}
 
-	return 0;
+	return INVALID_IO;
 }
 
 size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 {
-	uint32 global_fd = lft_get(&process_get_current()->lft, fd)->gfd;
+	if (count > MAX_IO)
+	{
+		set_last_error(EINVAL, FILE_BIG_REQUEST, EO_FILE_INTERFACE);
+		return INVALID_IO;
+	}
+
+	lfe* local_entry = lft_get(&process_get_current()->lft, fd);
+	if (local_entry == 0)
+		return INVALID_IO;
+
+	uint32 global_fd = local_entry->gfd;
 
 	gfe* entry = gft_get(global_fd);
 	if (!entry || gfe_is_invalid(entry))	
 	{
 		set_last_error(EBADF, FILE_GFD_NOT_FOUND, EO_FILE_INTERFACE);
-		return 0;
+		return INVALID_IO;
 	}
 
-	return vfs_write_file(global_fd, entry->file_node, start, count, buffer);
+	// check write capabilities
+	if (CHK_BIT(local_entry->flags, VFS_CAP_WRITE) == false)
+	{
+		set_last_error(EACCES, FILE_WRITE_ACCESS_DENIED, EO_FILE_INTERFACE);
+		return INVALID_IO;
+	}
+
+	if (CHK_BIT(local_entry->flags, VFS_CAP_CACHE))
+	{
+		if (start % PAGE_CACHE_SIZE != 0)
+		{
+			set_last_error(EINVAL, FILE_UNALIGED_ADDRESS, EO_FILE_INTERFACE);
+			return INVALID_IO;
+		}
+
+		uint32 total_pages = ceil_division(count, PAGE_CACHE_SIZE);
+		size_t bytes_written = 0;
+
+		for (uint32 i = 0; i < total_pages; i++)
+		{
+			uint32 page = start / PAGE_CACHE_SIZE + i;
+			virtual_addr cache = page_cache_get_buffer(global_fd, page);
+
+			// if the area hasn't been read => write with zero pad
+			if (cache == 0)
+			{
+				cache = page_cache_reserve_buffer(global_fd, page);
+				if (cache == 0)
+					break;
+
+				if(count - bytes_written < PAGE_CACHE_SIZE)
+					memset((void*)cache, 0, PAGE_CACHE_SIZE - count % PAGE_CACHE_SIZE);
+			}
+
+			if (count - bytes_written >= PAGE_CACHE_SIZE)
+			{
+				memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
+				bytes_written += PAGE_CACHE_SIZE;
+			}
+			else
+			{
+				memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, count - bytes_written);
+				bytes_written += count - bytes_written;
+			}
+
+			// TODO: make page dirty
+
+		}
+
+		uint32 length = entry->file_node->file_length;
+
+		// adjust file length
+		if (start + bytes_written > length)
+			while(CAS<uint32>(&entry->file_node->file_length, length, start + bytes_written) == false)
+				length = entry->file_node->file_length;
+
+		return bytes_written;
+	}
+	else
+		return vfs_write_file(global_fd, entry->file_node, start, count, buffer);
+
+	return INVALID_IO;
 }
 
 error_t sync_file(uint32 fd, uint32 start_page, uint32 end_page)
 {
-	uint32 global_fd = lft_get(&process_get_current()->lft, fd)->gfd;
+	lfe* local_entry = lft_get(&process_get_current()->lft, fd);
+	if (local_entry == 0)
+		return ERROR_OCCUR;
+
+	uint32 global_fd = local_entry->gfd;
 
 	gfe* entry = gft_get(global_fd);
 	if (!entry || gfe_is_invalid(entry))
@@ -147,5 +245,37 @@ error_t sync_file(uint32 fd, uint32 start_page, uint32 end_page)
 		return ERROR_OCCUR;
 	}
 
-	return vfs_sync(global_fd, entry->file_node, start_page, end_page);
+	// check cache capabilities. This is a cache-mode only function
+	if (CHK_BIT(local_entry->flags, VFS_CAP_WRITE | VFS_CAP_CACHE) == false)
+	{
+		set_last_error(EACCES, FILE_CAPABILITIES_ERROR, EO_FILE_INTERFACE);
+		return INVALID_IO;
+	}
+
+	// convention to sync the whole file
+	if (end_page < start_page)
+	{
+		start_page = 0;
+		end_page = ceil_division(entry->file_node->file_length, PAGE_CACHE_SIZE);
+	}
+
+	for (uint32 pg = start_page; pg <= end_page; pg++)
+	{
+		// TODO: Consider speed-up using the page cache list primitive (to avoid searching each time from the beginning of the page list)
+		virtual_addr cache = page_cache_get_buffer(global_fd, pg);
+
+		// assume page not loaded
+		if (cache == 0)
+			continue;
+
+		// TODO: Check if page is not dirty
+
+		// write the page to the hardware
+		if (vfs_write_file(global_fd, entry->file_node, start_page * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) != PAGE_CACHE_SIZE)
+			return ERROR_OCCUR;
+
+		// TODO: Remove page dirtyness
+	}
+
+	return ERROR_OK;
 }

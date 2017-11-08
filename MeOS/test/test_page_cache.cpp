@@ -36,7 +36,7 @@ bool test_page_cache_reserve_anonymous()
 	RET_SUCCESS;
 }
 
-bool test_page_cache_reserve()
+bool test_page_cache_reserve_and_release()
 {
 	uint32 fd, gfd;
 	if (open_file("dev/keyboard", &fd, VFS_CAP_READ) != ERROR_OK)

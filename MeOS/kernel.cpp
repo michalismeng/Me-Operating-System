@@ -50,6 +50,8 @@
 
 #include "kernel_stack.h"
 
+#include "test_dev.h"
+
 #include "test/test_Fat32.h"
 #include "test/test_open_file_table.h"
 #include "test/test_page_cache.h"
@@ -850,7 +852,7 @@ void proc_init_thread()
 		PANIC("");
 	}
 
-	if (test_page_cache_reserve() == false)
+	if (test_page_cache_reserve_and_release() == false)
 	{
 		serial_printf("page cache reserve test failed");
 		PANIC("");
@@ -862,7 +864,51 @@ void proc_init_thread()
 		PANIC("");
 	}
 
+	init_test_dev();
+
+	// do not run the two tests below simulatneously as they require pages not be cached
+	/*if (test_read_file_cached() == false)
+	{
+		serial_printf("read cached file failed");
+		PANIC("");
+	}*/
+
+	if (test_write_file_cached() == false)
+	{
+		serial_printf("write cached file failed");
+		PANIC("");
+	}
+
+	if (test_sync_file() == false)
+	{
+		serial_printf("sync cached file failed");
+		PANIC("");
+	}
+
 	//PANIC("Test End");
+
+
+	//vfs_node* dev;
+	//if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
+	//	PANIC("Error opening");
+
+	//virtual_addr cache = page_cache_reserve_anonymous();
+
+	//*(uint32*)(cache) = 0;
+
+	//// attention: if the address is not allocated (but exists only in the contract) then the driver fails (as it uses vmmngr_get_phys_addr)
+	//if (vfs_read_file(0, dev, 0, 1, cache) != 1)
+	//{
+	//	serial_printf("Cannot read: %e\n", get_last_error());
+	//	PANIC("");
+	//}
+
+
+	//fat_mbr* mbr = (fat_mbr*)cache;
+
+	//serial_printf("signature: %h\n", mbr->boot_sign);
+	//serial_printf("1st partition offset, size: %h, %h\n", mbr->primary_partition.lba_offset, mbr->primary_partition.size);
+	//serial_printf("2nd partition offset: %h\n", mbr->secondary_partition.lba_offset);
 
 	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
 	init_screen_gfx(vbe);
@@ -873,10 +919,9 @@ void proc_init_thread()
 	//set_foreground_color(0x000FF00);
 	//set_background_color(0);
 
-	init_print_utility();
 
-	printfln("hello");
-	printfln("hello %u", 3);
+
+	init_print_utility();
 
 	serial_printf("screen ready...\n");
 

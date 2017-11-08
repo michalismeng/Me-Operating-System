@@ -49,6 +49,8 @@ typedef uint32 physical_addr;
 
 #define NULL 0
 #define INVALID_FD -1
+#define MAX_IO (size_t)-1 - 1
+#define INVALID_IO (size_t)-1
 
 #define cast(type, param) ((type)param)
 

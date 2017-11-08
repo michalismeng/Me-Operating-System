@@ -6,7 +6,7 @@
 #include "../file.h"
 
 bool test_page_cache_reserve_anonymous();
-bool test_page_cache_reserve();
+bool test_page_cache_reserve_and_release();
 bool test_page_cache_find_buffer();
 
 #endif
