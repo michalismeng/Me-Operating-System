@@ -1,6 +1,9 @@
 #include "AHCI.h"
 #include "print_utility.h"
 #include "mmngr_virtual.h"
+#include "thread_sched.h"
+#include "kernel_stack.h"
+#include "error.h"
 
 // private data and helper function
 #define NODE_INFO(x) ((ahci_storage_info*)x->deep_md)
@@ -8,6 +11,9 @@
 HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci controller
 uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
+
+TCB* ahci_daemon = 0;
+vfs_node* ahci_port_nodes[32] = { 0 };
 
 //error_t ahci_open(vfs_node* node);
 size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
@@ -35,23 +41,44 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	if (file == 0 || file->deep_md == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE)
 	{
 		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
-		return 0;
+		return INVALID_IO;
 	}
 
-	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	uint32 high_lba = fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
 	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
 
 	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
 	{
 		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
-		return 0;
+		return INVALID_IO;
 	}
 
-	// retrieve data using the physical address!
-	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), true) == ERROR_OK)
-		return count;
+	// perform a write in the region to ensure it is virtually allocated, otherwise get_phys_addr fails
+	*(char*)address = 0;
 
-	return 0;
+	ahci_message message;
+	message.issuer = thread_get_current();
+	message.port = port;
+	message.low_lba = start;
+	message.high_lba = high_lba;
+	message.count = count;
+	message.address = vmmngr_get_phys_addr(address);
+	message.read = true;
+
+	// TODO: this will not work as this is a multi-producer path.		
+	while (true)
+		if (queue_lf_insert(&NODE_INFO(file)->messages, &message))
+			break;
+
+	// TODO: Combine these into one function
+	thread_notify(ahci_daemon);
+	thread_block(thread_get_current());
+
+	// message result is filled by the daemon
+	if (message.result != ERROR_OK)
+		return INVALID_IO;
+
+	return count;
 }
 
 size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
@@ -59,7 +86,7 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 	if (file == 0 || (file->attributes & 0x7) != VFS_ATTRIBUTES::VFS_DEVICE || NODE_INFO(file) == 0)
 	{
 		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
-		return 0;
+		return INVALID_IO;
 	}
 	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
 	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
@@ -67,13 +94,31 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
 	{
 		set_last_error(EBADSLT, AHCI_PORT_NOT_OK, EO_MASS_STORAGE_DEV);
-		return 0;
+		return INVALID_IO;
 	}
 
-	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), false) == ERROR_OK)
-		return count;
+	ahci_message message;
+	message.issuer = thread_get_current();
+	message.port = port;
+	message.low_lba = start;
+	message.high_lba = high_lba;
+	message.count = count;
+	message.address = vmmngr_get_phys_addr(address);
+	message.read = false;
 
-	return 0;
+	// TODO: insertion will not work as this is a multi-producer path.
+	while (true)
+		if (queue_lf_insert(&NODE_INFO(file)->messages, &message))
+			break;
+
+	// TODO: Combine these into one function
+	thread_notify(ahci_daemon);
+	thread_block(thread_get_current());
+
+	if (message.result != ERROR_OK)
+		return INVALID_IO;
+
+	return count;
 }
 
 error_t ahci_ioctl(vfs_node* node, uint32 command, ...)
@@ -104,7 +149,7 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 {
 	port->is = (DWORD)-1;	// clear interrupts
 
-	int slot = ahci_find_empty_slot(port);
+	int slot = ahci_find_empty_slot(port) + 1;
 
 	if (slot == -1) 
 	{
@@ -149,7 +194,7 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 	cmdfis->c = 1;	// Command
 
 	if (read)
-		cmdfis->command = 0x25;//0xc8;
+		cmdfis->command = 0x25;/*0xc8;*/
 	else
 		cmdfis->command = 0x35;
 
@@ -166,39 +211,41 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 	cmdfis->counth = (BYTE)(count >> 8);
 
 	// The below loop waits until the port is no longer busy before issuing a new command
-	Timer t;
+	uint32 cur = millis();
 	while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)))
 	{
-		if (t.GetElapsedMillis() >= 500)
+		if (millis() - cur >= 500)
 		{
 			set_last_error(EBUSY, AHCI_SPIN_ERROR, EO_MASS_STORAGE_DEV);
 			return ERROR_OCCUR;
 		}
 	}
 
-	port->ci = 1 << slot;	// Issue command
+	port->ci |= 1 << slot;	// Issue command
+		
+	//while (1)		// Wait for completion
+	//{
+	//	// In some longer duration reads, it may be helpful to spin on the DPS bit
+	//	// in the PxIS port field as well (1 << 5)
+	//	if ((port->ci & (1 << slot)) == 0)
+	//		break;
+	//	if (port->is & HBA_PxIS_TFES)	// Task file error
+	//	{
+	//		set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+	//		return ERROR_OCCUR;
+	//	}
+	//}
 
-	while (1)		// Wait for completion
-	{
-		// In some longer duration reads, it may be helpful to spin on the DPS bit
-		// in the PxIS port field as well (1 << 5)
-		if ((port->ci & (1 << slot)) == 0)
-			break;
-		if (port->is & HBA_PxIS_TFES)	// Task file error
-		{
-			set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
-			return ERROR_OCCUR;
-		}
-	}
+	//// Check again
+	//if (port->is & HBA_PxIS_TFES)
+	//{
+	//	set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
+	//	return ERROR_OCCUR;
+	//}
 
-	// Check again
-	if (port->is & HBA_PxIS_TFES)
-	{
-		set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
-		return ERROR_OCCUR;
-	}
+	//port->ci = 0;
 
-	port->ci = 0;
+	thread_block(thread_get_current());
 
 	return ERROR_OK;
 }
@@ -254,26 +301,37 @@ bool ahci_stop_cmd(HBA_PORT_t* port)
 
 void ahci_callback(registers_t* regs)
 {
-	printfln("sata callback");
 	for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 	{
 		if (ahci_is_interrupt_pending(i))
 		{
 			HBA_PORT_t* port = &abar->ports[i];
-			printfln("\nPort %u status: %h and ci %h", i, port->is, port->ci);
+			thread_notify(ahci_daemon);
 
-			port->ie &= ~1;
-			ahci_clear_interrupt(i);
-
-			//if (abar->is == 0)
-			//	PANIC("is zero");
-
-			//FIS_REG_D2H* fis = (FIS_REG_D2H*)port->fb;
-			//printfln("FIS at %h %h", fis, fis->fis_type);
+			port->is = -1;				// clear port interrupts
+			ahci_clear_interrupt(i);	// clear master port interrupt at ahci
 		}
 	}
+}
 
-	//PANIC("ahci interrupt");
+void ahci_daemon_callback()
+{
+	while (true)
+	{
+		for (uint8 i = 0; i < ahci_get_no_ports(); i++)
+		{
+			ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
+			if (queue_lf_is_empty(&info->messages) == false)
+			{
+				ahci_message* message = queue_lf_peek(&info->messages);
+				queue_lf_remove(&info->messages);
+
+				message->result = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
+				thread_notify(message->issuer);
+			}
+		}
+		thread_block(thread_get_current());
+	}
 }
 
 #pragma endregion
@@ -304,8 +362,16 @@ error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 		}
 	}
 
-	//register_interrupt_handler(43, ahci_callback);
-	//ahci_enable_interrupts(false);
+	virtual_addr stack = kernel_stack_reserve();
+	if (stack == 0)
+		PANIC("ahci stack allocation failed");
+
+	ahci_daemon = thread_create(process_get_current(), (virtual_addr)ahci_daemon_callback, stack, 4096, 1, 0);
+	thread_insert(ahci_daemon);
+	thread_block(ahci_daemon);
+
+	register_interrupt_handler(43, ahci_callback);
+	ahci_enable_interrupts(true);
 
 	return ERROR_OK;
 }
@@ -323,7 +389,8 @@ error_t ahci_setup_vfs_port(uint8 port_num)
 	name[0] = 's'; name[1] = 'd';		// to be safe
 
 	uitoalpha(port_num, name + 2);
-	ahci_storage_info* dev_dmd = (ahci_storage_info*)vfs_create_device(name, DEVICE_DEFAULT_CAPS, sizeof(ahci_storage_info), NULL, &AHCI_fs_operations)->deep_md;
+	vfs_node* node = vfs_create_device(name, VFS_CAP_READ | VFS_CAP_WRITE, sizeof(ahci_storage_info), NULL, &AHCI_fs_operations);
+	ahci_storage_info* dev_dmd = (ahci_storage_info*)node->deep_md;
 
 	// populate storage struct
 	uint16* ptr = (uint16*)buf;
@@ -332,6 +399,11 @@ error_t ahci_setup_vfs_port(uint8 port_num)
 	memcpy(dev_dmd->storage_info.serial_number, ptr + 10, 20);
 	dev_dmd->storage_info.sector_size = 512;
 	dev_dmd->volume_port = port_num;
+
+	ahci_port_nodes[port_num] = node;
+
+	// allow maximum 10 requests
+	queue_lf_init(&dev_dmd->messages, 10);
 
 	return ERROR_OK;
 }
@@ -381,7 +453,7 @@ error_t ahci_port_rebase(uint8 port_num)
 	}
 
 	port->serr = (DWORD)-1;		// clear the error status register
-	//port->ie = (DWORD)-1;
+	port->ie = (DWORD)-1;		// enable all interrupts
 	if (ahci_start_cmd(port) == false)
 	{
 		set_last_error(EIO, AHCI_CANT_STOP_PORT, EO_MASS_STORAGE_DEV);

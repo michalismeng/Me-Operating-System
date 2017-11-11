@@ -24,12 +24,6 @@ extern "C" {
 #define ATA_DEV_BUSY	0x80
 #define ATA_DEV_DRQ		0x08
 
-	struct ahci_storage_info
-	{
-		mass_storage_info storage_info;		// general mass storage info
-		uint8 volume_port;					// ahci port for this volume
-	};
-
 	enum FIS_TYPE
 	{
 		FIS_TYPE_REG_H2D = 0x27,	// Register FIS - Host to Device

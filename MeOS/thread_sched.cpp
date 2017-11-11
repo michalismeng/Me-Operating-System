@@ -411,9 +411,9 @@ void thread_notify(TCB* thread)
 
 
 	// preempt the low priority thread, if it is preemptible
-	if (thread_is_preemptible(thread_get_current()) && 
+	/*if (thread_is_preemptible(thread_get_current()) && 
 		thread_get_lower_priority(thread, thread_get_current()) == thread_get_current())
-		thread_current_yield();		
+		thread_current_yield();*/		
 
 	INT_ON;
 }

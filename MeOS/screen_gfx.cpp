@@ -9,6 +9,7 @@ const int FONT_CHAR_WIDTH = 8, FONT_CHAR_PAD = 1, FONT_CHAR_HEIGHT = 16, FONT_EN
 const int FONT_SIZE = (FONT_CHAR_WIDTH + FONT_CHAR_PAD) * FONT_CHAR_HEIGHT * FONT_ENTRIES;
 
 char font[FONT_SIZE];
+bool font_loaded = false;
 uint32 font_fd;
 
 vbe_mode_info_block* vbe;
@@ -50,6 +51,9 @@ error_t screen_gfx_open(vfs_node* node, uint32 capabilities)
 
 size_t screen_gfx_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
+	if (font_loaded == false)
+		return INVALID_IO;
+
 	uint8* ptr = ((uint8*)address) + start;
 	size_t res;
 
@@ -106,7 +110,7 @@ void init_screen_gfx(vbe_mode_info_block* _vbe)
 	// print diagnostics
 	screen_gfx_print();
 
-	vfs_create_device("screen", DEVICE_DEFAULT_CAPS, 0, 0, &screen_gfx_operations);
+	vfs_create_device("screen", VFS_CAP_WRITE, 0, 0, &screen_gfx_operations);
 
 	screen_initialized = true;
 }
@@ -148,7 +152,7 @@ void clear_screen()
 
 void load_default_font()
 {
-	if (open_file("sdc_mount/FONT.RAW", &font_fd, O_NOCACHE) != ERROR_OK)
+	if (open_file("sdc_mount/FONT.RAW", &font_fd, VFS_CAP_READ) != ERROR_OK)
 	{
 		serial_printf("**************Font could not be loaded. File not found.*******************\n");
 		//PANIC("");
@@ -160,6 +164,8 @@ void load_default_font()
 		serial_printf("Font could not be read %u.\n", get_last_error());
 		PANIC("");
 	}
+
+	font_loaded = true;
 }
 
 void put_pixel(point p, uint32 color)

@@ -180,80 +180,29 @@ error_t fat_fs_custom_cache_read(uint32 fd, vfs_node* file, uint32 page, virtual
 
 size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	if (!file->tag->tag)
-	{
-		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
-		return 0;		// read 0 bytes
-	}
+	//if (!file->tag->tag)
+	//{
+	//	set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
+	//	return 0;		// read 0 bytes
+	//}
 
-	// TODO: filesystem read permission
+	if (start % FAT_FORMAT_PAGE_SIZE != 0 || count % FAT_FORMAT_PAGE_SIZE != 0)
+	{
+		set_last_error(EINVAL, FAT_BAD_ALIGN, EO_MASS_STORAGE_FS);
+		return INVALID_IO;
+	}
 
 	uint32 start_pg = start / FAT_FORMAT_PAGE_SIZE;
-	uint32 current_pg = start_pg;
 	vfs_node* mount_point = file->tag;
 	virtual_addr cache;
-	uint32 read = 0;
 	uint32 offset = start % FAT_FORMAT_PAGE_SIZE;
 
-	bool use_file_cache = (file->flags & O_NOCACHE) == 0;
-	bool ignore_address = (file->flags & O_CACHE_ONLY) != 0;
 
-	if (use_file_cache == false && 
-		((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)) || (use_file_cache == false && ignore_address))
+	for (uint32 pg = 0; pg < ceil_division(count, FAT_FORMAT_PAGE_SIZE); pg++)
 	{
-		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
-		return 0;
+		if (fat_fs_read_by_page(mount_point, file, start_pg + pg, address + FAT_FORMAT_PAGE_SIZE * pg) == false)
+			return INVALID_IO;
 	}
-
-	// if the page cache is not to be used, then reserve a minimum of one entry to load partial data when required
-	if (use_file_cache == false)
-	{
-		if (!(cache = page_cache_reserve_anonymous()))
-			return 0;
-	}
-
-	/* Read pages until second to last */
-	for (uint32 pg = 0; pg < count / FAT_FORMAT_PAGE_SIZE; pg++, current_pg++)
-	{
-		if (fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache) != ERROR_OK)
-		{
-			if (use_file_cache)
-				page_cache_release_anonymous(cache);
-			return read;		// read bytes are read until now. Error is set in the core routine above.
-		}
-
-		if (!ignore_address)
-			memcpy((void*)(address + read), (void*)(cache + offset), min(4096, min(count, FAT_FORMAT_PAGE_SIZE - offset)));
-
-		read += min(4096, min(count, FAT_FORMAT_PAGE_SIZE - offset));
-		offset = 0;				// reset offset as it is used only for the first loop run
-	}
-
-	if (read == count)
-	{
-		if(use_file_cache == false)
-			page_cache_release_anonymous(cache);
-
-		if (ignore_address)
-			return cache;		// TODO: returns the last cache where the data was read. Is this useful for more than 8 KB data?
-
-		return read;
-	}
-
-	/* read the last page */
-
-	if (fat_fs_custom_cache_read(fd, file, current_pg, &cache, use_file_cache) != ERROR_OK)
-	{
-		if (use_file_cache)
-			page_cache_release_anonymous(cache);
-		return read;
-	}
-
-	if(!ignore_address)
-		memcpy((void*)(address + read), (void*)cache, count - read);
-
-	if (ignore_address)
-		return cache;
 
 	return count;
 }
@@ -261,60 +210,28 @@ size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtua
 //TODO: Do more testing with larger files...
 size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	if (!file->tag->tag)
+	//if (!file->tag->tag)
+	//{
+	//	set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
+	//	return 0;	// written zero bytes
+	//}
+
+	if (start % FAT_FORMAT_PAGE_SIZE != 0 || count % FAT_FORMAT_PAGE_SIZE != 0)
 	{
-		set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
-		return 0;	// written zero bytes
+		set_last_error(EINVAL, FAT_BAD_ALIGN, EO_MASS_STORAGE_FS);
+		return INVALID_IO;
 	}
 
-	bool use_file_cache = (file->flags & O_NOCACHE) == 0;
-
-	if (use_file_cache == false && ((start % FAT_FORMAT_PAGE_SIZE != 0) || (count % FAT_FORMAT_PAGE_SIZE != 0)))
-	{
-		set_last_error(EINVAL, FAT_BAD_ARGUMENTS, EO_MASS_STORAGE_FS);
-		return 0;
-	}
-
-	// TODO: filesystem write permission
-
-	uint32 start_pg = start / PAGE_SIZE;
-	uint32 current_pg = start_pg;
-	uint32 read = 0;
-
+	uint32 start_pg = start / FAT_FORMAT_PAGE_SIZE;
+	vfs_node* mount_point = file->tag;
 	virtual_addr cache;
-	error_t error;
+	uint32 offset = start % FAT_FORMAT_PAGE_SIZE;
 
-	// ensure page cache is read
-	if (fat_fs_read_to_cache(fd, file, current_pg, &cache) != ERROR_OK)
-		return 0;
-
-	serial_printf("write here: %s\n", cache);
-
-
-	// copy perhaps partial data from user buffer to cache buffer
-	memcpy((void*)(cache + start % PAGE_SIZE), (void*)address, min(count, PAGE_SIZE - start % PAGE_SIZE));
-	read += min(count, PAGE_SIZE - start % PAGE_SIZE);
-	current_pg++;
-
-	serial_printf("write here: %s\n", address);
-	// retrieve and read foreach intermediate page
-	for (uint32 pg = 1; pg < count / PAGE_SIZE; pg++, current_pg++)
+	for (uint32 pg = 0; pg < ceil_division(count, FAT_FORMAT_PAGE_SIZE); pg++)
 	{
-		if (fat_fs_read_to_cache(fd, file, current_pg, &cache) != ERROR_OK)
-			return read;
-
-		read += 4096;
-		memcpy((void*)cache, (void*)(address + read), 4096);
+		if (fat_fs_write_by_page(mount_point, file, start_pg + pg, address + FAT_FORMAT_PAGE_SIZE * pg) == false)
+			return INVALID_IO;
 	}
-
-	if (read == count)
-		return read;
-
-	// now read the last page
-	if (fat_fs_read_to_cache(fd, file, current_pg, &cache) != ERROR_OK)
-		return read;
-
-	memcpy((void*)cache, (void*)(address + read), count - read);
 
 	return count;
 }
@@ -696,7 +613,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 
 			uint32 attrs = fat_to_vfs_attributes(entry[i].attributes);
 
-			auto node = vfs_create_node(name, true, attrs, NULL, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
+			auto node = vfs_create_node(name, true, attrs, VFS_CAP_READ | VFS_CAP_WRITE, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
 			NODE_DATA(node)->metadata_cluster = offset;
 			NODE_DATA(node)->metadata_index = i;
 			NODE_DATA(node)->layout_loaded = false;		// even though the first entry is inserted in the layout, the whole layout is not loaded and a file open is expected.

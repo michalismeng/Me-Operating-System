@@ -641,13 +641,15 @@ void proc_init_thread()
 	
 	init_vfs();
 
+	page_cache_init(2 GB, 20);
+	init_global_file_table(16);
+
 	_abar = PCIFindAHCI();
 
 	uint32 ahci_base = 0x200000;
 	init_ahci(_abar, ahci_base);
 
-	page_cache_init(2 GB, 20);
-	init_global_file_table(16);
+	
 
 	/*init_net();
 	init_arp(NETWORK_LAYER);*/
@@ -827,7 +829,7 @@ void proc_init_thread()
 	//printfln("End load");
 
 	//PANIC("");
-
+#ifdef TEST_ENV
 	if (test_open_file_table_open() == false)
 	{
 		serial_printf("test failed...\n");
@@ -885,8 +887,7 @@ void proc_init_thread()
 		PANIC("");
 	}
 
-	//PANIC("Test End");
-
+#endif
 
 	//vfs_node* dev;
 	//if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
@@ -918,8 +919,6 @@ void proc_init_thread()
 
 	//set_foreground_color(0x000FF00);
 	//set_background_color(0);
-
-
 
 	init_print_utility();
 
@@ -958,12 +957,62 @@ void proc_init_thread()
 	//PCB* p = process_create(process_get_current(), 0, 0, 0xFFFFFFFF);
 	//thread_insert(c = thread_create(p, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
 
-	clear_screen();
-	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
-	printfln("Welcome to Me Operating System");
 	//serial_printf("int on\n");
 	INT_ON;
 
+	vfs_node* dev;
+	if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
+		PANIC("Error opening");
+
+	virtual_addr cache = page_cache_reserve_anonymous();
+
+	*(uint32*)(cache) = 0;
+
+	// mount FAT
+
+	if (dev)
+	{
+		vfs_node* hierarchy = fat_fs_mount("sdc_mount", dev);
+		vfs_add_child(vfs_get_root(), hierarchy);
+	}
+
+	uint32 fd;
+	if (open_file("sdc_mount/TEXT.TXT", &fd, VFS_CAP_READ | VFS_CAP_WRITE) == ERROR_OCCUR)
+		PANIC("Could not open text");
+
+	if (read_file(fd, 0, 4096, cache) != 4096)
+	{
+		serial_printf("error occur: %e\n", get_last_error());
+		PANIC("Could not read");
+	}
+
+	char* buf = (char*)cache;
+	for (int i = 0; i < 20; i++)
+		if (isprint(buf[i]))
+		{
+			serial_printf("%c", buf[i]);
+			buf[i] = 'a';
+		}	
+
+	uint32 written;
+	set_last_error(1, 1, 0);
+	if ((written = write_file(fd, 0, 4096, cache)) != 4096)
+	{
+		serial_printf("error occur %u: %e\n",written, get_last_error());
+		PANIC("Could not write");
+	}
+
+	serial_printf("\n\n");
+	page_cache_print();
+	serial_printf("\n\n");
+
+	serial_printf("end of read\n");
+
+	load_default_font();
+
+	clear_screen();
+	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);
+	printfln("Welcome to Me Operating System");
 
 	while (true)
 	{
