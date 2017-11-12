@@ -1,6 +1,6 @@
 #include "thread_exception.h"
 #include "process.h"
-#include "queue_lf.h"
+#include "queue_spsc.h"
 #include "print_utility.h"
 
 //process_exception process_exception_create(uint8 number, uint8* data, uint8 data_count, uint32 target_tid)

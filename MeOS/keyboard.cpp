@@ -2,15 +2,15 @@
 #include "vfs.h"
 #include "process.h"
 #include "thread_sched.h"
-#include "queue_lf.h"
+#include "queue_spsc.h"
 #include "print_utility.h"
 #include "kernel_stack.h"
 
 // driver private data
 
 uint32 _scancode;
-queue_lf<uint8> keycode_buffer;
-queue_lf<uint32> user_buffer;
+queue_spsc<uint8> keycode_buffer;
+queue_spsc<uint32> user_buffer;
 int code = 0;								// the code received by the keyboard irq
 bool _numlock, _capslock, _scrolllock;
 bool _shift, _alt, _ctrl;
@@ -46,10 +46,10 @@ size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_
 
 	while (temp_count > 0)
 	{
-		if (queue_lf_is_empty(&user_buffer) == false)
+		if (queue_spsc_is_empty(&user_buffer) == false)
 		{
-			*buffer = queue_lf_peek(&user_buffer);
-			queue_lf_remove(&user_buffer);
+			*buffer = queue_spsc_peek(&user_buffer);
+			queue_spsc_remove(&user_buffer);
 			temp_count--;
 			buffer++;
 		}
@@ -370,7 +370,7 @@ void keyboard_callback(registers_t* regs)
 	if (kybrd_ctrl_input_ready())
 	{
 		// read the code into the buffer
-		queue_lf_insert(&keycode_buffer, kybrd_enc_read_status());
+		queue_spsc_insert(&keycode_buffer, kybrd_enc_read_status());
 
 		// notify the daemon of the incoming code
 		if (keyboard_daemon != 0)
@@ -383,10 +383,10 @@ void keyboard_irq()
 	// run forever
 	while (true)
 	{
-		while (queue_lf_is_empty(&keycode_buffer) == false)
+		while (queue_spsc_is_empty(&keycode_buffer) == false)
 		{
-			code = queue_lf_peek(&keycode_buffer);
-			queue_lf_remove(&keycode_buffer);
+			code = queue_spsc_peek(&keycode_buffer);
+			queue_spsc_remove(&keycode_buffer);
 
 			// TODO : ADD EXTENDED CODE CAPABILITY
 			if (code == 0xE0 || code == 0xE1)
@@ -466,7 +466,7 @@ void keyboard_irq()
 				// if there is an active thread, write the data to it.
 				if (active != 0)
 				{
-					queue_lf_insert(&user_buffer, key);
+					queue_spsc_insert(&user_buffer, key);
 					thread_notify(active);
 				}
 			}
@@ -500,8 +500,8 @@ void init_keyboard()
 	register_interrupt_handler(33, keyboard_callback);
 	vfs_create_device("keyboard", DEVICE_DEFAULT_CAPS, 0, 0, &kybd_operations);
 
-	queue_lf_init(&keycode_buffer, 10);
-	queue_lf_init(&user_buffer, 10);
+	queue_spsc_init(&keycode_buffer, 10);
+	queue_spsc_init(&user_buffer, 10);
 
 	_kybrd_BAT_res = true;							// assume true.. will be checked at the irq handler right above
 	_scancode = INVALID_SCAN_CODE;

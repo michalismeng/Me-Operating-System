@@ -167,9 +167,6 @@
     <ClInclude Include="MeOS\file.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MeOS\queue_lf.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MeOS\atomic.h">
       <Filter>atomic\Headers</Filter>
     </ClInclude>
@@ -246,6 +243,12 @@
       <Filter>tests</Filter>
     </ClInclude>
     <ClInclude Include="MeOS\test_dev.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\queue_mpmc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MeOS\queue_spsc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

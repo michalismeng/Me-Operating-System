@@ -5,12 +5,12 @@
 #include "ethernet.h"
 #include "mmngr_virtual.h"
 #include "process.h"
-#include "queue_lf.h"
+#include "queue_spsc.h"
 #include "thread_sched.h"
 #include "kernel_stack.h"
 
 TCB* net_daemon = 0;
-queue_lf<uint32> recv_queue;
+queue_spsc<uint32> recv_queue;
 
 void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
 {
@@ -172,12 +172,12 @@ void e1000_recv_defered()
 {
 	while (true)
 	{
-		while (queue_lf_is_empty(&recv_queue) == false)
+		while (queue_spsc_is_empty(&recv_queue) == false)
 		{
 			packet_in_process = true;
 
-			uint32 pkt_ind = queue_lf_peek(&recv_queue);
-			queue_lf_remove(&recv_queue);
+			uint32 pkt_ind = queue_spsc_peek(&recv_queue);
+			queue_spsc_remove(&recv_queue);
 
 			uint8 *pkt = (uint8 *)nic_dev->rx_descs[pkt_ind]->addr;
 			uint16 pktlen = nic_dev->rx_descs[pkt_ind]->length;
@@ -316,7 +316,7 @@ void e1000_recv_packet(e1000* dev)
 	e1000_write_command(dev, REG_RXDESCTAIL, dev->rx_cur);
 
 	// insert the reception index for deferred processing
-	if (!queue_lf_insert(&recv_queue, recv_index))
+	if (!queue_spsc_insert(&recv_queue, recv_index))
 		printfln("queue is full");
 
 	if (net_daemon != 0)
@@ -373,7 +373,7 @@ e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physi
 
 	serial_printf("MAC address: %x %x %x %x %x %x\n", dev->mac[0], dev->mac[1], dev->mac[2], dev->mac[3], dev->mac[4], dev->mac[5]);
 
-	queue_lf_init(&recv_queue, 32);
+	queue_spsc_init(&recv_queue, 32);
 
 	virtual_addr krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)

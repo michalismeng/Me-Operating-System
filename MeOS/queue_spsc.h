@@ -8,8 +8,9 @@
 #include "memory.h"
 
 // single-producer, single-consumer, lock-free queue implemented as circular vector
+// TODO: there must be bugs in here.
 template<class T>
-struct queue_lf
+struct queue_spsc
 {
 	T* buffer;					// buffer that holds the items in queue
 	uint32 max_count;			// maximum items in the buffer
@@ -19,7 +20,7 @@ struct queue_lf
 };
 
 template<class T>
-void queue_lf_init(queue_lf<T>* q, uint32 max_elements)
+void queue_spsc_init(queue_spsc<T>* q, uint32 max_elements)
 {
 	q->head_index = q->tail_index = 0;
 	q->max_count = max_elements;
@@ -28,7 +29,7 @@ void queue_lf_init(queue_lf<T>* q, uint32 max_elements)
 }
 
 template<class T>
-bool queue_lf_remove(queue_lf<T>* q)
+bool queue_spsc_remove(queue_spsc<T>* q)
 {
 	if (q->head_index != q->tail_index)
 	{
@@ -40,7 +41,7 @@ bool queue_lf_remove(queue_lf<T>* q)
 }
 
 template<class T>
-bool queue_lf_insert(queue_lf<T>* q, const T& element)
+bool queue_spsc_insert(queue_spsc<T>* q, const T& element)
 {
 	if ((q->tail_index + 1) % q->max_count != q->head_index)
 	{
@@ -53,7 +54,7 @@ bool queue_lf_insert(queue_lf<T>* q, const T& element)
 }
 
 template<class T>
-T queue_lf_peek(queue_lf<T>* q)
+T queue_spsc_peek(queue_spsc<T>* q)
 {
 	if (q->tail_index != q->head_index)
 		return q->buffer[q->head_index];
@@ -61,14 +62,14 @@ T queue_lf_peek(queue_lf<T>* q)
 }
 
 template<class T>
-bool queue_lf_is_empty(queue_lf<T>* q)
+bool queue_spsc_is_empty(queue_spsc<T>* q)
 {
 	return (q->tail_index == q->head_index);
 }
 
 // clears the queue based on the caller type (required to mess with the right variable)
 template<class T>
-void queue_lf_clear(queue_lf<T>* q, bool reader_caller)
+void queue_spsc_clear(queue_spsc<T>* q, bool reader_caller)
 {
 	if (reader_caller)
 		q->head_index = q->tail_index;

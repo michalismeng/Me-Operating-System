@@ -6,7 +6,7 @@
 #include "vm_contract.h"
 #include "open_file_table.h"
 
-#include "queue_lf.h"
+#include "queue_spsc.h"
 #include "thread_exception.h"
 
 #include "Debugger.h"
@@ -117,7 +117,7 @@ _asm	mov esp, 0x90000
 		THREAD_ATTRIBUTE attribute;					// thread's extra attribute info
 		uint32 thread_lock;							// thread lock status
 
-		queue_lf<thread_exception> exceptions;		// thread exception queue to be consumed and served by the kernel
+		queue_spsc<thread_exception> exceptions;		// thread exception queue to be consumed and served by the kernel
 		uint32 exception_lock;						// lock for the exception consumption (to be used with CAS)
 	}TCB;
 

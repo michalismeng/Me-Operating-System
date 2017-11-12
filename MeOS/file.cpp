@@ -21,8 +21,6 @@ error_t open_file(char* path, uint32* fd, uint32 capabilities)
 	if (vfs_root_lookup(path, &node) != ERROR_OK)
 		return ERROR_OCCUR;
 
-	node->flags = 0;
-
 	return open_file_by_node(node, fd, capabilities);
 }
 
@@ -79,14 +77,19 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 		return INVALID_IO;
 	}
 
+	return read_file_global(global_fd, entry->file_node, start, count, buffer, local_entry->flags);
+}
+
+size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities)
+{
 	// check read capabilities
-	if (!CHK_BIT(local_entry->flags, VFS_CAP_READ))
+	if (!CHK_BIT(capabilities, VFS_CAP_READ))
 	{
 		set_last_error(EACCES, FILE_READ_ACCESS_DENIED, EO_FILE_INTERFACE);
 		return INVALID_IO;
 	}
 
-	if (CHK_BIT(local_entry->flags, VFS_CAP_CACHE))
+	if (CHK_BIT(capabilities, VFS_CAP_CACHE))
 	{
 		// initiate caching and do 4KB chunks of data
 		// segment the 'count' bytes into 4KB regions => read them to the page cache => copy to user buffer
@@ -104,18 +107,18 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 		for (uint32 i = 0; i < total_pages; i++)
 		{
 			uint32 page = start / PAGE_CACHE_SIZE + i;
-			virtual_addr cache = page_cache_get_buffer(global_fd, page);
+			virtual_addr cache = page_cache_get_buffer(gfd, page);
 
 			// if the area hasn't been read => read it
 			if (cache == 0)
 			{
-				cache = page_cache_reserve_buffer(global_fd, page);
+				cache = page_cache_reserve_buffer(gfd, page);
 				if (cache == 0)
 					return bytes_read;
 
-				if (vfs_read_file(global_fd, entry->file_node, start + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) == INVALID_IO)
+				if (vfs_read_file(gfd, node, start + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) == INVALID_IO)
 				{
-					page_cache_release_buffer(global_fd, page);
+					page_cache_release_buffer(gfd, page);
 					return bytes_read;
 				}
 			}
@@ -139,7 +142,7 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 	{
 		// the user requires immediate read to his buffer
 		// it is up to the driver to check count validity or do segmented data loading (in specific manageable chunks)
-		return vfs_read_file(global_fd, entry->file_node, start, count, buffer);
+		return vfs_read_file(gfd, node, start, count, buffer);
 	}
 
 	return INVALID_IO;

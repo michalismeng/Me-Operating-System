@@ -31,7 +31,8 @@
 #include "Debugger.h"
 
 #include "atomic.h"
-#include "queue_lf.h"
+#include "queue_spsc.h"
+#include "queue_mpmc.h"
 
 #include "dl_list.h"
 
@@ -84,7 +85,7 @@ uint32 fail_remove = 0;
 
 void test1()
 {
-	printfln("executing test 1");
+	serial_printf("executing test 1\n");
 
 	for (int i = 0; i < 10000000; i++)
 	{
@@ -108,6 +109,8 @@ void test1()
 		//	fail_insert++;
 	}
 
+
+
 	//printfln("fail insert: %u", fail_insert);
 
 	//thread_sleep(thread_get_current(), 1000);
@@ -115,13 +118,13 @@ void test1()
 	//for (int i = 0; i < 10; i++)
 	//	printf("%u ", q.buffer[i]);
 
-	serial_printf("test 1 finished: %u", a);
+	serial_printf("test 1 finished: %u\n", a);
 	while (true);
 }
 
 void test2()
 {
-	printfln("executing test 2");
+	serial_printf("executing test 2");
 
 	for (int i = 0; i < 10000000; i++)
 	{
@@ -146,6 +149,7 @@ void test2()
 		x[i] = 'b';
 
 	serial_printf("end of test2\n");*/
+
 
 	serial_printf("test 2 finished: %u\n", a);
 
@@ -185,10 +189,8 @@ char __temp[4096] = {'a', 'b', 'c', 'd', 0};
 void keyboard_fancy_function()
 {
 	uint32 fd;
-	if (open_file("dev/keyboard", &fd, 0) != ERROR_OK)
-	{
-		printfln("error occured: %u", get_last_error());
-	}
+	if (open_file("dev/keyboard", &fd, VFS_CAP_READ) != ERROR_OK)
+		serial_printf("error occured: %u", get_last_error());
 	else
 	{
 		while (true)
@@ -216,63 +218,14 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_P)
 			{
-				/*for (int i = 0; i < 4096; i++)
-					__temp[i] = 'b';
+				uint32 text_fd;
+				if (open_file("sdc_mount/TEXT.TXT", &text_fd, VFS_CAP_READ | VFS_CAP_WRITE) != ERROR_OK)
+					PANIC("could not open text.txt");
 
-				int ___fd;
-				if(open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
-					PANIC("Could not open text file");
+				if (vfs_mmap(0x500000, gft_get_by_fd(text_fd), 0, 4096, PROT_READ | PROT_WRITE, MMAP_PRIVATE) == MAP_FAILED)
+					serial_printf("map error: %e\n", get_last_error());
 
-				virtual_addr cache = page_cache_reserve_buffer(lft_get(&process_get_current()->lft, ___fd)->gfd, 0);
-
-				for (int i = 0; i < 4096; i++)
-					((char*)cache)[i] = __temp[i];
-
-				error_t e = fat_fs_sync(lft_get(&process_get_current()->lft, ___fd)->gfd, gft_get(lft_get(&process_get_current()->lft, ___fd)->gfd)->file_node,
-					0, 0);
-
-				serial_printf("error: %u", e);*/
-
-
-				//serial_printf("write result: %u\n", ahci_write(2, 0, 0, 512, (void*)vmmngr_get_phys_addr((virtual_addr)__temp)));
-				/*int ___fd;
-				if (open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
-					PANIC("Could not open text file");
-
-				if (vfs_mmap(0x700000, lft_get(&process_get_current()->lft, ___fd)->gfd, 2, 4096, MMAP_PRIVATE, PROT_READ | PROT_WRITE) == MAP_FAILED)
-					PANIC("Could not map file");
-
-				char* character = (char*)0x700000;
-
-				printfln("printing text: ");
-				for (int i = 0; i < 20; i++)
-					printf("%c", character[i]);
-
-				printfln(".End");*/
-				/*char* x = (char*)0x800000;
-
-				for (int i = 0; i < 10; i++)
-					printf("%c", x[i]);
-				printfln("");
-
-				page_cache_print();*/
-
-				uint32 ___fd;
-				if(open_file("sdc_mount/TEXT.TXT", &___fd, 0) != VFS_OK)
-					PANIC("Could not open text file");
-
-				if(read_file(___fd, 0, 12, (virtual_addr)__temp) != 12)
-					PANIC("Could not write text file");
-
-				serial_printf("read: %s\n", __temp);
-				/*for (int i = 0; i < 5; i++)
-					__temp[i] = 'c' + i;
-
-				if (write_file(___fd, 0, 5, (virtual_addr)__temp) != 5)
-					PANIC("Could not write text file");
-
-				if (sync_file(___fd, 0, 0) != VFS_OK)
-					PANIC("Could not sync text file");*/
+				serial_printf("%s\n\n", 0x500000);
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
@@ -914,11 +867,11 @@ void proc_init_thread()
 	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
 	init_screen_gfx(vbe);
 
-	set_foreground_color(0x00FFFFFF);
-	set_background_color(0x000000FF);
+	/*set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);*/
 
-	//set_foreground_color(0x000FF00);
-	//set_background_color(0);
+	set_foreground_color(0x000FF00);
+	set_background_color(0);
 
 	init_print_utility();
 
@@ -944,8 +897,8 @@ void proc_init_thread()
 	serial_printf("kernel stack top for idle: %h\n", krnl_stack);
 
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, krnl_stack, 4 KB, 7, 0));
-	/////*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3));
-	////thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3));*/
+	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3, 0));
+	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3, 0));*/
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
 	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
@@ -955,7 +908,13 @@ void proc_init_thread()
 
 	// create new test process to run keyboard fancy function.
 	//PCB* p = process_create(process_get_current(), 0, 0, 0xFFFFFFFF);
-	//thread_insert(c = thread_create(p, (uint32)keyboard_fancy_function, 3 GB + 10 MB + 520 KB, 4 KB, 3));
+	krnl_stack = kernel_stack_reserve();
+	if (krnl_stack == 0)
+	{
+		serial_printf("kernel stack allocation failed: %e", get_last_error());
+		PANIC("");
+	}
+	thread_insert(thread_create(process_get_current(), (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));
 
 	//serial_printf("int on\n");
 	INT_ON;
@@ -978,7 +937,10 @@ void proc_init_thread()
 
 	uint32 fd;
 	if (open_file("sdc_mount/TEXT.TXT", &fd, VFS_CAP_READ | VFS_CAP_WRITE) == ERROR_OCCUR)
+	{
+		serial_printf("error: %e\n", get_last_error());
 		PANIC("Could not open text");
+	}
 
 	if (read_file(fd, 0, 4096, cache) != 4096)
 	{
@@ -987,18 +949,13 @@ void proc_init_thread()
 	}
 
 	char* buf = (char*)cache;
-	for (int i = 0; i < 20; i++)
+	for (int i = 0; i < 40; i++)
 		if (isprint(buf[i]))
-		{
-			serial_printf("%c", buf[i]);
-			buf[i] = 'a';
-		}	
+			serial_printf("%c", buf[i]);	
 
-	uint32 written;
-	set_last_error(1, 1, 0);
-	if ((written = write_file(fd, 0, 4096, cache)) != 4096)
+	if (write_file(fd, 0, 4096, cache) != 4096)
 	{
-		serial_printf("error occur %u: %e\n",written, get_last_error());
+		serial_printf("error occur: %e\n", get_last_error());
 		PANIC("Could not write");
 	}
 

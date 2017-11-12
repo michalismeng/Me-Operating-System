@@ -53,7 +53,7 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 		return INVALID_IO;
 	}
 
-	// perform a write in the region to ensure it is virtually allocated, otherwise get_phys_addr fails
+	// write to ensure address is allocated
 	*(char*)address = 0;
 
 	ahci_message message;
@@ -65,9 +65,15 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	message.address = vmmngr_get_phys_addr(address);
 	message.read = true;
 
-	// TODO: this will not work as this is a multi-producer path.		
+	// address was never allocated
+	/*if (message.address == 0)
+	{
+		set_last_error(EINVAL, AHCI_BAD_ADDRESS, EO_MASS_STORAGE_DEV);
+		return INVALID_IO;
+	}*/
+
 	while (true)
-		if (queue_lf_insert(&NODE_INFO(file)->messages, &message))
+		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
 			break;
 
 	// TODO: Combine these into one function
@@ -106,9 +112,8 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 	message.address = vmmngr_get_phys_addr(address);
 	message.read = false;
 
-	// TODO: insertion will not work as this is a multi-producer path.
 	while (true)
-		if (queue_lf_insert(&NODE_INFO(file)->messages, &message))
+		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
 			break;
 
 	// TODO: Combine these into one function
@@ -321,10 +326,10 @@ void ahci_daemon_callback()
 		for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 		{
 			ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
-			if (queue_lf_is_empty(&info->messages) == false)
+			if (queue_mpmc_is_empty(&info->messages) == false)
 			{
-				ahci_message* message = queue_lf_peek(&info->messages);
-				queue_lf_remove(&info->messages);
+				ahci_message* message = queue_mpmc_peek(&info->messages);
+				queue_mpmc_remove(&info->messages);
 
 				message->result = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
 				thread_notify(message->issuer);
@@ -403,7 +408,7 @@ error_t ahci_setup_vfs_port(uint8 port_num)
 	ahci_port_nodes[port_num] = node;
 
 	// allow maximum 10 requests
-	queue_lf_init(&dev_dmd->messages, 10);
+	queue_mpmc_init(&dev_dmd->messages, 10);
 
 	return ERROR_OK;
 }

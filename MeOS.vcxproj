@@ -201,7 +201,8 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\net_protocol.h" />
     <ClInclude Include="MeOS\pipe.h" />
     <ClInclude Include="MeOS\print_utility.h" />
-    <ClInclude Include="MeOS\queue_lf.h" />
+    <ClInclude Include="MeOS\queue_spsc.h" />
+    <ClInclude Include="MeOS\queue_mpmc.h" />
     <ClInclude Include="MeOS\screen_gfx.h" />
     <ClInclude Include="MeOS\semaphore.h" />
     <ClInclude Include="MeOS\sock_buf.h" />

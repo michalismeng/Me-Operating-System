@@ -7,7 +7,7 @@
 #include "utility.h"
 #include "mmngr_virtual.h"
 #include "vfs.h"
-#include "queue_lf.h"
+#include "queue_mpmc.h"
 #include "process.h"
 
 enum AHCI_ERROR 
@@ -23,7 +23,8 @@ enum AHCI_ERROR
 	AHCI_SPIN_ERROR, 
 	AHCI_TASK_ERROR, 
 	AHCI_PORT_NOT_OK,
-	AHCI_BAD_NODE_STRUCTURE
+	AHCI_BAD_NODE_STRUCTURE,
+	AHCI_BAD_ADDRESS
 };
 
 struct ahci_message
@@ -43,9 +44,9 @@ struct ahci_message
 
 struct ahci_storage_info
 {
-	mass_storage_info storage_info;		// general mass storage info
-	uint8 volume_port;					// ahci port for this volume
-	queue_lf<ahci_message*> messages;		// messages for this port (read/write requests)
+	mass_storage_info storage_info;			// general mass storage info
+	uint8 volume_port;						// ahci port for this volume
+	queue_mpmc<ahci_message*> messages;		// messages for this port (read/write requests)
 };
 
 error_t init_ahci(HBA_MEM_t* abar, uint32 base);

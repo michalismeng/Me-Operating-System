@@ -52,11 +52,34 @@ void page_fault(registers_struct* regs)
 		te.data[0] = addr;
 		te.data[1] = regs->err_code;
 
-		if (!queue_lf_insert(&thread_get_current()->exceptions, te))
+		if (!queue_spsc_insert(&thread_get_current()->exceptions, te))
 			WARNING("queue_lf insertion error");
 	}
 	else
 		PANIC("Page fault occured but threading is not enabled!");
+}
+
+uint32 page_fault_calculate_present_flags(uint32 area_flags)
+{
+	uint32 flags = I86_PDE_PRESENT;
+
+	if (CHK_BIT(area_flags, MMAP_WRITE))
+		flags |= I86_PDE_WRITABLE;
+
+	if (CHK_BIT(area_flags, MMAP_USER))
+		flags |= I86_PDE_USER;
+
+	return flags;
+}
+
+void page_fault_alloc_page(uint32 area_flags, virtual_addr address)
+{
+	uint32 flags = page_fault_calculate_present_flags(area_flags);
+
+	if (CHK_BIT(area_flags, MMAP_IDENTITY_MAP))
+		vmmngr_map_page(vmmngr_get_directory(), address, address, flags);
+	else
+		vmmngr_alloc_page_f(address, flags);
 }
 
 void page_fault_bottom(thread_exception te)
@@ -115,43 +138,16 @@ void page_fault_bottom(thread_exception te)
 			// TODO: Make function to unduplicate this work. +Alloc immediate for mmaped files
 			// loop through all addresses and map them
 			for (virtual_addr address = area.start_addr; address < area.end_addr; address += 4096)
-			{
 				if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
-				{
-					uint32 flags = I86_PDE_PRESENT;
-
-					if (CHK_BIT(area.flags, MMAP_WRITE))
-						flags |= I86_PDE_WRITABLE;
-
-					if (CHK_BIT(area.flags, MMAP_USER))
-						flags |= I86_PDE_USER;
-
-					if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
-						vmmngr_map_page(vmmngr_get_directory(), address, address, flags);
-					else
-						vmmngr_alloc_page_f(address, flags);
-				}
-			}
+					page_fault_alloc_page(area.flags, address);
 		}
 		else
 		{
-			uint32 flags = I86_PDE_PRESENT;
-
-			if (CHK_BIT(area.flags, MMAP_WRITE))
-				flags |= I86_PDE_WRITABLE;
-
-			if (CHK_BIT(area.flags, MMAP_USER))
-				flags |= I86_PDE_USER;
-
 			if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
-			{
-				if (CHK_BIT(area.flags, MMAP_IDENTITY_MAP))
-					vmmngr_map_page(vmmngr_get_directory(), addr & (~0xFFF), addr & (~0xFFF), flags);
-				else
-					vmmngr_alloc_page_f(addr, flags);
-			}
+				page_fault_alloc_page(area.flags, addr & (~0xFFF));
 			else
 			{
+				uint32 flags = page_fault_calculate_present_flags(area.flags);
 				vmmngr_alloc_page_f(addr & (~0xFFF), flags);
 
 				uint32 read_start = area.offset + ((addr - area.start_addr) / PAGE_SIZE) * PAGE_SIZE;		// file read start
@@ -170,7 +166,7 @@ void page_fault_bottom(thread_exception te)
 				}
 
 				// read one page from the file offset given at the 4KB-aligned fault address 
-				if (vfs_read_file(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF)) != read_size)
+				if (read_file_global(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF), VFS_CAP_READ) != read_size)
 				{
 					serial_printf("read fd: %u\n", area.fd);
 					PANIC("mmap anonymous file read less bytes than expected");
@@ -184,6 +180,7 @@ void page_fault_bottom(thread_exception te)
 			PANIC("A shared area cannot be marked as anonymous yet.");
 		else
 		{
+			// TODO: This needs fixing
 			// in the shared file mapping the address to read is ignored as data are read only to page cache. 
 			uint32 read_start = area.offset + ((addr & (~0xfff)) - area.start_addr);
 			gfe* entry = gft_get(area.fd);

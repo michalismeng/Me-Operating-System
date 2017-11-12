@@ -97,8 +97,6 @@ struct vfs_node
 	vfs_node* tag;					// tag node associated with this node
 	vfs_node* parent;				// the parent node
 
-	uint32 flags;					// file flags
-
 	fs_operations* fs_ops;			// file basic operations
 	list<vfs_node*> children;		// children list
 

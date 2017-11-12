@@ -5,6 +5,8 @@ TCB* current_thread = 0;
 _thread_sched scheduler;
 list<PCB*> procs;
 
+uint32 in_critical_section = 0;
+
 extern volatile uint32 ticks;
 extern "C" uint32 frequency;
 
@@ -167,11 +169,14 @@ PCB* process_get_current()
 void scheduler_thread_switch()
 {
 	// if the current thread is in a critical section (critlock), do not change execution
-	if ((current_thread->thread_lock & THREAD_LOCK_CRITICAL) == THREAD_LOCK_CRITICAL)
+	/*if ((current_thread->thread_lock & THREAD_LOCK_CRITICAL) == THREAD_LOCK_CRITICAL)
 	{
 		current_thread->thread_lock |= THREAD_LOCK_YIELD;
 		return;
-	}
+	}*/
+
+	if (in_critical_section)
+		return;
 
 	// assertions:
 	// thread's state is saved on its stack
@@ -240,7 +245,6 @@ void thread_set_priority(TCB* thread, uint32 priority)
 	//INT_ON;
 }
 
-// TODO: Search all the queues for the thread
 TCB* thread_find(uint32 id)
 {
 	// we need a cli environment as we search a common data structure

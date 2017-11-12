@@ -188,7 +188,7 @@ TCB* thread_create(PCB* parent, uint32 entry, virtual_addr stack_top, uint32 sta
 	t->ss = 0x10;
 	t->esp = stack_top;
 
-	queue_lf_init(&t->exceptions, 10);
+	queue_spsc_init(&t->exceptions, 10);
 	t->exception_lock = 0;
 
 	// TODO: Replace the directory switches by a simple kernel page map

@@ -162,19 +162,6 @@ bool fat_fs_validate_83_name(char* name, uint32 length)
 
 #pragma endregion
 
-error_t fat_fs_custom_cache_read(uint32 fd, vfs_node* file, uint32 page, virtual_addr* cache, bool use_cache)
-{
-	vfs_node* mount_point = file->tag;
-
-	if (use_cache)
-		return fat_fs_read_to_cache (fd, file, page, cache);
-	else
-	{
-		if (fat_fs_read_by_page(mount_point, file, page, *cache) == false)
-			return ERROR_OCCUR;
-		return ERROR_OK;
-	}
-}
 
 #pragma region VFS API Implementation
 
@@ -207,7 +194,6 @@ size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtua
 	return count;
 }
 
-//TODO: Do more testing with larger files...
 size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	//if (!file->tag->tag)
@@ -330,7 +316,7 @@ bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
 	// because this is a mass storage data exchange, the fd represents the high lba address to read (for now it is zero).
 	// the count is 8 sectors !!
 
-	if (vfs_read_file(0, mount_point->tag, lba, 8, /*vmmngr_get_phys_addr*/(address)) != 8)
+	if (vfs_read_file(0, mount_point->tag, lba, 8, address) != 8)
 		return false;
 
 	return true;
@@ -346,7 +332,7 @@ bool fat_fs_write_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address
 		return false;
 	}
 	
-	if(vfs_write_file(0, mount_point->tag, lba, 8, /*vmmngr_get_phys_addr*/(address)) != 8)
+	if(vfs_write_file(0, mount_point->tag, lba, 8, address) != 8)
 		return false;
 
 	return true;
@@ -440,28 +426,28 @@ size_t fat_node_write(uint32 fd, vfs_node* node, uint32 start, size_t count, vir
 	return sizeof(fat_dir_entry_short);
 }
 
-error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache)
-{
-	vfs_node* mount_point = file->tag;
-	virtual_addr cache = page_cache_get_buffer(fd, page);
-	
-	// if page is not found then allocate a new one to hold the required data.
-	if (cache == 0)
-	{
-		if ((cache = page_cache_reserve_buffer(fd, page)) == 0)
-			return ERROR_OCCUR;
-
-		if(fat_fs_read_by_page(mount_point, file, page, cache) == false)
-		{
-			page_cache_release_buffer(fd, page);
-			*_cache = 0;
-			return ERROR_OCCUR;
-		}
-	}
-
-	*_cache = cache;
-	return ERROR_OK;
-}
+//error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache)
+//{
+//	vfs_node* mount_point = file->tag;
+//	virtual_addr cache = page_cache_get_buffer(fd, page);
+//	
+//	// if page is not found then allocate a new one to hold the required data.
+//	if (cache == 0)
+//	{
+//		if ((cache = page_cache_reserve_buffer(fd, page)) == 0)
+//			return ERROR_OCCUR;
+//
+//		if(fat_fs_read_by_page(mount_point, file, page, cache) == false)
+//		{
+//			page_cache_release_buffer(fd, page);
+//			*_cache = 0;
+//			return ERROR_OCCUR;
+//		}
+//	}
+//
+//	*_cache = cache;
+//	return ERROR_OK;
+//}
 
 // returns the next cluster to read based on the current cluster and the first FAT or zero on failure
 uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
