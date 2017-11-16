@@ -135,11 +135,10 @@ void page_fault_bottom(thread_exception te)
 	{
 		if (CHK_BIT(area.flags, MMAP_ALLOC_IMMEDIATE))
 		{
-			// TODO: Make function to unduplicate this work. +Alloc immediate for mmaped files
 			// loop through all addresses and map them
 			for (virtual_addr address = area.start_addr; address < area.end_addr; address += 4096)
-				if (CHK_BIT(area.flags, MMAP_ANONYMOUS))
-					page_fault_alloc_page(area.flags, address);
+				//if (CHK_BIT(area.flags, MMAP_ANONYMOUS))	ALLOC_IMMEDIATE works only for anonymous (imposed in mmap)
+				page_fault_alloc_page(area.flags, address);
 		}
 		else
 		{
@@ -156,7 +155,8 @@ void page_fault_bottom(thread_exception te)
 				//if (read_start < area.start_addr + PAGE_SIZE)	// we are reading the first page so subtract offset from read_size
 				//	read_size -= area.offset;
 
-				serial_printf("reading at mem: %h, file: %h, size: %u\n", addr & (~0xfff), read_start, read_size);
+				serial_printf("gfd: %u, reading at mem: %h, phys: %h file: %h, size: %u\n", area.fd, addr & (~0xfff), vmmngr_get_phys_addr(addr & (~0xfff)),
+					read_start, read_size);
 
 				gfe* entry = gft_get(area.fd);
 				if (entry == 0)
@@ -166,7 +166,7 @@ void page_fault_bottom(thread_exception te)
 				}
 
 				// read one page from the file offset given at the 4KB-aligned fault address 
-				if (read_file_global(area.fd, entry->file_node, read_start, read_size, addr & (~0xFFF), VFS_CAP_READ) != read_size)
+				if (read_file_global(area.fd, read_start, read_size, addr & (~0xFFF), VFS_CAP_READ | VFS_CAP_CACHE) != read_size)
 				{
 					serial_printf("read fd: %u\n", area.fd);
 					PANIC("mmap anonymous file read less bytes than expected");
@@ -180,19 +180,14 @@ void page_fault_bottom(thread_exception te)
 			PANIC("A shared area cannot be marked as anonymous yet.");
 		else
 		{
-			// TODO: This needs fixing
 			// in the shared file mapping the address to read is ignored as data are read only to page cache. 
 			uint32 read_start = area.offset + ((addr & (~0xfff)) - area.start_addr);
 			gfe* entry = gft_get(area.fd);
-			virtual_addr used_cache;
 
-			// because the O_CACHE_ONLY flag is set, the driver returns the address where data were read
-			if ((used_cache = vfs_read_file(area.fd, entry->file_node, read_start, PAGE_SIZE, -1)) == 0)
+			if (read_file_global(area.fd, read_start, PAGE_SIZE, -1, VFS_CAP_READ | VFS_CAP_CACHE) != PAGE_SIZE)
 				PANIC("mmap shared file failed");
 
-			serial_printf("used cache is: %h\n", used_cache);
-			used_cache = page_cache_get_buffer(area.fd, read_start / PAGE_SIZE);
-			serial_printf("used cache is: %h\n", used_cache);
+			virtual_addr used_cache = page_cache_get_buffer(area.fd, read_start / PAGE_SIZE);
 
 			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), DEFAULT_FLAGS);
 		}

@@ -12,8 +12,6 @@ size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 error_t fat_fs_sync(uint32 fd, vfs_node* file, uint32 start_page, uint32 end_page);
 error_t fat_fs_ioctl(vfs_node* node, uint32 command, ...);
 
-
-error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache);
 bool fat_fs_write_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
 size_t fat_node_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 bool fat_fs_read_by_page(vfs_node* mount_point, vfs_node* node, uint32 file_page, virtual_addr address);
@@ -315,7 +313,6 @@ bool fat_fs_read_by_lba(vfs_node* mount_point, uint32 lba, virtual_addr address)
 
 	// because this is a mass storage data exchange, the fd represents the high lba address to read (for now it is zero).
 	// the count is 8 sectors !!
-
 	if (vfs_read_file(0, mount_point->tag, lba, 8, address) != 8)
 		return false;
 
@@ -425,29 +422,6 @@ size_t fat_node_write(uint32 fd, vfs_node* node, uint32 start, size_t count, vir
 
 	return sizeof(fat_dir_entry_short);
 }
-
-//error_t fat_fs_read_to_cache(uint32 fd, vfs_node* file, uint32 page, virtual_addr* _cache)
-//{
-//	vfs_node* mount_point = file->tag;
-//	virtual_addr cache = page_cache_get_buffer(fd, page);
-//	
-//	// if page is not found then allocate a new one to hold the required data.
-//	if (cache == 0)
-//	{
-//		if ((cache = page_cache_reserve_buffer(fd, page)) == 0)
-//			return ERROR_OCCUR;
-//
-//		if(fat_fs_read_by_page(mount_point, file, page, cache) == false)
-//		{
-//			page_cache_release_buffer(fd, page);
-//			*_cache = 0;
-//			return ERROR_OCCUR;
-//		}
-//	}
-//
-//	*_cache = cache;
-//	return ERROR_OK;
-//}
 
 // returns the next cluster to read based on the current cluster and the first FAT or zero on failure
 uint32 fat_fs_find_next_cluster(vfs_node* mount_point, uint32 current_cluster)
@@ -599,7 +573,7 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 
 			uint32 attrs = fat_to_vfs_attributes(entry[i].attributes);
 
-			auto node = vfs_create_node(name, true, attrs, VFS_CAP_READ | VFS_CAP_WRITE, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
+			auto node = vfs_create_node(name, true, attrs, VFS_CAP_READ | VFS_CAP_WRITE | VFS_CAP_CACHE, entry[i].file_size, sizeof(fat_node_data), mount_point, parent, &fat_fs_operations);
 			NODE_DATA(node)->metadata_cluster = offset;
 			NODE_DATA(node)->metadata_index = i;
 			NODE_DATA(node)->layout_loaded = false;		// even though the first entry is inserted in the layout, the whole layout is not loaded and a file open is expected.

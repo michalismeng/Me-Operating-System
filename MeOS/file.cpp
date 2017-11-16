@@ -69,19 +69,18 @@ size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 		return INVALID_IO;
 
 	uint32 global_fd = local_entry->gfd;
+	return read_file_global(global_fd, start, count, buffer, local_entry->flags);
+}
 
-	gfe* entry = gft_get(global_fd);
+size_t read_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities)
+{
+	gfe* entry = gft_get(gfd);
 	if (!entry || gfe_is_invalid(entry))
 	{
 		set_last_error(EBADF, FILE_GFD_NOT_FOUND, EO_FILE_INTERFACE);
 		return INVALID_IO;
 	}
 
-	return read_file_global(global_fd, entry->file_node, start, count, buffer, local_entry->flags);
-}
-
-size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities)
-{
 	// check read capabilities
 	if (!CHK_BIT(capabilities, VFS_CAP_READ))
 	{
@@ -103,10 +102,14 @@ size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, 
 		uint32 total_pages = ceil_division(count, PAGE_CACHE_SIZE);
 		size_t bytes_read = 0;
 
-		// TODO: Detect end of file
 		for (uint32 i = 0; i < total_pages; i++)
 		{
 			uint32 page = start / PAGE_CACHE_SIZE + i;
+
+			// do not read past the end of file
+			/*if (page * PAGE_CACHE_SIZE >= entry->file_node->file_length)
+				break;*/
+
 			virtual_addr cache = page_cache_get_buffer(gfd, page);
 
 			// if the area hasn't been read => read it
@@ -116,24 +119,25 @@ size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, 
 				if (cache == 0)
 					return bytes_read;
 
-				if (vfs_read_file(gfd, node, start + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) == INVALID_IO)
+				if (vfs_read_file(gfd, entry->file_node, start + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE, cache) == INVALID_IO)
 				{
 					page_cache_release_buffer(gfd, page);
 					return bytes_read;
 				}
 			}
 
-			if (count - bytes_read >= PAGE_CACHE_SIZE)
-			{
-				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, PAGE_CACHE_SIZE);
-				bytes_read += PAGE_CACHE_SIZE;
-			}
-			else
-			{
-				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, count - bytes_read);
-				bytes_read += count - bytes_read;
-			}
+			// convention: when address is -1 do not copy from the cache
+			if(buffer != -1)
+				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, min(count - bytes_read, PAGE_CACHE_SIZE));
 
+			/*if (count - bytes_read < PAGE_CACHE_SIZE)
+			{
+				serial_printf("zeroing cache for addr: %h", buffer + i * PAGE_CACHE_SIZE);
+				memset((char*)cache + count - bytes_read, 0, count - bytes_read);
+
+			}*/
+
+			bytes_read += min(count - bytes_read, PAGE_CACHE_SIZE);
 		}
 
 		return bytes_read;
@@ -142,7 +146,7 @@ size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, 
 	{
 		// the user requires immediate read to his buffer
 		// it is up to the driver to check count validity or do segmented data loading (in specific manageable chunks)
-		return vfs_read_file(gfd, node, start, count, buffer);
+		return vfs_read_file(gfd, entry->file_node, start, count, buffer);
 	}
 
 	return INVALID_IO;
@@ -184,6 +188,12 @@ size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 			return INVALID_IO;
 		}
 
+		if (start / PAGE_CACHE_SIZE >= ceil_division(entry->file_node->file_length, PAGE_CACHE_SIZE) + 2)
+		{
+			set_last_error(EINVAL, FILE_FAR_START, EO_FILE_INTERFACE);
+			return INVALID_IO;
+		}
+
 		uint32 total_pages = ceil_division(count, PAGE_CACHE_SIZE);
 		size_t bytes_written = 0;
 
@@ -203,16 +213,21 @@ size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 					memset((void*)cache, 0, PAGE_CACHE_SIZE - count % PAGE_CACHE_SIZE);
 			}
 
-			if (count - bytes_written >= PAGE_CACHE_SIZE)
-			{
+			if(buffer != -1)
 				memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
-				bytes_written += PAGE_CACHE_SIZE;
-			}
-			else
-			{
-				memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, count - bytes_written);
-				bytes_written += count - bytes_written;
-			}
+
+			bytes_written += min(count - bytes_written, PAGE_CACHE_SIZE);
+
+			//if (count - bytes_written >= PAGE_CACHE_SIZE)
+			//{
+			//	memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
+			//	bytes_written += PAGE_CACHE_SIZE;
+			//}
+			//else
+			//{
+			//	memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, count - bytes_written);
+			//	bytes_written += count - bytes_written;
+			//}
 
 			// TODO: make page dirty
 

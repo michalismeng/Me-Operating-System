@@ -320,67 +320,6 @@ void vfs_print_all()
 	}
 }
 
-/* VFS Wrapper functions to node specific calls */
-
-size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
-{
-	if (!node)
-		return VFS_INVALID_NODE;
-
-	// TODO: check for caching
-
-	// TODO: Check read permissions
-
-	return node->fs_ops->fs_read(fd, node, start, count, address);
-}
-
-size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address)
-{
-	if (!node)
-		return VFS_INVALID_NODE;
-
-	// TODO: Check for caching
-
-	// TODO: Check read permissions
-	uint32 written = node->fs_ops->fs_write(fd, node, start, count, address);
-	/*if (start + written > node->file_length)
-	{
-		serial_printf("new length: %u", start + written);
-		node->file_length = start + written;
-		node->fs_ops->fs_ioctl(node, 0);
-	}*/
-
-	return written;
-}
-
-//error_t vfs_sync(uint32 fd, vfs_node* node, uint32 page_start, uint32 page_end)
-//{
-//	if (!node)
-//		return VFS_INVALID_NODE;
-//
-//	// TODO: Check read permissions
-//	return node->fs_ops->fs_sync(fd, node, page_start, page_end);
-//}
-
-//inline error_t vfs_open_file(vfs_node* node, uint32 capabilities)
-//{
-//	return node->fs_ops->fs_open(node, capabilities);
-//}
-
-//error_t vfs_lookup(vfs_node* parent, char* path, vfs_node** result)
-//{
-//	if (!parent)
-//	{
-//		set_last_error(EINVAL, VFS_INVALID_NODE, EO_VFS);
-//		return ERROR_OCCUR;
-//	}
-//
-//	if (parent->fs_ops->fs_lookup == 0)
-//		return vfs_default_lookup(parent, path, result);
-//
-//	return parent->fs_ops->fs_lookup(parent, path, result);
-//}
-
 error_t vfs_root_lookup(char* path, vfs_node** result)
 {
 	return vfs_lookup(vfs_get_root(), path, result);

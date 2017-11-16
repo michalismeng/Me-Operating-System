@@ -52,6 +52,11 @@ uint32 set_last_error(uint8 base_code, uint16 extended_code, uint8 code_origin)
 	return error;
 }
 
+void set_raw_error(uint32 error)
+{
+	*thread_get_error(thread_get_current()) = error;
+}
+
 uint32 get_last_error()
 {
 	uint32 temp = *thread_get_error(thread_get_current());

@@ -4,6 +4,7 @@
 !Boot/
 !Builds
 !Resources
+!Resources/*.exe
 !Builds/*.exe
 !MeOSLDR/
 /MeOSLdr/Debug

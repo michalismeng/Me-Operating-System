@@ -180,6 +180,9 @@ extern const char* ERROR_ORIGIN_STR[];
 // code origin is the module identifier where the error occured
 uint32 set_last_error(uint8 base_code, uint16 extended_code, uint8 code_origin);
 
+// directly sets the last error for the thread
+void set_raw_error(uint32 error);
+
 // retrieves the most recent error for the currently executing thread and clears the field to zero (assumes error handled).
 uint32 get_last_error();
 

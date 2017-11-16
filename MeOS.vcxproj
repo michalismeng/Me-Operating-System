@@ -199,6 +199,7 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\memory_definitions.h" />
     <ClInclude Include="MeOS\net.h" />
     <ClInclude Include="MeOS\net_protocol.h" />
+    <ClInclude Include="MeOS\pe_loader.h" />
     <ClInclude Include="MeOS\pipe.h" />
     <ClInclude Include="MeOS\print_utility.h" />
     <ClInclude Include="MeOS\queue_spsc.h" />
@@ -282,6 +283,7 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\open_file_table.cpp" />
     <ClCompile Include="MeOS\page_cache.cpp" />
     <ClCompile Include="MeOS\PCI.cpp" />
+    <ClCompile Include="MeOS\pe_loader.cpp" />
     <ClCompile Include="MeOS\pic.c" />
     <ClCompile Include="MeOS\pipe.cpp" />
     <ClCompile Include="MeOS\pit.c" />

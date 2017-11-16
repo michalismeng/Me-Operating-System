@@ -151,13 +151,17 @@ virtual_addr page_cache_reserve_anonymous()
 	page_cache_index_reserve_buffer(free_buf);
 	virtual_addr address = page_cache_addr_by_index(free_buf);
 
-	// virtual memory allocation is now done through the page fault handler (29/10/2017). But the bug below is important as a note.
-	
 	// Pages are not freed so always check to see if they are already present
 	//if (vmmngr_is_page_present(address) == false)	// HUGE BUG. If page is present and an allocation happens the software is updated but the TLB still points to the previous entry. Now the vmmngr is updated to check already alloced pages.
 	/*if (vmmngr_alloc_page(address) != ERROR_OK)
 		return 0;*/
-	// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
+		// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
+
+	if (vmmngr_alloc_page(address) != ERROR_OK)
+	{
+		page_cache_index_release_buffer(free_buf);
+		return 0;
+	}
 
 	return address;
 }
@@ -170,8 +174,8 @@ void page_cache_release_anonymous(virtual_addr address)
 		return;
 
 	page_cache_index_release_buffer(index);
-	//vmmngr_free_page_addr(buffer); 
-	// The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
+	vmmngr_free_page_addr(address); 
+	// ?? The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
 }
 
 virtual_addr page_cache_reserve_buffer(uint32 gfd, uint32 page)

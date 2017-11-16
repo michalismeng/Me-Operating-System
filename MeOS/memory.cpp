@@ -66,6 +66,13 @@ virtual_addr vfs_mmap_p(void* _proc, virtual_addr pref, uint32 gfd, uint32 offse
 		return MAP_FAILED;
 	}
 
+	// alloc immediate works only for anonymous mappings
+	if (CHK_BIT(flags, MMAP_ALLOC_IMMEDIATE) && !CHK_BIT(flags, MMAP_ANONYMOUS))
+	{
+		set_last_error(EINVAL, MEMORY_BAD_FLAGS, EO_MEMORY);
+		return MAP_FAILED;
+	}
+
 	vm_area area = vm_area_create(pref, pref + length, flags | prot, gfd, offset);
 
 	if (area.flags == MMAP_INVALID)

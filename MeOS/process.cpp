@@ -246,35 +246,3 @@ TCB* thread_get_lower_priority(TCB* thread1, TCB* thread2)
 	// (highest priority is 0, lowest is 7)
 	return thread_get_priority(thread1) > thread_get_priority(thread2) ? thread1 : thread2;
 }
-
-bool validate_PE_image(void* image)
-{
-	IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)image;
-
-	/* make sure program is valid */
-	if (dos_header->e_lfanew == 0 || dos_header->e_magic != IMAGE_DOS_SIGNATURE)
-		return false;
-
-	IMAGE_NT_HEADERS* nt_headers = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)image);
-
-	/* make sure program header is valid */
-	if (nt_headers->Signature != IMAGE_NT_SIGNATURE)
-		return false;
-
-	/* make sure executable is only for i386 cpu */
-	if (nt_headers->FileHeader.Machine != IMAGE_FILE_MACHINE_I386)
-		return false;
-
-	/* make sure this is an executable image and that it is built for 32-bit arch */
-	if (nt_headers->FileHeader.Characteristics & (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE) == 0)
-		return false;
-
-	if ((nt_headers->FileHeader.Characteristics & 1) == 0)
-		return false;
-
-	/* make sure the image base is between 4MB and 2GB as this is the user land */
-	if (nt_headers->OptionalHeader.ImageBase < 4 MB || nt_headers->OptionalHeader.ImageBase >= 2 GB)
-		return false;
-
-	return true;
-}

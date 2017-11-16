@@ -54,7 +54,7 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	}
 
 	// write to ensure address is allocated
-	*(char*)address = 0;
+	//*(char*)address = 0;
 
 	ahci_message message;
 	message.issuer = thread_get_current();
@@ -64,13 +64,6 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	message.count = count;
 	message.address = vmmngr_get_phys_addr(address);
 	message.read = true;
-
-	// address was never allocated
-	/*if (message.address == 0)
-	{
-		set_last_error(EINVAL, AHCI_BAD_ADDRESS, EO_MASS_STORAGE_DEV);
-		return INVALID_IO;
-	}*/
 
 	while (true)
 		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
@@ -121,7 +114,10 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 	thread_block(thread_get_current());
 
 	if (message.result != ERROR_OK)
+	{
+		set_raw_error(message.result);
 		return INVALID_IO;
+	}
 
 	return count;
 }
@@ -227,29 +223,6 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 	}
 
 	port->ci |= 1 << slot;	// Issue command
-		
-	//while (1)		// Wait for completion
-	//{
-	//	// In some longer duration reads, it may be helpful to spin on the DPS bit
-	//	// in the PxIS port field as well (1 << 5)
-	//	if ((port->ci & (1 << slot)) == 0)
-	//		break;
-	//	if (port->is & HBA_PxIS_TFES)	// Task file error
-	//	{
-	//		set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
-	//		return ERROR_OCCUR;
-	//	}
-	//}
-
-	//// Check again
-	//if (port->is & HBA_PxIS_TFES)
-	//{
-	//	set_last_error(EBUSY, AHCI_TASK_ERROR, EO_MASS_STORAGE_DEV);
-	//	return ERROR_OCCUR;
-	//}
-
-	//port->ci = 0;
-
 	thread_block(thread_get_current());
 
 	return ERROR_OK;
@@ -331,7 +304,12 @@ void ahci_daemon_callback()
 				ahci_message* message = queue_mpmc_peek(&info->messages);
 				queue_mpmc_remove(&info->messages);
 
-				message->result = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
+				error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
+				if (error != ERROR_OK)
+					message->result = get_last_error();
+				else
+					message->result = ERROR_OK;
+
 				thread_notify(message->issuer);
 			}
 		}

@@ -105,6 +105,9 @@ uint32 gft_get_n(vfs_node* node);
 // get the index of the global file entry pointed by the given local file descriptor
 uint32 gft_get_by_fd(uint32 fd);
 
+// returns the first index of the global file entry associated with a file node with the given name
+uint32 gft_get_by_name(char* name);
+
 // prints all the global file table
 void gft_print();
 

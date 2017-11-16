@@ -22,7 +22,8 @@ enum FILE_ERROR
 	FILE_READ_ACCESS_DENIED,
 	FILE_WRITE_ACCESS_DENIED,
 	FILE_UNALIGED_ADDRESS,
-	FILE_BIG_REQUEST
+	FILE_BIG_REQUEST,
+	FILE_FAR_START
 };
 
 	/* Defines the standard file io API */
@@ -38,7 +39,7 @@ enum FILE_ERROR
 	// reads the file, given its global file descriptor, to the given buffer
 	size_t read_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);
 
-	size_t read_file_global(uint32 gfd, vfs_node* node, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities);
+	size_t read_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities);
 
 	// writes to the file, given its global file descriptor, from the given buffer
 	size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);

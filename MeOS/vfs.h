@@ -141,14 +141,14 @@ vfs_node* vfs_find_node(char* path);
 // initialize the virtual file system
 void init_vfs();
 
-// opens a file for operations.
+// opens a file for operations
 inline error_t vfs_open_file(vfs_node* node, uint32 capabilities) { return node->fs_ops->fs_open(node, capabilities); }
 
-// include read and write to and from page-cache functions
-size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
+// reads data from an opened file
+inline size_t vfs_read_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address) { return node->fs_ops->fs_read(fd, node, start, count, address); }
 
-// writes to an opened file
-size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address);
+// writes data to an opened file
+inline size_t vfs_write_file(uint32 fd, vfs_node* node, uint32 start, size_t count, virtual_addr address) { return node->fs_ops->fs_write(fd, node, start, count, address); }
 
 // syncs the in memory changes to the underlying drive
 inline error_t vfs_sync(uint32 fd, vfs_node* node, uint32 page_start, uint32 page_end) { return node->fs_ops->fs_sync(fd, node, page_start, page_end); }

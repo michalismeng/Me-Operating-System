@@ -57,6 +57,9 @@
 #include "test/test_open_file_table.h"
 #include "test/test_page_cache.h"
 
+#include "pe_loader.h"
+
+__declspec(dllexport) extern "C" int add(int x, int y) { return x + y; }
 
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
@@ -222,7 +225,7 @@ void keyboard_fancy_function()
 				if (open_file("sdc_mount/TEXT.TXT", &text_fd, VFS_CAP_READ | VFS_CAP_WRITE) != ERROR_OK)
 					PANIC("could not open text.txt");
 
-				if (vfs_mmap(0x500000, gft_get_by_fd(text_fd), 0, 4096, PROT_READ | PROT_WRITE, MMAP_PRIVATE) == MAP_FAILED)
+				if (vfs_mmap(0x500000, gft_get_by_fd(text_fd), 0, 4096, PROT_READ | PROT_WRITE, MMAP_SHARED) == MAP_FAILED)
 					serial_printf("map error: %e\n", get_last_error());
 
 				serial_printf("%s\n\n", 0x500000);
@@ -312,7 +315,7 @@ void keyboard_fancy_function()
 			else if (c == KEYCODE::KEY_D)
 			{
 				uint32 __fd;
-				if (open_file("sdc_mount/TESTDLL.DLL", &__fd, 0) != ERROR_OK)
+				if (open_file("sdc_mount/TESTDLL.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
 				{
 					printfln("open file error: %e", get_last_error());
 					return;
@@ -467,7 +470,7 @@ void kernel_setup_process(uint32 stack, uint32 entry)
 
 	serial_printf("executing process: %u\n\n", process_get_current()->id);
 
-	serial_printf("executed testdll with stack: %u\n", stack);
+	serial_printf("executed testdll with stack: %u at address: %h\n", stack, entry);
 
 	typedef void(*fptr)();
 	((fptr)entry)();
@@ -503,9 +506,9 @@ virtual_addr pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, ui
 
 TCB* create_test_process(uint32 fd)
 {
-	PCB* proc = process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
+	PCB* proc = process_get_current();//process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
 
-	for (uint32 i = 0; i < 1; i++)
+	/*for (uint32 i = 0; i < 1; i++)
 	{
 		size_t read = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
 		if (read != PAGE_SIZE)
@@ -525,6 +528,11 @@ TCB* create_test_process(uint32 fd)
 	IMAGE_DATA_DIRECTORY* DataDirectory = &nt_header->OptionalHeader.DataDirectory[0];
 	IMAGE_EXPORT_DIRECTORY* exportDirectory = (IMAGE_EXPORT_DIRECTORY*)(DataDirectory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
 
+	serial_printf("image base: %h\n", nt_header->OptionalHeader.ImageBase);
+	serial_printf("stack commit: %u\nstack reserve: %u\nheap commit: %u\nheap reserve: %u\n", 
+		nt_header->OptionalHeader.SizeOfStackCommit, nt_header->OptionalHeader.SizeOfStackReserve,
+		nt_header->OptionalHeader.SizeOfHeapCommit, nt_header->OptionalHeader.SizeOfHeapReserve);
+
 	serial_printf("section name\n");
 	for (int x = 0; x < nt_header->FileHeader.NumberOfSections; x++)
 	{
@@ -532,21 +540,87 @@ TCB* create_test_process(uint32 fd)
 			serial_printf("%c", section[x].Name[i]);
 		serial_printf("\n");
 
-		serial_printf("mmaping fd: %u to %h, size of raw: %h, raw offset: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
-			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData, section[x].PointerToRawData);
+		serial_printf("mmaping fd: %u to %h, size of raw: %h, raw offset: %h, size of virtual: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
+			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData, section[x].PointerToRawData, section[x].VirtualSize);
 
-		// TODO: Remember vfs_map_p prot and flags were reversed in the definition and this function is not cheched if working.
+		serial_printf("section characteristics: %h\n", section[x].Characteristics);
+
+
 		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
 			lft_get(&process_get_current()->lft, fd)->gfd, section[x].PointerToRawData, 4096,
-			PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_USER) == MAP_FAILED)
+			PROT_READ | PROT_WRITE, MMAP_PRIVATE) == MAP_FAILED)
 		{
 			serial_printf("address: %h size %h", section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
 			PANIC("Could not map for process");
 		}
 	}
 
+	pe_print_export_functions(exportDirectory, nt_header->OptionalHeader.ImageBase);
+
+	typedef int(*add)(int, int);
+	add func = (add)pe_get_export_function_addr(exportDirectory, nt_header->OptionalHeader.ImageBase, "sub");
+
+	if (func == 0)
+	{
+		PANIC("ADD NOT FOUND");
+	}
+
+	serial_printf("sub(20, 10) = %u\n\n", func(20, 10));
+
+	PANIC("");*/
+
+	//PANIC("");
+
+	IMAGE_DOS_HEADER* dos_header = pe_load_image(gft_get_by_fd(fd), proc);
+
+	if (dos_header == 0)
+	{
+		serial_printf("error occured while reading image: %e\n");
+		PANIC("");
+	}
+
+	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)dos_header);
+	IMAGE_DATA_DIRECTORY* import_table_directory = &nt_header->OptionalHeader.DataDirectory[1];
+	IMAGE_IMPORT_DESCRIPTOR* import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(import_table_directory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
+	IMAGE_DATA_DIRECTORY* DataDirectory = &nt_header->OptionalHeader.DataDirectory[0];
+	IMAGE_EXPORT_DIRECTORY* exportDirectory = (IMAGE_EXPORT_DIRECTORY*)(DataDirectory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
+
+	serial_printf("getting export functions\n");
+	pe_print_export_functions(exportDirectory, nt_header->OptionalHeader.ImageBase);
+
+	//serial_printf("data directory: %h\n", nt_header->OptionalHeader.DataDirectory);
+
+	//uint32 image_base = nt_header->OptionalHeader.ImageBase;
+	//for(; import_descriptor->FirstThunk != 0; import_descriptor++)
+	//{
+	//	//// get the module name
+	//	char* module_name = (char*)(import_descriptor->Name + image_base);
+	//	serial_printf("import module %s\n", module_name);
+	//	serial_printf("time stamp: %u\n", import_descriptor->TimeDateStamp);
+
+	//	IMAGE_THUNK_DATA* thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
+
+	//	// first thunk contains the addresses
+	//	// original first thunk contains the names of the functions.
+
+	//	for(uint32 index = 0; thunk->Function != 0; thunk++, index++)
+	//	{
+	//		char* func_name = (char*)(image_base + thunk->AddressOfData->Name);
+	//		uint32* addr = (uint32*)(image_base + import_descriptor->FirstThunk) + index;
+
+	//		serial_printf("function: %s at %h\n", func_name, *addr);
+
+	//		*addr = (uint32)add;	// bind the function
+	//	}
+	//}
+
 	/*typedef int(*add)(int, int);
 	add func = (add)pe_get_export_function(exportDirectory, nt_header->OptionalHeader.ImageBase, "?add@@YAHHH@Z");
+
+	if (func == 0)
+	{
+		PANIC("ADD NOT FOUND");
+	}
 
 	serial_printf("add(10, 20) = %u\n\n", func(10, 20));*/
 
@@ -578,7 +652,8 @@ void proc_init_thread()
 		PANIC("Could not map MMIO");
 
 	// write protect supervisor => cr0 bit 16 must be set to trigger page fault when kernel writes to read only page
-	enable_write_protection();
+	// DISABLE THIS FOR LOADING PROCESSES
+	//enable_write_protection();
 
 	// create a 16KB heap
 	kernel_heap = heap_create(3 GB + 11 MB, 16 KB);
@@ -602,45 +677,11 @@ void proc_init_thread()
 	uint32 ahci_base = 0x200000;
 	init_ahci(_abar, ahci_base);
 
-	
-
 	/*init_net();
 	init_arp(NETWORK_LAYER);*/
 	//init_ipv4(NETWORK_LAYER);
 	//init_icmp(TRANSPORT_LAYER);
 	//init_udp(TRANSPORT_LAYER);
-
-	//vfs_node* disk = vfs_find_child(vfs_get_dev(), "sdc");
-	//if (disk)
-	//{
-	//	vfs_node* hierarchy = fat_fs_mount("sdc_mount", disk);
-	//	vfs_node* folder = 0;
-	//	vfs_add_child(vfs_get_root(), hierarchy);
-	//}
-
-	//vfs_print_all();
-
-	//page_cache_print();
-	//debugf(strupper("print tree..."));
-
-	//ClearScreen();
-	//print_vfs(hierarchy, 0);
-
-
-	//if (vfs_lookup(hierarchy, "FOLDER", &folder) != 0)
-	//	printfln("ERROR");
-	//else
-	//{
-	//	if (vfs_open_file(folder) != VFS_OK)
-	//		DEBUG("error");
-
-	//	auto layout = &((fat_node_data*)folder->deep_md)->layout;
-	//	printf("folder clusters ");
-	//	for (int i = 0; i < layout->count; i++)
-	//		printf("%u ", vector_at(layout, i));
-	//}
-	////while (true);
-	//ClearScreen();
 
 	//print_vfs(hierarchy, 0);
 
@@ -691,25 +732,6 @@ void proc_init_thread()
 		//debugf("press to print cache...");
 
 		//page_cache_print();
-
-		//while (true);
-
-		//while (true);
-
-		//if (err = open_file("sdc_mount/FONT.RAW", &f_desc))
-		//	printfln("Error opening mic.TXT: %u", err);
-
-		//if (err = read_file(f_desc, 0, 128, (virtual_addr)___buffer) != 128)
-		//	printfln("Could not read file: %u", err);
-		//else
-		//{
-		//	for (uint32 i = 0; i < 128; i++)
-		//		if (((char*)___buffer)[i] != 0)
-		//			printfln("this is not zero");
-		//	//printfln("read:   %s", ___buffer);
-		//}
-
-		//while (true);
 
 		/*fat_fs_load_file_layout((fat_mount_data*)hierarchy->deep_md, (mass_storage_info*)hierarchy->tag->deep_md, file);
 		auto head = (fat_file_layout*)file->deep_md;
@@ -842,51 +864,18 @@ void proc_init_thread()
 
 #endif
 
-	//vfs_node* dev;
-	//if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
-	//	PANIC("Error opening");
-
-	//virtual_addr cache = page_cache_reserve_anonymous();
-
-	//*(uint32*)(cache) = 0;
-
-	//// attention: if the address is not allocated (but exists only in the contract) then the driver fails (as it uses vmmngr_get_phys_addr)
-	//if (vfs_read_file(0, dev, 0, 1, cache) != 1)
-	//{
-	//	serial_printf("Cannot read: %e\n", get_last_error());
-	//	PANIC("");
-	//}
-
-
-	//fat_mbr* mbr = (fat_mbr*)cache;
-
-	//serial_printf("signature: %h\n", mbr->boot_sign);
-	//serial_printf("1st partition offset, size: %h, %h\n", mbr->primary_partition.lba_offset, mbr->primary_partition.size);
-	//serial_printf("2nd partition offset: %h\n", mbr->secondary_partition.lba_offset);
-
 	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
 	init_screen_gfx(vbe);
 
-	/*set_foreground_color(0x00FFFFFF);
-	set_background_color(0x000000FF);*/
+	set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);
 
-	set_foreground_color(0x000FF00);
-	set_background_color(0);
+	/*set_foreground_color(0x000FF00);
+	set_background_color(0);*/
 
 	init_print_utility();
 
 	serial_printf("screen ready...\n");
-
-	/*virtual_addr krnl_stack = kernel_stack_reserve();
-	if (krnl_stack == 0)
-	{
-		serial_printf("kernel stack allocation failed: %e", get_last_error());
-		PANIC("");
-	}
-	serial_printf("kernel stack top for kybd_fancy: %h", krnl_stack);
-
-	TCB* c;
-	thread_insert(c = thread_create(thread_get_current()->parent, (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));*/
 
 	virtual_addr krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)
@@ -923,10 +912,6 @@ void proc_init_thread()
 	if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
 		PANIC("Error opening");
 
-	virtual_addr cache = page_cache_reserve_anonymous();
-
-	*(uint32*)(cache) = 0;
-
 	// mount FAT
 
 	if (dev)
@@ -935,35 +920,64 @@ void proc_init_thread()
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
 
-	uint32 fd;
-	if (open_file("sdc_mount/TEXT.TXT", &fd, VFS_CAP_READ | VFS_CAP_WRITE) == ERROR_OCCUR)
+	//virtual_addr buffer = page_cache_reserve_anonymous();
+
+	//*(uint32*)(buffer) = 0;
+
+	//uint32 fd;
+	//if (open_file("sdc_mount/TEXT.TXT", &fd, VFS_CAP_READ | VFS_CAP_WRITE | VFS_CAP_CACHE) == ERROR_OCCUR)
+	//{
+	//	serial_printf("error: %e\n", get_last_error());
+	//	PANIC("Could not open text");
+	//}
+
+	//if (read_file(fd, 0, 4096, buffer) == INVALID_IO)
+	//{
+	//	serial_printf("error occur: %e\n", get_last_error());
+	//	PANIC("Could not read");
+	//}
+
+	//char* buf = (char*)buffer;
+	//for (int i = 0; i < 10; i++)
+	//	if (isprint(buf[i]))
+	//	{
+	//		serial_printf("%c", buf[i]);
+	//		buf[i] = 'c';
+	//	}
+
+	//if (write_file(fd, 0, 4096, buffer) != 4096)
+	//{
+	//	serial_printf("error occur: %e\n", get_last_error());
+	//	PANIC("Could not write");
+	//}
+
+	//serial_printf("\n\n");
+	//page_cache_print();
+	//serial_printf("\n\n");
+
+	//serial_printf("end of read\n");
+
+	//PANIC("");
+	
+	uint32 __fd;
+	/*if (open_file("sdc_mount/TESTEXPT.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
 	{
-		serial_printf("error: %e\n", get_last_error());
-		PANIC("Could not open text");
+		printfln("open file error: %e", get_last_error());
+		return;
+	}*/
+
+	/*if (open_file("sdc_mount/TESTDLL.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+	{
+		printfln("open file error: %e", get_last_error());
+		return;
 	}
 
-	if (read_file(fd, 0, 4096, cache) != 4096)
-	{
-		serial_printf("error occur: %e\n", get_last_error());
-		PANIC("Could not read");
-	}
+	TCB* proc = create_test_process(__fd);
 
-	char* buf = (char*)cache;
-	for (int i = 0; i < 40; i++)
-		if (isprint(buf[i]))
-			serial_printf("%c", buf[i]);	
-
-	if (write_file(fd, 0, 4096, cache) != 4096)
-	{
-		serial_printf("error occur: %e\n", get_last_error());
-		PANIC("Could not write");
-	}
-
-	serial_printf("\n\n");
-	page_cache_print();
-	serial_printf("\n\n");
-
-	serial_printf("end of read\n");
+	INT_OFF;
+	serial_printf("executing TESTDLL.EXE");
+	thread_insert(proc);
+	INT_ON;*/
 
 	load_default_font();
 

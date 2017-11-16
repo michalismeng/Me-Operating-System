@@ -260,6 +260,15 @@ uint32 gft_get_by_fd(uint32 fd)
 	return process_get_current()->lft.entries[fd].gfd;
 }
 
+uint32 gft_get_by_name(char* name)
+{
+	for (uint32 i = 0; i < gft.count; i++)
+		if (strcmp(name, gft[i].file_node->name) == 0)
+			return i;
+
+	return INVALID_FD;
+}
+
 void gft_print()
 {
 	for (uint32 i = 0; i < gft.count; i++)
