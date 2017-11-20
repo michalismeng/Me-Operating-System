@@ -228,6 +228,7 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\screen.h" />
     <ClInclude Include="MeOS\SerialDebugger.h" />
     <ClInclude Include="MeOS\system.h" />
+    <ClInclude Include="MeOS\test\test_AHCI.h" />
     <ClInclude Include="MeOS\test\test_base.h" />
     <ClInclude Include="MeOS\test\test_Fat32.h" />
     <ClInclude Include="MeOS\test\test_open_file_table.h" />
@@ -251,7 +252,9 @@ call format-light.bat"</Command>
   <ItemGroup>
     <ClCompile Include="MeOS\AHCI.cpp" />
     <ClCompile Include="MeOS\arp.cpp" />
-    <ClCompile Include="MeOS\critlock.cpp" />
+    <ClCompile Include="MeOS\critlock.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
     <ClCompile Include="MeOS\cstring.c" />
     <ClCompile Include="MeOS\Debugger.cpp" />
     <ClCompile Include="MeOS\descriptor_tables.c" />
@@ -301,6 +304,7 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\icmp.cpp" />
     <ClCompile Include="MeOS\spinlock.cpp" />
     <ClCompile Include="MeOS\system.c" />
+    <ClCompile Include="MeOS\test\test_AHCI.cpp" />
     <ClCompile Include="MeOS\test\test_FAT32.cpp" />
     <ClCompile Include="MeOS\test\test_open_file_table.cpp" />
     <ClCompile Include="MeOS\test\test_page_cache.cpp" />

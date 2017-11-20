@@ -4,6 +4,7 @@
 #include "thread_sched.h"
 #include "kernel_stack.h"
 #include "error.h"
+#include "semaphore.h"
 
 // private data and helper function
 #define NODE_INFO(x) ((ahci_storage_info*)x->deep_md)
@@ -14,6 +15,8 @@ uint32 port_ok = 0;		// bit significant variable that states if port is ok for u
 
 TCB* ahci_daemon = 0;
 vfs_node* ahci_port_nodes[32] = { 0 };
+
+semaphore request_semaphore;
 
 //error_t ahci_open(vfs_node* node);
 size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
@@ -44,7 +47,7 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 		return INVALID_IO;
 	}
 
-	uint32 high_lba = fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	uint32 high_lba = 0;		//TODO: delete this mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
 	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
 
 	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
@@ -65,17 +68,24 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	message.address = vmmngr_get_phys_addr(address);
 	message.read = true;
 
+	semaphore_signal(&request_semaphore);
+
 	while (true)
 		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
 			break;
 
 	// TODO: Combine these into one function
+	INT_OFF;
 	thread_notify(ahci_daemon);
 	thread_block(thread_get_current());
+	INT_ON;
 
 	// message result is filled by the daemon
 	if (message.result != ERROR_OK)
+	{
+		PANIC("error");
 		return INVALID_IO;
+	}
 
 	return count;
 }
@@ -87,7 +97,7 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 		set_last_error(EINVAL, AHCI_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_DEV);
 		return INVALID_IO;
 	}
-	uint32 high_lba = (uint32)fd;		// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
+	uint32 high_lba = 0; // (uint32)fd;	TODO: delete this	// mass storage convention. fd - as it is irrelevant for a device - stores the high disk lba.
 	HBA_PORT_t* port = &abar->ports[NODE_INFO(file)->volume_port];
 
 	if (ahci_is_port_ok(NODE_INFO(file)->volume_port) == false)
@@ -110,8 +120,10 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 			break;
 
 	// TODO: Combine these into one function
+	INT_OFF;
 	thread_notify(ahci_daemon);
 	thread_block(thread_get_current());
+	INT_ON;
 
 	if (message.result != ERROR_OK)
 	{
@@ -296,21 +308,25 @@ void ahci_daemon_callback()
 {
 	while (true)
 	{
-		for (uint8 i = 0; i < ahci_get_no_ports(); i++)
+		while (request_semaphore.lock > 0)
 		{
-			ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
-			if (queue_mpmc_is_empty(&info->messages) == false)
+			for (uint8 i = 0; i < ahci_get_no_ports(); i++)
 			{
-				ahci_message* message = queue_mpmc_peek(&info->messages);
-				queue_mpmc_remove(&info->messages);
+				ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
+				while (queue_mpmc_is_empty(&info->messages) == false)
+				{
+					ahci_message* message = queue_mpmc_peek(&info->messages);
+					queue_mpmc_remove(&info->messages);
 
-				error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
-				if (error != ERROR_OK)
-					message->result = get_last_error();
-				else
-					message->result = ERROR_OK;
+					error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
+					if (error != ERROR_OK)
+						message->result = get_last_error();
+					else
+						message->result = ERROR_OK;
 
-				thread_notify(message->issuer);
+					thread_notify(message->issuer);
+					semaphore_wait(&request_semaphore);
+				}
 			}
 		}
 		thread_block(thread_get_current());
@@ -345,6 +361,7 @@ error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 		}
 	}
 
+	semaphore_init(&request_semaphore, 0);
 	virtual_addr stack = kernel_stack_reserve();
 	if (stack == 0)
 		PANIC("ahci stack allocation failed");

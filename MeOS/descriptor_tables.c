@@ -2,6 +2,8 @@
 #include "SerialDebugger.h"
 #include "print_utility.h"
 
+void scheduler_print_queues();
+
 gdt_entry_t gdt_entries[6];
 gdt_ptr_t 	 gdt_ptr;
 
@@ -85,7 +87,9 @@ void TripleFault(registers_t* regs)
 void test_handle(registers_t* regs)
 {
 	//printfln("called %h", regs->ebx);
-	serial_printf("message: %h %s", regs->ebx, regs->ebx);
+	serial_printf("message: %h %s\n", regs->ebx, regs->ebx);
+
+	scheduler_print_queues();
 }
 
 void init_descriptor_tables(gdt_entry_t* gdt_base, isr_t* isr_base, idt_entry_t* idt_base)

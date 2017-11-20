@@ -52,11 +52,13 @@ void page_fault(registers_struct* regs)
 		te.data[0] = addr;
 		te.data[1] = regs->err_code;
 
+		
 		if (!queue_spsc_insert(&thread_get_current()->exceptions, te))
 			WARNING("queue_lf insertion error");
 	}
 	else
 		PANIC("Page fault occured but threading is not enabled!");
+
 }
 
 uint32 page_fault_calculate_present_flags(uint32 area_flags)
@@ -188,8 +190,10 @@ void page_fault_bottom(thread_exception te)
 				PANIC("mmap shared file failed");
 
 			virtual_addr used_cache = page_cache_get_buffer(area.fd, read_start / PAGE_SIZE);
+			//serial_printf("m%h\n", used_cache);
 
 			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), DEFAULT_FLAGS);
+			//serial_printf("shared mapping fd: %u, cache: %h, phys cache: %h, read: %u, addr: %h\n", area.fd, used_cache, used_cache, read_start, addr);
 		}
 	}
 }
@@ -201,8 +205,12 @@ error_t vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, 
 	pd_entry* e = vmmngr_pdirectory_lookup_entry(dir, virt);
 
 	if (pd_entry_test_attrib(e, I86_PDE_PRESENT) == false)	// table is not present
+	{
 		if (vmmngr_create_table(dir, virt, flags) != ERROR_OK)
 			return ERROR_OCCUR;
+		serial_printf("table not present\n");
+	}
+		
 
 	// here we have a guaranteed working table (perhaps empty)
 
@@ -214,9 +222,11 @@ error_t vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, 
 		return ERROR_OCCUR;
 	}
 	
-	*page = 0;												// delete possible previous information (pt_entry is just a uint32)
+	//*page = 0;												// delete possible previous information (pt_entry is just a uint32)
 	*page |= flags;											// and reset
 	pt_entry_set_frame(page, phys);
+
+	vmmngr_flush_TLB_entry(virt);
 
 	return ERROR_OK;
 }
@@ -311,7 +321,7 @@ error_t vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr)
 	// if the page directory hasn't change do not flush cr3 as such an action is a performance hit
 	if (pmmngr_get_PDBR() == pdbr)
 		return ERROR_OK;
-
+	serial_printf("changing dir\n");
 	if (!dir)
 	{
 		set_last_error(EINVAL, VMEM_BAD_ARGUMENT, EO_VMMNGR);

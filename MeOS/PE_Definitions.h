@@ -13,6 +13,18 @@
 #define IMAGE_FILE_EXECUTABLE_IMAGE          0x0002  /* File is executable  (i.e. no unresolved externel references). */
 #define IMAGE_FILE_32BIT_MACHINE             0x0100  /* 32 bit word machine. */
 
+// The PE data directories
+enum PE_DATA_DIRECTORIES
+{
+	PE_EXPORT_DIRECTORY,
+	PE_IMPORT_DIRECTORY,
+	PE_RESOURCE_DIRECTORY,
+	PE_EXCEPTION_TABLE,
+	PE_CERTIFICATE_DIRECTORY,
+	PE_BASE_RELOC_DIRECTORY,
+	PE_DEBUG_DIRECTORY,
+};
+
 typedef struct _IMAGE_DATA_DIRECTORY
 {
 	uint32 VirtualAddress;

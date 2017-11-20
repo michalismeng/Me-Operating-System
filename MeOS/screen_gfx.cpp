@@ -10,7 +10,7 @@ const int FONT_SIZE = (FONT_CHAR_WIDTH + FONT_CHAR_PAD) * FONT_CHAR_HEIGHT * FON
 
 char font[FONT_SIZE];
 bool font_loaded = false;
-uint32 font_fd;
+uint32 font_fd = INVALID_FD;
 
 vbe_mode_info_block* vbe;
 
@@ -152,13 +152,13 @@ void clear_screen()
 
 void load_default_font()
 {
+	serial_printf("font\n");
 	if (open_file("sdc_mount/FONT.RAW", &font_fd, VFS_CAP_READ) != ERROR_OK)
 	{
 		serial_printf("**************Font could not be loaded. File not found.*******************\n");
-		//PANIC("");
 		return;
 	}
-
+	
 	if (read_file(font_fd, 0, FONT_SIZE, (virtual_addr)font) != FONT_SIZE)
 	{
 		serial_printf("Font could not be read %u.\n", get_last_error());

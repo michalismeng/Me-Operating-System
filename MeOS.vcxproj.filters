@@ -254,6 +254,9 @@
     <ClInclude Include="MeOS\pe_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MeOS\test\test_AHCI.h">
+      <Filter>tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MeOS\cstring.c">
@@ -417,6 +420,9 @@
     </ClCompile>
     <ClCompile Include="MeOS\pe_loader.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\test\test_AHCI.cpp">
+      <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

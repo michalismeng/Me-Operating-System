@@ -17,6 +17,9 @@ extern "C" {
 	//		1 if first un-match of s1 is greater than s2
 	int8 strcmp(const char* s1, const char* s2);
 
+	// compares strings without taking into account letter case.
+	int8 strcmp_insensitive(const char* s1, const char* s2);
+
 	// copies source string to destination. destination must be capable of holding the source string.
 	void strcpy(char* destination, const char* source);
 

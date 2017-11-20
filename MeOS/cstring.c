@@ -24,6 +24,21 @@ int8 strcmp(const char* s1, const char* s2)
 	return res;
 }
 
+int8 strcmp_insensitive(const char* s1, const char* s2)
+{
+	int8 res = 0;
+
+	while (!(res = tolower(*s1) - tolower(*s2)) && *s2)
+		s1++, s2++;
+
+	if (res < 0)
+		res = -1;
+	else if (res > 0)
+		res = 1;
+
+	return res;
+}
+
 void strcpy(char* destination, const char* source)
 {
 	char* s = source;

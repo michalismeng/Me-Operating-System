@@ -263,7 +263,7 @@ uint32 gft_get_by_fd(uint32 fd)
 uint32 gft_get_by_name(char* name)
 {
 	for (uint32 i = 0; i < gft.count; i++)
-		if (strcmp(name, gft[i].file_node->name) == 0)
+		if (strcmp_insensitive(name, gft[i].file_node->name) == 0)
 			return i;
 
 	return INVALID_FD;

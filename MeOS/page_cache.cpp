@@ -1,6 +1,7 @@
 #include "page_cache.h"
 #include "open_file_table.h"
 #include "print_utility.h"
+#include "critlock.h"
 
 // private data
 _page_cache page_cache;			// the global page cache
@@ -66,23 +67,6 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 	return finfo;
 }
 
-// TODO: TO BE DELETED
-_page_cache_file* page_cache_get_file(uint32 fd)
-{
-	/*for (uint32 i = 0; i < page_cache.cached_files.count; i++)
-		if (page_cache.cached_files[i].gfd == fd)
-			return &page_cache.cached_files[i];*/
-
-	return 0;
-}
-
-// TODO: TO BE DELETED
-_page_cache_file* page_cache_get_first_unused()
-{
-	// trick here.
-	return page_cache_get_file(INVALID_FD);
-}
-
 // public functions
 
 error_t page_cache_init(virtual_addr start, uint32 no_buffers)
@@ -137,7 +121,9 @@ virtual_addr page_cache_get_buffer(uint32 gfd, uint32 page)
 virtual_addr page_cache_reserve_anonymous()
 {
 	// find the first free buffer index
+	//critlock_acquire();
 	uint32 free_buf = page_cache_index_free_buffer();
+	//critlock_release();
 
 	// could not find free buffer. Die!
 	if (free_buf >= page_cache_num_buffers())
@@ -157,11 +143,13 @@ virtual_addr page_cache_reserve_anonymous()
 		return 0;*/
 		// if page is present and page is re-allocated then vmmngr_flush_TLB_entry(address);
 
+	//critlock_acquire();
 	if (vmmngr_alloc_page(address) != ERROR_OK)
 	{
 		page_cache_index_release_buffer(free_buf);
 		return 0;
 	}
+	//critlock_release();
 
 	return address;
 }
@@ -173,8 +161,10 @@ void page_cache_release_anonymous(virtual_addr address)
 	if (index >= page_cache_num_buffers())
 		return;
 
+	//critlock_acquire();
 	page_cache_index_release_buffer(index);
 	vmmngr_free_page_addr(address); 
+	//critlock_release();
 	// ?? The cache will eat up space until it reaches a lethal point. Then a special kernel thread will clean up.
 }
 
@@ -256,59 +246,6 @@ error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 	}
 
 	page_cache_release_anonymous(page_cache_addr_by_index(index));
-
-	return ERROR_OK;
-}
-
-// TODO: TO BE DELETED
-error_t page_cache_register_file(uint32 gfd)
-{	
-	// if the file doesnt exist then we must create an entry for it either add a new one, or consume an unused one.
-	if (page_cache_get_file(gfd) == 0)
-	{
-		_page_cache_file* unused = page_cache_get_first_unused();
-		if (unused == 0)		// page cache entries vector is full so extend it
-		{
-			_page_cache_file file;
-			file.gfd = gfd;
-			list_init(&file.pages);
-
-			//if (vector_insert_back(&page_cache.cached_files, file) != ERROR_OK)
-				//return ERROR_OCCUR;
-		}
-		else					// replace the empty entry found with the new one
-		{
-			unused->gfd = gfd;
-			list_init(&unused->pages);
-		}
-	}
-
-	return ERROR_OK;
-
-	// if the file exists, we do nothing.
-}
-
-// TODO: TO BE DELETED
-error_t page_cache_unregister_file(uint32 gfd)
-{
-	//if (gfd >= page_cache.cached_files.count || page_cache.cached_files[gfd].gfd == INVALID_FD)		// kinda erroneous gfd
-	//{
-	//	set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
-	//	return ERROR_OCCUR;
-	//}
-
-	//page_cache.cached_files[gfd].gfd = INVALID_FD;				// invalid global descriptor
-
-	// release all buffers associated with this file
-	//auto temp = page_cache.cached_files[gfd].pages.head;
-	//while (temp != 0)
-	//{
-	//	page_cache_index_release_buffer(temp->data.buffer_index);
-	//	temp = temp->next;
-	//}
-
-	//// TODO: Check errors for this line
-	//list_clear(&page_cache.cached_files[gfd].pages);	// empty page list.	
 
 	return ERROR_OK;
 }

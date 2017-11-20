@@ -2,6 +2,7 @@
 #include "thread_sched.h"
 #include "print_utility.h"
 #include "atomic.h"
+#include "critlock.h"
 
 // private functions
 
@@ -116,6 +117,7 @@ size_t read_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buf
 			if (cache == 0)
 			{
 				cache = page_cache_reserve_buffer(gfd, page);
+
 				if (cache == 0)
 					return bytes_read;
 

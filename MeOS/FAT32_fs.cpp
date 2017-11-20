@@ -645,9 +645,9 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 
 	// create the mount point file (root directory)
 
-	MOUNT_DATA(mount_point)->fd = gft_insert_s(create_gfe(mount_point));
-	if (page_cache_register_file(MOUNT_DATA(mount_point)->fd) != ERROR_OK)
-		return 0;
+	//MOUNT_DATA(mount_point)->fd = gft_insert_s(create_gfe(mount_point));
+	/*if (page_cache_register_file(MOUNT_DATA(mount_point)->fd) != ERROR_OK)
+		return 0;*/
 
 	// load the data at the mount point
 	mount_data->cluster_lba = cluster_lba;

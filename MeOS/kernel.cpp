@@ -56,10 +56,9 @@
 #include "test/test_Fat32.h"
 #include "test/test_open_file_table.h"
 #include "test/test_page_cache.h"
+#include "test/test_AHCI.h"
 
 #include "pe_loader.h"
-
-__declspec(dllexport) extern "C" int add(int x, int y) { return x + y; }
 
 extern "C" uint8 canOutput = 1;
 extern "C" int _fltused = 1;
@@ -204,13 +203,13 @@ void keyboard_fancy_function()
 			if (c == KEYCODE::KEY_R)
 			{
 				printf("reseting system");
-				sleep(500);
+				sleep(100);
 				printf(".");
-				sleep(500);
+				sleep(100);
 				printf(".");
-				sleep(500);
+				sleep(100);
 				printf(".");
-				sleep(500);
+				sleep(100);
 				kybrd_reset_system();
 			}
 			else if (c == KEYCODE::KEY_V)
@@ -483,93 +482,9 @@ void kernel_setup_process(uint32 stack, uint32 entry)
 	for (;;);
 }
 
-virtual_addr pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 image_base, char* name)
-{
-	char** names = (char**)((uint32)export_directory->AddressOfNames + image_base);
-	uint16* ordinals = (uint16*)((uint32)export_directory->AddressOfNameOrdinal + image_base);
-	virtual_addr* addrs = (virtual_addr*)((uint32)export_directory->AddressOfFunctions + image_base);
-
-	for (int i = 0; i < export_directory->NumberOfFunctions; i++)
-	{
-		char* func_name = names[i] + image_base;
-
-		if (strcmp(func_name, name) == 0)
-		{
-			uint16 ordinal = ordinals[i];
-			virtual_addr address = addrs[ordinal] + image_base;
-			return address;
-		}
-	}
-
-	return 0;
-}
-
 TCB* create_test_process(uint32 fd)
 {
-	PCB* proc = process_get_current();//process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
-
-	/*for (uint32 i = 0; i < 1; i++)
-	{
-		size_t read = read_file(fd, i, PAGE_SIZE, (virtual_addr)___buffer);
-		if (read != PAGE_SIZE)
-			printfln("read error: %e", get_last_error());
-	}
-
-	if (!validate_PE_image((void*)___buffer))
-	{
-		DEBUG("Could not load PE image. Corrupt image or data.");
-		return 0;
-	}
-
-	IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)___buffer;
-	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)___buffer);
-	IMAGE_SECTION_HEADER* section = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
-
-	IMAGE_DATA_DIRECTORY* DataDirectory = &nt_header->OptionalHeader.DataDirectory[0];
-	IMAGE_EXPORT_DIRECTORY* exportDirectory = (IMAGE_EXPORT_DIRECTORY*)(DataDirectory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
-
-	serial_printf("image base: %h\n", nt_header->OptionalHeader.ImageBase);
-	serial_printf("stack commit: %u\nstack reserve: %u\nheap commit: %u\nheap reserve: %u\n", 
-		nt_header->OptionalHeader.SizeOfStackCommit, nt_header->OptionalHeader.SizeOfStackReserve,
-		nt_header->OptionalHeader.SizeOfHeapCommit, nt_header->OptionalHeader.SizeOfHeapReserve);
-
-	serial_printf("section name\n");
-	for (int x = 0; x < nt_header->FileHeader.NumberOfSections; x++)
-	{
-		for (int i = 0; i < 8; i++)
-			serial_printf("%c", section[x].Name[i]);
-		serial_printf("\n");
-
-		serial_printf("mmaping fd: %u to %h, size of raw: %h, raw offset: %h, size of virtual: %h\n", lft_get(&process_get_current()->lft, fd)->gfd,
-			section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData, section[x].PointerToRawData, section[x].VirtualSize);
-
-		serial_printf("section characteristics: %h\n", section[x].Characteristics);
-
-
-		if (vfs_mmap_p(proc, section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, 
-			lft_get(&process_get_current()->lft, fd)->gfd, section[x].PointerToRawData, 4096,
-			PROT_READ | PROT_WRITE, MMAP_PRIVATE) == MAP_FAILED)
-		{
-			serial_printf("address: %h size %h", section[x].VirtualAddress + nt_header->OptionalHeader.ImageBase, section[x].SizeOfRawData);
-			PANIC("Could not map for process");
-		}
-	}
-
-	pe_print_export_functions(exportDirectory, nt_header->OptionalHeader.ImageBase);
-
-	typedef int(*add)(int, int);
-	add func = (add)pe_get_export_function_addr(exportDirectory, nt_header->OptionalHeader.ImageBase, "sub");
-
-	if (func == 0)
-	{
-		PANIC("ADD NOT FOUND");
-	}
-
-	serial_printf("sub(20, 10) = %u\n\n", func(20, 10));
-
-	PANIC("");*/
-
-	//PANIC("");
+	PCB* proc = process_get_current(); //process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
 
 	IMAGE_DOS_HEADER* dos_header = pe_load_image(gft_get_by_fd(fd), proc);
 
@@ -580,51 +495,60 @@ TCB* create_test_process(uint32 fd)
 	}
 
 	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)dos_header);
-	IMAGE_DATA_DIRECTORY* import_table_directory = &nt_header->OptionalHeader.DataDirectory[1];
+	IMAGE_DATA_DIRECTORY* import_table_directory = &nt_header->OptionalHeader.DataDirectory[PE_IMPORT_DIRECTORY];
 	IMAGE_IMPORT_DESCRIPTOR* import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(import_table_directory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
-	IMAGE_DATA_DIRECTORY* DataDirectory = &nt_header->OptionalHeader.DataDirectory[0];
-	IMAGE_EXPORT_DIRECTORY* exportDirectory = (IMAGE_EXPORT_DIRECTORY*)(DataDirectory->VirtualAddress + nt_header->OptionalHeader.ImageBase);
 
-	serial_printf("getting export functions\n");
-	pe_print_export_functions(exportDirectory, nt_header->OptionalHeader.ImageBase);
+	serial_printf("parsing dependecies\n");
 
-	//serial_printf("data directory: %h\n", nt_header->OptionalHeader.DataDirectory);
-
-	//uint32 image_base = nt_header->OptionalHeader.ImageBase;
-	//for(; import_descriptor->FirstThunk != 0; import_descriptor++)
-	//{
-	//	//// get the module name
-	//	char* module_name = (char*)(import_descriptor->Name + image_base);
-	//	serial_printf("import module %s\n", module_name);
-	//	serial_printf("time stamp: %u\n", import_descriptor->TimeDateStamp);
-
-	//	IMAGE_THUNK_DATA* thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
-
-	//	// first thunk contains the addresses
-	//	// original first thunk contains the names of the functions.
-
-	//	for(uint32 index = 0; thunk->Function != 0; thunk++, index++)
-	//	{
-	//		char* func_name = (char*)(image_base + thunk->AddressOfData->Name);
-	//		uint32* addr = (uint32*)(image_base + import_descriptor->FirstThunk) + index;
-
-	//		serial_printf("function: %s at %h\n", func_name, *addr);
-
-	//		*addr = (uint32)add;	// bind the function
-	//	}
-	//}
-
-	/*typedef int(*add)(int, int);
-	add func = (add)pe_get_export_function(exportDirectory, nt_header->OptionalHeader.ImageBase, "?add@@YAHHH@Z");
-
-	if (func == 0)
+	uint32 image_base = nt_header->OptionalHeader.ImageBase;
+	for(; import_descriptor->FirstThunk != 0; import_descriptor++)
 	{
-		PANIC("ADD NOT FOUND");
+		//// get the module name
+		char* module_name = (char*)(import_descriptor->Name + image_base);
+		serial_printf("import module %s\n", module_name);
+		serial_printf("time stamp: %u\n", import_descriptor->TimeDateStamp);
+
+		uint32 dep_gfd = gft_get_by_name(module_name);
+
+		if (dep_gfd == INVALID_FD)
+			PANIC("Cannot find dependency\n");
+
+		serial_printf("loading dependency module\n");
+
+		// dependencies
+		/*IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, proc);
+		virtual_addr dep_image_base = pe_get_image_base(dep_dos_header);
+		IMAGE_DATA_DIRECTORY* dep_data_dir = pe_get_data_directory(dep_dos_header);
+		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);*/
+
+		IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, proc);
+		IMAGE_NT_HEADERS* dep_nt_header = pe_get_nt_headers(dep_dos_header);(IMAGE_NT_HEADERS*)(dep_dos_header->e_lfanew + (uint32)dep_dos_header);
+		virtual_addr dep_image_base = dep_nt_header->OptionalHeader.ImageBase; pe_get_image_base(dep_dos_header);
+		IMAGE_DATA_DIRECTORY* dep_data_dir = /*&dep_nt_header->OptionalHeader.DataDirectory[PE_EXPORT_DIRECTORY];*/ pe_get_data_directory(dep_dos_header);
+		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);
+
+		// -----------------------------------------------
+
+		IMAGE_THUNK_DATA* thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
+
+		// first thunk contains the addresses
+		// original first thunk contains the names of the functions.
+
+		for(uint32 index = 0; thunk->Function != 0; thunk++, index++)
+		{
+			char* func_name = (char*)(image_base + thunk->AddressOfData->Name);
+			uint32* addr = (uint32*)(image_base + import_descriptor->FirstThunk) + index;
+
+			virtual_addr address = pe_get_export_function_addr(dep_export_dir, dep_image_base, func_name);
+			serial_printf("found address for function: %s: %h\n", func_name, address);
+
+			*addr = address;	// bind the function
+		}
 	}
 
-	serial_printf("add(10, 20) = %u\n\n", func(10, 20));*/
+	serial_printf("executable loaded.\n\n");
 
-	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + nt_header->OptionalHeader.ImageBase;
+	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + image_base;
 	virtual_addr krnl_stack = kernel_stack_reserve();
 	TCB* thread = 0;
 
@@ -662,7 +586,7 @@ void proc_init_thread()
 	// re-init this processe's local file table against the new heap
 	init_local_file_table(&process_get_current()->lft, 10);
 
-	___buffer = (char*)(3 GB + 10 MB + 10 KB);
+	___buffer = (char*)(3 GB + 10 MB + 12 KB);
 
 	// TODO: standardize this!
 	vbe_mode_info_block* vbe = (vbe_mode_info_block*)(0x2000);
@@ -867,11 +791,11 @@ void proc_init_thread()
 	serial_printf("initializeing screen width mode: %h...\n", boot_info->m_vbe_mode_info);
 	init_screen_gfx(vbe);
 
-	set_foreground_color(0x00FFFFFF);
-	set_background_color(0x000000FF);
+	/*set_foreground_color(0x00FFFFFF);
+	set_background_color(0x000000FF);*/
 
-	/*set_foreground_color(0x000FF00);
-	set_background_color(0);*/
+	set_foreground_color(0x000FF00);
+	set_background_color(0);
 
 	init_print_utility();
 
@@ -920,6 +844,11 @@ void proc_init_thread()
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
 
+	/*if (test_ahci_read() == false)
+		PANIC("AHCI read test failed");
+
+	PANIC("Tests completed");*/
+
 	//virtual_addr buffer = page_cache_reserve_anonymous();
 
 	//*(uint32*)(buffer) = 0;
@@ -960,13 +889,13 @@ void proc_init_thread()
 	//PANIC("");
 	
 	uint32 __fd;
-	/*if (open_file("sdc_mount/TESTEXPT.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+	if (open_file("sdc_mount/TESTEXPT.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
 	{
 		printfln("open file error: %e", get_last_error());
 		return;
-	}*/
+	}
 
-	/*if (open_file("sdc_mount/TESTDLL.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+	if (open_file("sdc_mount/TESTDLL.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
 	{
 		printfln("open file error: %e", get_last_error());
 		return;
@@ -974,12 +903,20 @@ void proc_init_thread()
 
 	TCB* proc = create_test_process(__fd);
 
+	//scheduler_print_queues();
+
 	INT_OFF;
-	serial_printf("executing TESTDLL.EXE");
+	serial_printf("executing TESTDLL.EXE\n");
 	thread_insert(proc);
-	INT_ON;*/
+	INT_ON;
 
 	load_default_font();
+	serial_printf("here printng\n");
+
+	scheduler_print_queues();
+
+	//while (true);
+
 
 	clear_screen();
 	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);

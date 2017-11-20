@@ -24,11 +24,6 @@ void pe_get_section_protection_and_flags(uint32 characteristics, uint32* protect
 	}
 }
 
-IMAGE_NT_HEADERS* pe_get_nt_headers(IMAGE_DOS_HEADER* header)
-{
-	return (IMAGE_NT_HEADERS*)(header->e_lfanew + (uint32)header);
-}
-
 void pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 image_base, uint32 index, char** name, virtual_addr* address)
 {
 	char** names = (char**)((uint32)export_directory->AddressOfNames + image_base);
@@ -40,6 +35,17 @@ void pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 ima
 }
 
 // public functions
+
+IMAGE_DATA_DIRECTORY* pe_get_data_directory(IMAGE_DOS_HEADER* header)
+{
+	return pe_get_nt_headers(header)->OptionalHeader.DataDirectory;
+}
+
+IMAGE_SECTION_HEADER* pe_get_section_header(IMAGE_DOS_HEADER* header)
+{
+	IMAGE_NT_HEADERS* nt_header = pe_get_nt_headers(header);
+	return (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);;
+}
 
 IMAGE_DOS_HEADER* pe_load_image(uint32 gfd, PCB* proc)
 {
@@ -65,7 +71,7 @@ IMAGE_DOS_HEADER* pe_load_image(uint32 gfd, PCB* proc)
 	uint32 image_base = nt_header->OptionalHeader.ImageBase;
 
 	// map section data - assume they are page aligned
-	IMAGE_SECTION_HEADER* section = (IMAGE_SECTION_HEADER*)((char*)&nt_header->OptionalHeader + nt_header->FileHeader.SizeOfOptionalHeader);
+	IMAGE_SECTION_HEADER* section = pe_get_section_header(dos_header);
 	for (uint32 i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
 	{
 		for (int j = 0; j < 8; j++)

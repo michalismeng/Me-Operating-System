@@ -176,7 +176,10 @@ void scheduler_thread_switch()
 	}*/
 
 	if (in_critical_section)
+	{
+
 		return;
+	}
 
 	// assertions:
 	// thread's state is saved on its stack
@@ -450,7 +453,7 @@ void scheduler_print_queue(dl_list<TCB*>& queue)
 	}
 }
 
-void scheduler_print_queues()
+extern "C" void scheduler_print_queues()
 {
 	serial_printf("noraml queues\n");
 	for (int i = 0; i < NUMBER_PRIORITIES; i++)

@@ -68,9 +68,8 @@ void thread_insert(TCB* thread);
 
 void thread_set_priority(TCB* thread, uint32 priority);
 
-void scheduler_print_queues();
+extern "C" void scheduler_print_queues();
 
-void scheduler_print_queue(list<TCB*>& queue);
 void scheduler_print_queue(dl_list<TCB*>& queue);
 
 #endif
