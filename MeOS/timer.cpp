@@ -30,7 +30,7 @@ uint32 get_ticks()
 
 void sleep(uint32 _time)
 {
-	thread_sleep(thread_get_current(), _time);
+	thread_sleep(thread_get_current_node(), _time);
 	//uint32 start = millis();
 	//while (millis() < start + _time);
 	//thread_sleep(thread_get_current(), _time);

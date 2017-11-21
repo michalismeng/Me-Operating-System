@@ -257,6 +257,9 @@
     <ClInclude Include="MeOS\test\test_AHCI.h">
       <Filter>tests</Filter>
     </ClInclude>
+    <ClInclude Include="MeOS\test\test_dl_list.h">
+      <Filter>tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MeOS\cstring.c">
@@ -422,6 +425,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MeOS\test\test_AHCI.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+    <ClCompile Include="MeOS\test\test_dl_list.cpp">
       <Filter>tests</Filter>
     </ClCompile>
   </ItemGroup>

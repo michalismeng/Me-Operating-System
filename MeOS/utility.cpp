@@ -5,6 +5,15 @@
 char hexes[] = "0123456789ABCDEF";
 char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
 
+uint32 get_flags()
+{
+	_asm
+	{
+		pushfd
+		pop eax
+	}
+}
+
 void uitoa(uint32 val, char* buffer, uint8 base)
 {
 	uint16 i = 0;

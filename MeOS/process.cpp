@@ -173,8 +173,10 @@ TCB* thread_create(PCB* parent, uint32 entry, virtual_addr stack_top, uint32 sta
 	if (stack_top % vmmngr_get_page_size() != 0)
 		PANIC("stack must be page-aligned");
 
+	TCB temp;
 	TCB* t;
-	queue_insert(&parent->threads, TCB());
+	queue_insert(&parent->threads, temp);
+
 	t = &parent->threads.tail->data;
 
 	t->id = ++lastID;

@@ -55,7 +55,7 @@ void scheduler_decrease_sleep_time()
 	while (ptr != 0)
 	{
 		TCB* thread = ptr->data;
-		if (elapsed > ptr->data->sleep_time)
+		if (elapsed > thread->sleep_time)
 		{
 			dl_list_node<TCB*>* node;
 			ptr = ptr->next;
@@ -137,7 +137,7 @@ no_tasks:
 }
 
 // returns the first non empty queue, priority taken into account.
-dl_list<TCB*>* sched_get_first_non_empty()
+TCB_list* sched_get_first_non_empty()
 {
 	for (uint32 i = HIGHEST_PRIORITY; i < NUMBER_PRIORITIES; i++)
 		if (scheduler.thread_queues[i].count > 0)
@@ -154,6 +154,16 @@ void init_thread_scheduler()
 		dl_list_init(&scheduler.thread_queues[i]);
 
 	dl_list_init(&scheduler.block_queue);
+	dl_list_init(&scheduler.sleep_queue);
+}
+
+TCB_node* thread_get_current_node()
+{
+	INT_OFF;
+	auto result = dl_list_find_node(&READY_QUEUE(thread_get_priority(current_thread)), current_thread);
+	INT_ON;
+
+	return result;
 }
 
 TCB* thread_get_current()
@@ -169,17 +179,8 @@ PCB* process_get_current()
 void scheduler_thread_switch()
 {
 	// if the current thread is in a critical section (critlock), do not change execution
-	/*if ((current_thread->thread_lock & THREAD_LOCK_CRITICAL) == THREAD_LOCK_CRITICAL)
-	{
-		current_thread->thread_lock |= THREAD_LOCK_YIELD;
-		return;
-	}*/
-
 	if (in_critical_section)
-	{
-
 		return;
-	}
 
 	// assertions:
 	// thread's state is saved on its stack
@@ -201,7 +202,7 @@ void scheduler_thread_switch()
 
 	if (to_execute->state != THREAD_STATE::THREAD_READY)
 	{
-		printfln("thread at %h id: %u stack_base: %h", to_execute, to_execute->id, to_execute->stack_top);
+		serial_printf("thread at %h id: %u stack_base: %h", to_execute, to_execute->id, to_execute->stack_top);
 		PANIC("Received non ready thread to execute");
 	}
 
@@ -221,12 +222,13 @@ void scheduler_start()
 	thread_execute(*current_thread);
 }
 
-void thread_insert(TCB* thread)
+TCB_node* thread_insert(TCB* thread)
 {
 	//TODO: if current thread's priority is lees than the new one's, the current should be pre-empted (except if it is non preemptible)
 	thread->state = THREAD_STATE::THREAD_READY;
-	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), new dl_list_node<TCB*>{ thread });
-	//printfln("inserted");
+	TCB_node* node = new dl_list_node<TCB*>{ thread };
+	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), node);
+	return node;
 }
 
 // TODO: this must be enriched and better written
@@ -288,7 +290,7 @@ __declspec(naked) void thread_current_yield()
 	thread_execute(*current_thread);
 }
 
-__declspec(naked) void thread_block(TCB* thread)
+__declspec(naked) void thread_block(TCB_node* thread)
 {
 	// TODO: Perhaps we will need to disable interrupts throughout this function to control the reading of the thread's state
 	_asm push ebp
@@ -296,34 +298,36 @@ __declspec(naked) void thread_block(TCB* thread)
 
 	INT_OFF;  // cli to mess with common data structure
 
-	if (thread->state == THREAD_STATE::THREAD_BLOCK)
-		PANIC("Thread already blocked"); // return
-
-	if (thread->state != THREAD_STATE::THREAD_RUNNING && thread->state != THREAD_STATE::THREAD_READY)
+	if (thread->data->state == THREAD_STATE::THREAD_BLOCK)
 	{
-		printfln("thread: %u", thread->state);
+		serial_printf("thread: %u already blocked\n", thread->data->id);
+		PANIC(""); // return
+	}
+
+	if (thread->data->state != THREAD_STATE::THREAD_RUNNING && thread->data->state != THREAD_STATE::THREAD_READY)
+	{
+		printfln("thread: %u", thread->data->state);
 		PANIC("thread error: thread neither READY nor RUNNING");  // iretd. Thread is neither running nor ready-waiting
 	}
 
 	// if the thread is not running
 	// we simply remove the thread and add it to the blocked queue
-	if (thread->state != THREAD_STATE::THREAD_RUNNING)
+	if (thread->data->state != THREAD_STATE::THREAD_RUNNING)
 	{
-		thread->state = THREAD_BLOCK;
-
-		auto node = dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread)), dl_list_find_node(&READY_QUEUE(thread_get_priority(thread)), thread));
-		dl_list_insert_back_node(&BLOCK_QUEUE, node); 
+		thread->data->state = THREAD_BLOCK;
+		dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread->data)), thread);
+		dl_list_insert_back_node(&BLOCK_QUEUE, thread); 
 
 		_asm pop ebp
 	}
-	else  // we need to firstly save its state at the stack
+	else  // we need to firstly save its state on the stack
 	{
-		thread->state = THREAD_BLOCK;
+		thread->data->state = THREAD_BLOCK;
 
-		if (thread == current_thread)
+		if (thread->data == current_thread)
 		{
-			auto node = dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)));
-			dl_list_insert_back_node(&BLOCK_QUEUE, node);
+			dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread->data)));
+			dl_list_insert_back_node(&BLOCK_QUEUE, thread);
 
 			_asm pop ebp
 
@@ -342,43 +346,43 @@ __declspec(naked) void thread_block(TCB* thread)
 	_asm ret
 }
 
-__declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
+__declspec(naked) void thread_sleep(TCB_node* thread, uint32 sleep_time)
 {
 	_asm push ebp
 	_asm mov ebp, esp
 
 	INT_OFF;  // cli to mess with common data structure
 
-	if (thread->state == THREAD_STATE::THREAD_SLEEP)
+	if (thread->data->state == THREAD_STATE::THREAD_SLEEP)
 		PANIC("THREAD IS ALREADY SLEEPING");
 
-	if (thread->state != THREAD_STATE::THREAD_RUNNING && thread->state != THREAD_STATE::THREAD_READY)
+	if (thread->data->state != THREAD_STATE::THREAD_RUNNING && thread->data->state != THREAD_STATE::THREAD_READY)
 	{
-		printfln("thread: %u", thread->state);
+		printfln("thread: %u", thread->data->state);
 		PANIC("current thread error");  // iretd. Thread is neither running nor ready-waiting
 	}
 
-	thread->sleep_time = sleep_time;
+	thread->data->sleep_time = sleep_time;
 
 	// if the thread is not running
 	// we simply remove the thread and add it to the sleeping queue
-	if (thread->state != THREAD_STATE::THREAD_RUNNING)
+	if (thread->data->state != THREAD_STATE::THREAD_RUNNING)
 	{
-		thread->state = THREAD_SLEEP;
+		thread->data->state = THREAD_SLEEP;
 
-		auto node = dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread)), dl_list_find_node(&READY_QUEUE(thread_get_priority(thread)), thread));
-		dl_list_insert_back_node(&SLEEP_QUEUE, node);
+		dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread->data)), thread);
+		dl_list_insert_back_node(&SLEEP_QUEUE, thread);
 
 		_asm pop ebp
 	}
 	else  // we need to firstly save its state at the stack
 	{
-		if (thread == current_thread)
+		if (thread->data == current_thread)
 		{
-			thread->state = THREAD_SLEEP;
+			thread->data->state = THREAD_SLEEP;
 
-			auto node = dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread)));
-			dl_list_insert_back_node(&SLEEP_QUEUE, node);
+			dl_list_remove_front_node(&READY_QUEUE(thread_get_priority(thread->data)));
+			dl_list_insert_back_node(&SLEEP_QUEUE, thread);
 
 			_asm pop ebp  // fix the stack to create the interrupt frame
 
@@ -401,20 +405,21 @@ __declspec(naked) void thread_sleep(TCB* thread, uint32 sleep_time)
 	_asm ret
 }
 
-void thread_notify(TCB* thread)
+void thread_notify(TCB_node* thread)
 {
 	INT_OFF;
 
 	// thread must be blocked
-	if (thread->state != THREAD_STATE::THREAD_BLOCK)
+	if (thread->data->state != THREAD_STATE::THREAD_BLOCK)
 	{
+		serial_printf("thread %u not blocked\n", thread->data->id);
 		INT_ON;
 		return;
 	}
 
-	auto node = dl_list_remove_node(&BLOCK_QUEUE, dl_list_find_node(&BLOCK_QUEUE, thread));
-	thread->state = THREAD_STATE::THREAD_READY;
-	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread)), node);
+	auto node = dl_list_remove_node(&BLOCK_QUEUE, thread);
+	thread->data->state = THREAD_STATE::THREAD_READY;
+	dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(thread->data)), node);
 
 
 	// preempt the low priority thread, if it is preemptible
@@ -422,29 +427,15 @@ void thread_notify(TCB* thread)
 		thread_get_lower_priority(thread, thread_get_current()) == thread_get_current())
 		thread_current_yield();*/		
 
-	INT_ON;
+	//INT_ON;
 }
 
-void scheduler_print_queue(list<TCB*>& queue)
+void scheduler_print_queue(TCB_list& queue)
 {
 	if (queue.count == 0)
 		return;
 
-	list_node<TCB*>* ptr = queue.head;
-
-	while (ptr != 0)
-	{
-		serial_printf("Task: %h with address space at: %h and esp: %h, id %u\n", ptr->data->id, ptr->data->parent->page_dir, ptr->data->esp, ptr->data->id);
-		ptr = ptr->next;
-	}
-}
-
-void scheduler_print_queue(dl_list<TCB*>& queue)
-{
-	if (queue.count == 0)
-		return;
-
-	dl_list_node<TCB*>* ptr = queue.head;
+	TCB_node* ptr = queue.head;
 
 	while (ptr != 0)
 	{

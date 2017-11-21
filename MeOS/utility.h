@@ -44,6 +44,9 @@ extern "C" {
 	uint32 pow(uint32 base, uint32 exp);
 	uint32 ceil_division(uint32 value, uint32 divisor);
 
+	uint32 get_flags();
+
+
 #ifdef __cplusplus
 }
 #endif

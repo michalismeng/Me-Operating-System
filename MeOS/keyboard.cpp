@@ -20,8 +20,8 @@ bool _kybrd_diag_res = false;
 bool _kybrd_resend_res = false;
 bool _kybrd_disable = false;
 
-TCB* keyboard_daemon = 0;
-TCB* active = 0;
+TCB_node* keyboard_daemon = 0;
+TCB_node* active = 0;
 size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
 error_t kybd_open(vfs_node* node, uint32 capabilities);
 error_t kybd_ioctl(vfs_node* node, uint32 command, ...);
@@ -41,7 +41,7 @@ size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_
 {
 	size_t temp_count = count;
 	uint8* buffer = (uint8*)address;
-	active = thread_get_current();
+	active = thread_get_current_node();
 	// perhaps we will need to empty the user_buffer at some point
 
 	while (temp_count > 0)
@@ -54,7 +54,7 @@ size_t kybd_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_
 			buffer++;
 		}
 		else
-			thread_block(thread_get_current());
+			thread_block(thread_get_current_node());
 	}
 
 	active = 0;
@@ -491,7 +491,7 @@ void keyboard_irq()
 			}
 		}
 
-		thread_block(thread_get_current());
+		thread_block(thread_get_current_node());
 	}
 }
 
@@ -515,7 +515,7 @@ void init_keyboard()
 		PANIC("keyboard stack allocation failed");
 
 	// parent is the kernel init thread
-	keyboard_daemon = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, krnl_stack, 4 KB, 1, 0);
-	thread_insert(keyboard_daemon);
+	auto temp = thread_create(thread_get_current()->parent, (uint32)keyboard_irq, krnl_stack, 4 KB, 1, 0);
+	keyboard_daemon = thread_insert(temp);
 	thread_block(keyboard_daemon);
 }

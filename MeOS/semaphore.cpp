@@ -1,28 +1,34 @@
 #include "semaphore.h"
 
+extern _thread_sched scheduler;
+
 void semaphore_init(semaphore* s, int32 initial_value)
 {
 	s->lock = initial_value;
-	queue_init(&s->waiting_threads);
+	dl_list_init(&s->waiting_threads);
 }
 
 void semaphore_wait(semaphore* s)
 {
+	auto thread = thread_get_current_node();
 	INT_OFF;
 
-	while (s->lock <= 0)
+	if (s->lock <= 0)
 	{
-		queue_insert(&s->waiting_threads, thread_get_current());
-		thread_block(thread_get_current());
+		thread->data->state = THREAD_STATE::THREAD_BLOCK;
+		dl_list_remove_node(&READY_QUEUE(thread_get_priority(thread->data)), thread);
+		dl_list_insert_back_node(&s->waiting_threads, thread);
+		thread_current_yield();
 	}
-
-	s->lock--;
+	else
+		s->lock--;
 
 	INT_ON;
 }
 
 bool semaphore_try_wait(semaphore* s)
 {
+	PANIC("try wait is not implemented");
 	INT_OFF;
 
 	if (s->lock <= 0)
@@ -44,15 +50,13 @@ void semaphore_signal(semaphore* s)
 
 	if (s->waiting_threads.count > 0)
 	{
-		// remove a thread from our qaiting queue
-		TCB* temp = queue_peek(&s->waiting_threads);
-		queue_remove(&s->waiting_threads);
-
-		// notify the thread
-		thread_notify(temp);
+		// remove a thread from our qaiting queue and notify it
+		TCB_node* temp = dl_list_remove_front_node(&s->waiting_threads);
+		temp->data->state = THREAD_STATE::THREAD_READY;
+		dl_list_insert_back_node(&READY_QUEUE(thread_get_priority(temp->data)), temp);
 	}
-
-	s->lock++;
+	else
+		s->lock++;
 
 	INT_ON;
 }

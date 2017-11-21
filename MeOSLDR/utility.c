@@ -3,6 +3,8 @@
 char hexes[] = "0123456789ABCDEF";
 char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
 
+
+
 void uitoa(uint32 val, char* buffer, uint8 base)
 {
 	uint16 i = 0;

@@ -13,10 +13,10 @@ HBA_MEM_t* abar;		// PCI header Base address register 5 relative to the ahci con
 uint32 AHCI_BASE = 0;
 uint32 port_ok = 0;		// bit significant variable that states if port is ok for use
 
-TCB* ahci_daemon = 0;
+TCB_node* ahci_daemon = 0;
 vfs_node* ahci_port_nodes[32] = { 0 };
-
-semaphore request_semaphore;
+semaphore ahci_callback_sem = { 1 };
+semaphore ahci_request_sem = { 1 };
 
 //error_t ahci_open(vfs_node* node);
 size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address);
@@ -59,33 +59,34 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 	// write to ensure address is allocated
 	//*(char*)address = 0;
 
-	ahci_message message;
-	message.issuer = thread_get_current();
-	message.port = port;
-	message.low_lba = start;
-	message.high_lba = high_lba;
-	message.count = count;
-	message.address = vmmngr_get_phys_addr(address);
-	message.read = true;
-
-	semaphore_signal(&request_semaphore);
-
-	while (true)
-		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
-			break;
-
-	// TODO: Combine these into one function
-	INT_OFF;
-	thread_notify(ahci_daemon);
-	thread_block(thread_get_current());
-	INT_ON;
-
-	// message result is filled by the daemon
-	if (message.result != ERROR_OK)
-	{
-		PANIC("error");
+	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), true) != ERROR_OK)
 		return INVALID_IO;
-	}
+		 
+	//ahci_message message;
+	//message.issuer = thread_get_current();
+	//message.port = port;
+	//message.low_lba = start;
+	//message.high_lba = high_lba;
+	//message.count = count;
+	//message.address = vmmngr_get_phys_addr(address);
+	//message.read = true;
+
+	//while (true)
+	//	if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
+	//		break;
+
+	//// TODO: Combine these into one function
+	//INT_OFF;
+	//thread_notify(ahci_daemon);
+	//thread_block(thread_get_current_node());
+	//INT_ON;
+
+	//// message result is filled by the daemon
+	//if (message.result != ERROR_OK)
+	//{
+	//	PANIC("error");
+	//	return INVALID_IO;
+	//}
 
 	return count;
 }
@@ -106,30 +107,33 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 		return INVALID_IO;
 	}
 
-	ahci_message message;
-	message.issuer = thread_get_current();
-	message.port = port;
-	message.low_lba = start;
-	message.high_lba = high_lba;
-	message.count = count;
-	message.address = vmmngr_get_phys_addr(address);
-	message.read = false;
-
-	while (true)
-		if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
-			break;
-
-	// TODO: Combine these into one function
-	INT_OFF;
-	thread_notify(ahci_daemon);
-	thread_block(thread_get_current());
-	INT_ON;
-
-	if (message.result != ERROR_OK)
-	{
-		set_raw_error(message.result);
+	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), false) != ERROR_OK)
 		return INVALID_IO;
-	}
+
+	//ahci_message message;
+	//message.issuer = thread_get_current();
+	//message.port = port;
+	//message.low_lba = start;
+	//message.high_lba = high_lba;
+	//message.count = count;
+	//message.address = vmmngr_get_phys_addr(address);
+	//message.read = false;
+
+	//while (true)
+	//	if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
+	//		break;
+
+	//// TODO: Combine these into one function
+	//INT_OFF;
+	//thread_notify(ahci_daemon);
+	//thread_block(thread_get_current_node());
+	//INT_ON;
+
+	//if (message.result != ERROR_OK)
+	//{
+	//	set_raw_error(message.result);
+	//	return INVALID_IO;
+	//}
 
 	return count;
 }
@@ -160,6 +164,8 @@ int32 ahci_find_empty_slot(HBA_PORT_t* port)
 
 error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD count, physical_addr buf, bool read)
 {
+	// wait for a request slot to be available
+	semaphore_wait(&ahci_request_sem);
 	port->is = (DWORD)-1;	// clear interrupts
 
 	int slot = ahci_find_empty_slot(port) + 1;
@@ -235,7 +241,14 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 	}
 
 	port->ci |= 1 << slot;	// Issue command
-	thread_block(thread_get_current());
+
+	// wait for the ahci interrupt to signal us
+	semaphore_wait(&ahci_callback_sem);
+
+	// signal that the request has been completed
+	semaphore_signal(&ahci_request_sem);
+
+	//thread_block(thread_get_current_node());
 
 	return ERROR_OK;
 }
@@ -296,42 +309,44 @@ void ahci_callback(registers_t* regs)
 		if (ahci_is_interrupt_pending(i))
 		{
 			HBA_PORT_t* port = &abar->ports[i];
-			thread_notify(ahci_daemon);
+			//thread_notify(ahci_daemon);
 
 			port->is = -1;				// clear port interrupts
 			ahci_clear_interrupt(i);	// clear master port interrupt at ahci
+
+			semaphore_signal(&ahci_callback_sem);
 		}
 	}
 }
 
-void ahci_daemon_callback()
-{
-	while (true)
-	{
-		while (request_semaphore.lock > 0)
-		{
-			for (uint8 i = 0; i < ahci_get_no_ports(); i++)
-			{
-				ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
-				while (queue_mpmc_is_empty(&info->messages) == false)
-				{
-					ahci_message* message = queue_mpmc_peek(&info->messages);
-					queue_mpmc_remove(&info->messages);
-
-					error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
-					if (error != ERROR_OK)
-						message->result = get_last_error();
-					else
-						message->result = ERROR_OK;
-
-					thread_notify(message->issuer);
-					semaphore_wait(&request_semaphore);
-				}
-			}
-		}
-		thread_block(thread_get_current());
-	}
-}
+//void ahci_daemon_callback()
+//{
+//	while (true)
+//	{
+//		//while (request_semaphore.lock > 0)
+//		{
+//			for (uint8 i = 0; i < ahci_get_no_ports(); i++)
+//			{
+//				ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
+//				while (queue_mpmc_is_empty(&info->messages) == false)
+//				{
+//					ahci_message* message = queue_mpmc_peek(&info->messages);
+//					queue_mpmc_remove(&info->messages);
+//
+//					error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
+//					if (error != ERROR_OK)
+//						message->result = get_last_error();
+//					else
+//						message->result = ERROR_OK;
+//
+//					////////thread_notify(message->issuer);
+//					//semaphore_wait(&request_semaphore);
+//				}
+//			}
+//		}
+//		thread_block(thread_get_current_node());
+//	}
+//}
 
 #pragma endregion
 
@@ -360,15 +375,18 @@ error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 					return ERROR_OCCUR;
 		}
 	}
-
-	semaphore_init(&request_semaphore, 0);
-	virtual_addr stack = kernel_stack_reserve();
+	
+	// the client must always wait for the callback to happen
+	semaphore_init(&ahci_callback_sem, 0);
+	// there is one ahci-wide available request for the client to consume
+	semaphore_init(&ahci_request_sem, 1);
+	/*virtual_addr stack = kernel_stack_reserve();
 	if (stack == 0)
-		PANIC("ahci stack allocation failed");
+		PANIC("ahci stack allocation failed");*/
 
-	ahci_daemon = thread_create(process_get_current(), (virtual_addr)ahci_daemon_callback, stack, 4096, 1, 0);
-	thread_insert(ahci_daemon);
-	thread_block(ahci_daemon);
+	/*auto temp = thread_create(process_get_current(), (virtual_addr)ahci_daemon_callback, stack, 4096, 1, 0);
+	ahci_daemon = thread_insert(temp);
+	thread_block(ahci_daemon);*/
 
 	register_interrupt_handler(43, ahci_callback);
 	ahci_enable_interrupts(true);

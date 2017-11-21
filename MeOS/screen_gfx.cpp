@@ -152,7 +152,6 @@ void clear_screen()
 
 void load_default_font()
 {
-	serial_printf("font\n");
 	if (open_file("sdc_mount/FONT.RAW", &font_fd, VFS_CAP_READ) != ERROR_OK)
 	{
 		serial_printf("**************Font could not be loaded. File not found.*******************\n");

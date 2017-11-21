@@ -68,8 +68,8 @@ bool test_ahci_read()
 	serial_printf("read stuff:\n");
 	spinlock_init(&sp);
 
-	/*for (int i = 0; i < 1024; i++)
-		serial_printf("%c", buf[i]);*/
+	//for (int i = 0; i < 1024; i++)
+	//	serial_printf("%c", buf[i]);
 
 	virtual_addr stack = kernel_stack_reserve();
 	if (stack == 0)

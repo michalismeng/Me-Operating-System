@@ -205,11 +205,8 @@ error_t vmmngr_map_page(pdirectory* dir, physical_addr phys, virtual_addr virt, 
 	pd_entry* e = vmmngr_pdirectory_lookup_entry(dir, virt);
 
 	if (pd_entry_test_attrib(e, I86_PDE_PRESENT) == false)	// table is not present
-	{
 		if (vmmngr_create_table(dir, virt, flags) != ERROR_OK)
 			return ERROR_OCCUR;
-		serial_printf("table not present\n");
-	}
 		
 
 	// here we have a guaranteed working table (perhaps empty)
@@ -259,6 +256,8 @@ error_t vmmngr_initialize(uint32 kernel_pages)
 
 	register_interrupt_handler(14, page_fault);
 	register_bottom_interrupt_handler(14, page_fault_bottom);
+
+	return ERROR_OK;
 }
 
 error_t vmmngr_alloc_page(virtual_addr base)

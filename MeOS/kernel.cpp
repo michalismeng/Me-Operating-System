@@ -57,6 +57,7 @@
 #include "test/test_open_file_table.h"
 #include "test/test_page_cache.h"
 #include "test/test_AHCI.h"
+#include "test/test_dl_list.h"
 
 #include "pe_loader.h"
 
@@ -87,11 +88,14 @@ uint32 fail_remove = 0;
 
 void test1()
 {
-	serial_printf("executing test 1\n");
+	serial_printf("executing test 1\n\n");
 
-	for (int i = 0; i < 10000000; i++)
+	for (int i = 0; i < 500; i++)
 	{
-		critlock_acquire();
+		semaphore_wait(&sem);
+
+		if (i % 100 == 0)
+			serial_printf("test 1: %u\n", i);
 
 		_asm
 		{
@@ -105,32 +109,23 @@ void test1()
 			mov a, eax
 		}
 
-		critlock_release();
-
-		//if (!queue_lf_insert(&q, (short)i))
-		//	fail_insert++;
+		semaphore_signal(&sem);
 	}
 
-
-
-	//printfln("fail insert: %u", fail_insert);
-
-	//thread_sleep(thread_get_current(), 1000);
-	//printfln("queue:");
-	//for (int i = 0; i < 10; i++)
-	//	printf("%u ", q.buffer[i]);
-
-	serial_printf("test 1 finished: %u\n", a);
+	serial_printf("test 1 finished: %u\n\n", a);
 	while (true);
 }
 
 void test2()
 {
-	serial_printf("executing test 2");
+	serial_printf("executing test 2\n\n");
 
-	for (int i = 0; i < 10000000; i++)
+	for (int i = 0; i < 500; i++)
 	{
-		critlock_acquire();
+		semaphore_wait(&sem);
+
+		if (i % 100 == 0)
+			serial_printf("test 2: %u\n", i);
 
 		_asm
 		{
@@ -139,21 +134,9 @@ void test2()
 			mov a, eax
 		}
 
-		critlock_release();
-
-		//if (!queue_lf_insert(&q, (short)i))
-		//	fail_insert++;
+		semaphore_signal(&sem);
 	}
-
-	/*char* x = (char*)0x800000;
-
-	for (int i = 0; i < 5; i++)
-		x[i] = 'b';
-
-	serial_printf("end of test2\n");*/
-
-
-	serial_printf("test 2 finished: %u\n", a);
+	serial_printf("test 2 finished: %u\n\n", a);
 
 	while (true);
 }
@@ -186,7 +169,7 @@ TCB* thread_test_time;
 TCB* create_test_process(uint32 fd);
 
 extern char* ___buffer;
-char __temp[4096] = {'a', 'b', 'c', 'd', 0};
+//char __temp[4096] = {'a', 'b', 'c', 'd', 0};
 
 void keyboard_fancy_function()
 {
@@ -522,9 +505,9 @@ TCB* create_test_process(uint32 fd)
 		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);*/
 
 		IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, proc);
-		IMAGE_NT_HEADERS* dep_nt_header = pe_get_nt_headers(dep_dos_header);(IMAGE_NT_HEADERS*)(dep_dos_header->e_lfanew + (uint32)dep_dos_header);
-		virtual_addr dep_image_base = dep_nt_header->OptionalHeader.ImageBase; pe_get_image_base(dep_dos_header);
-		IMAGE_DATA_DIRECTORY* dep_data_dir = /*&dep_nt_header->OptionalHeader.DataDirectory[PE_EXPORT_DIRECTORY];*/ pe_get_data_directory(dep_dos_header);
+		//IMAGE_NT_HEADERS* dep_nt_header = pe_get_nt_headers(dep_dos_header);(IMAGE_NT_HEADERS*)(dep_dos_header->e_lfanew + (uint32)dep_dos_header);
+		virtual_addr dep_image_base = pe_get_image_base(dep_dos_header);
+		IMAGE_DATA_DIRECTORY* dep_data_dir = &pe_get_data_directory(dep_dos_header)[PE_EXPORT_DIRECTORY];
 		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);
 
 		// -----------------------------------------------
@@ -565,7 +548,7 @@ multiboot_info* boot_info;
 void proc_init_thread()
 {
 	INT_OFF;
-	printfln("executing %s", __FUNCTION__);
+	serial_printf("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
 	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS) == MAP_FAILED)
@@ -599,6 +582,7 @@ void proc_init_thread()
 	_abar = PCIFindAHCI();
 
 	uint32 ahci_base = 0x200000;
+	INT_OFF;
 	init_ahci(_abar, ahci_base);
 
 	/*init_net();
@@ -708,26 +692,12 @@ void proc_init_thread()
 	// initialize the page cache
 	//page_cache_print();
 	//debugf("");
-	INT_OFF;
 
 	uint32 error;
 	vfs_node* n;
+	INT_OFF;
+	//init_keyboard();	
 
-
-	init_keyboard();	
-
-	//uint32 addr = 0x700000;
-	//int fd;
-	//if (open_file("sdc_mount/FOLDER/NEW_DIR/MIC.TXT", &fd) != VFS_OK)
-	//	PANIC("Cannot open fd");
-
-	//if (read_file(fd, 0, 20, addr) != 20)
-	//	PANIC("Could not read");
-
-	//for (int i = 0; i < 20; i++)serial_printf("%c", ((char*)addr)[i]);	// lengthy procedure
-	//printfln("End load");
-
-	//PANIC("");
 #ifdef TEST_ENV
 	if (test_open_file_table_open() == false)
 	{
@@ -809,9 +779,13 @@ void proc_init_thread()
 	}
 	serial_printf("kernel stack top for idle: %h\n", krnl_stack);
 
+	semaphore_init(&sem, 1);
+
+	INT_OFF;
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)idle, krnl_stack, 4 KB, 7, 0));
 	/*thread_insert(thread_create(thread_get_current()->parent, (uint32)test1, 3 GB + 10 MB + 512 KB, 4 KB, 3, 0));
 	thread_insert(thread_create(thread_get_current()->parent, (uint32)test2, 3 GB + 10 MB + 508 KB, 4 KB, 3, 0));*/
+
 	/*TCB* thread = thread_create(thread_get_current()->parent, (uint32)test3, 3 GB + 10 MB + 500 KB, 4 KB, 1);
 	thread_insert(thread); */
 	//TCB* thread = thread_create(thread_get_current()->parent, (uint32)test_print_time, 3 GB + 10 MB + 504 KB, 4 KB, 3);
@@ -821,16 +795,22 @@ void proc_init_thread()
 
 	// create new test process to run keyboard fancy function.
 	//PCB* p = process_create(process_get_current(), 0, 0, 0xFFFFFFFF);
-	krnl_stack = kernel_stack_reserve();
+	/*krnl_stack = kernel_stack_reserve();
 	if (krnl_stack == 0)
 	{
 		serial_printf("kernel stack allocation failed: %e", get_last_error());
 		PANIC("");
-	}
-	thread_insert(thread_create(process_get_current(), (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));
-
-	//serial_printf("int on\n");
+	}*/
+	INT_OFF;
+	//auto fancy_node = thread_insert(thread_create(process_get_current(), (uint32)keyboard_fancy_function, krnl_stack, 4 KB, 3, 0));
+	serial_printf("main queues\n\n");
+	scheduler_print_queues();
 	INT_ON;
+
+	/*if (test_ahci_read() == false)
+		PANIC("AHCI read test failed");
+
+	PANIC("Tests completed");*/
 
 	vfs_node* dev;
 	if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
@@ -843,11 +823,6 @@ void proc_init_thread()
 		vfs_node* hierarchy = fat_fs_mount("sdc_mount", dev);
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
-
-	/*if (test_ahci_read() == false)
-		PANIC("AHCI read test failed");
-
-	PANIC("Tests completed");*/
 
 	//virtual_addr buffer = page_cache_reserve_anonymous();
 
@@ -913,10 +888,7 @@ void proc_init_thread()
 	load_default_font();
 	serial_printf("here printng\n");
 
-	scheduler_print_queues();
-
 	//while (true);
-
 
 	clear_screen();
 	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);

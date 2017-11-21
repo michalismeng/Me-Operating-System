@@ -230,6 +230,7 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\system.h" />
     <ClInclude Include="MeOS\test\test_AHCI.h" />
     <ClInclude Include="MeOS\test\test_base.h" />
+    <ClInclude Include="MeOS\test\test_dl_list.h" />
     <ClInclude Include="MeOS\test\test_Fat32.h" />
     <ClInclude Include="MeOS\test\test_open_file_table.h" />
     <ClInclude Include="MeOS\test\test_page_cache.h" />
@@ -305,6 +306,7 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\spinlock.cpp" />
     <ClCompile Include="MeOS\system.c" />
     <ClCompile Include="MeOS\test\test_AHCI.cpp" />
+    <ClCompile Include="MeOS\test\test_dl_list.cpp" />
     <ClCompile Include="MeOS\test\test_FAT32.cpp" />
     <ClCompile Include="MeOS\test\test_open_file_table.cpp" />
     <ClCompile Include="MeOS\test\test_page_cache.cpp" />

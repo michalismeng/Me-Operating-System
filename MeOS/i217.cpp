@@ -9,7 +9,7 @@
 #include "thread_sched.h"
 #include "kernel_stack.h"
 
-TCB* net_daemon = 0;
+TCB_node* net_daemon = 0;
 queue_spsc<uint32> recv_queue;
 
 void e1000_write_command(e1000* dev, uint16 addr, uint32 value)
@@ -196,7 +196,7 @@ void e1000_recv_defered()
 			packet_in_process = false;
 		}
 
-		thread_block(thread_get_current());
+		////////thread_block(thread_get_current());
 	}
 }
 
@@ -379,10 +379,9 @@ e1000* e1000_start(uint8 bar_type, uint32 mem_base, physical_addr tx_base, physi
 	if (krnl_stack == 0)
 		PANIC("i217 kernel stack 0");
 
-	net_daemon = thread_create(thread_get_current()->parent, (uint32)e1000_recv_defered, krnl_stack, 4 KB, 1, 0);
-	serial_printf("net daemon id: %u\n\n", net_daemon->id);
-	thread_insert(net_daemon);
-	thread_block(net_daemon);
+	auto temp = thread_create(thread_get_current()->parent, (uint32)e1000_recv_defered, krnl_stack, 4 KB, 1, 0);
+	net_daemon = thread_insert(temp);
+	//////////thread_block(net_daemon);
 
 	e1000_enable_interrupts(dev);
 
