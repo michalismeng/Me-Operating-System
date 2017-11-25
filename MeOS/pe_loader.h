@@ -9,6 +9,9 @@
 // loads an open image associated with fd to the pdir address space
 IMAGE_DOS_HEADER* pe_load_image(uint32 gfd, PCB* pdir);
 
+// loads all addresses of the depenency_image needed by the image executable
+error_t pe_parse_import_functions(IMAGE_DOS_HEADER* image, IMAGE_DOS_HEADER* dependency_image);
+
 // given the image dos header returns the nt headers
 inline IMAGE_NT_HEADERS* pe_get_nt_headers(IMAGE_DOS_HEADER* header) { return (IMAGE_NT_HEADERS*)(header->e_lfanew + (uint32)header); }
 

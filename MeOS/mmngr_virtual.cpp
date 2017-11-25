@@ -92,6 +92,9 @@ void page_fault_bottom(thread_exception te)
 
 	serial_printf("PAGE_FALUT: PROC: %u ADDRESS: %h, THREAD: %u, CODE: %h\n", process_get_current()->id, addr, thread_get_current()->id, code);
 
+	if (process_get_current()->contract_spinlock == 1)
+		PANIC("PAge fault spinlock is already reserved\n");
+
 	spinlock_acquire(&process_get_current()->contract_spinlock);
 	vm_area* p_area = vm_contract_find_area(&thread_get_current()->parent->memory_contract, addr);
 
@@ -129,6 +132,7 @@ void page_fault_bottom(thread_exception te)
 	if (page_fault_error_is_page_present(code) == true)
 	{
 		serial_printf("memory violation at address: %h with code: %h\n", addr, code);
+		serial_printf("area flags: %h\n", area.flags);
 		PANIC("");
 	}
 
@@ -192,7 +196,8 @@ void page_fault_bottom(thread_exception te)
 			virtual_addr used_cache = page_cache_get_buffer(area.fd, read_start / PAGE_SIZE);
 			//serial_printf("m%h\n", used_cache);
 
-			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), DEFAULT_FLAGS);
+			uint32 flags = page_fault_calculate_present_flags(area.flags);
+			vmmngr_map_page(vmmngr_get_directory(), vmmngr_get_phys_addr(used_cache), addr & (~0xfff), flags/*DEFAULT_FLAGS*/);
 			//serial_printf("shared mapping fd: %u, cache: %h, phys cache: %h, read: %u, addr: %h\n", area.fd, used_cache, used_cache, read_start, addr);
 		}
 	}
@@ -320,7 +325,7 @@ error_t vmmngr_switch_directory(pdirectory* dir, physical_addr pdbr)
 	// if the page directory hasn't change do not flush cr3 as such an action is a performance hit
 	if (pmmngr_get_PDBR() == pdbr)
 		return ERROR_OK;
-	serial_printf("changing dir\n");
+
 	if (!dir)
 	{
 		set_last_error(EINVAL, VMEM_BAD_ARGUMENT, EO_VMMNGR);

@@ -3,8 +3,6 @@
 
 uint32 screen_fd;
 
-char x[4096 * 5];
-
 bool print_utility_initialized = false;
 
 void init_print_utility()

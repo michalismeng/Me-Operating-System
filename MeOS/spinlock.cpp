@@ -8,10 +8,11 @@ void spinlock_init(spinlock* lock)
 
 void spinlock_acquire(spinlock* lock)
 {
+	auto thread = thread_get_current_node();
 	INT_OFF;
 
 	while (*lock == 1)
-		thread_sleep(thread_get_current_node(), 1);		// dummy sleep to loose a turn in the scheduling
+		thread_sleep(thread, 1);		// dummy sleep to loose a turn in the scheduling
 
 	*lock = 1;		// lock acquired
 

@@ -108,8 +108,8 @@ size_t read_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buf
 			uint32 page = start / PAGE_CACHE_SIZE + i;
 
 			// do not read past the end of file
-			/*if (page * PAGE_CACHE_SIZE >= entry->file_node->file_length)
-				break;*/
+			if (page * PAGE_CACHE_SIZE >= entry->file_node->file_length)
+				break;
 
 			virtual_addr cache = page_cache_get_buffer(gfd, page);
 
@@ -132,12 +132,12 @@ size_t read_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buf
 			if(buffer != -1)
 				memcpy((uint8*)buffer + i * PAGE_CACHE_SIZE, (void*)cache, min(count - bytes_read, PAGE_CACHE_SIZE));
 
-			/*if (count - bytes_read < PAGE_CACHE_SIZE)
+			if (count - bytes_read < PAGE_CACHE_SIZE)
 			{
 				serial_printf("zeroing cache for addr: %h", buffer + i * PAGE_CACHE_SIZE);
 				memset((char*)cache + count - bytes_read, 0, count - bytes_read);
 
-			}*/
+			}
 
 			bytes_read += min(count - bytes_read, PAGE_CACHE_SIZE);
 		}
@@ -219,18 +219,6 @@ size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer)
 				memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
 
 			bytes_written += min(count - bytes_written, PAGE_CACHE_SIZE);
-
-			//if (count - bytes_written >= PAGE_CACHE_SIZE)
-			//{
-			//	memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
-			//	bytes_written += PAGE_CACHE_SIZE;
-			//}
-			//else
-			//{
-			//	memcpy((void*)cache, (uint8*)buffer + i * PAGE_CACHE_SIZE, count - bytes_written);
-			//	bytes_written += count - bytes_written;
-			//}
-
 			// TODO: make page dirty
 
 		}

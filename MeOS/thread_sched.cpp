@@ -354,7 +354,10 @@ __declspec(naked) void thread_sleep(TCB_node* thread, uint32 sleep_time)
 	INT_OFF;  // cli to mess with common data structure
 
 	if (thread->data->state == THREAD_STATE::THREAD_SLEEP)
-		PANIC("THREAD IS ALREADY SLEEPING");
+	{
+		serial_printf("THREAD %u IS ALREADY SLEEPING", thread->data->id);
+		PANIC("");
+	}
 
 	if (thread->data->state != THREAD_STATE::THREAD_RUNNING && thread->data->state != THREAD_STATE::THREAD_READY)
 	{

@@ -22,6 +22,8 @@ void pe_get_section_protection_and_flags(uint32 characteristics, uint32* protect
 		*protection = PROT_READ | PROT_WRITE;
 		*flags = MMAP_ANONYMOUS | MMAP_PRIVATE;
 	}
+
+	*flags |= MMAP_USER;
 }
 
 void pe_get_export_function(IMAGE_EXPORT_DIRECTORY* export_directory, uint32 image_base, uint32 index, char** name, virtual_addr* address)
@@ -96,6 +98,31 @@ IMAGE_DOS_HEADER* pe_load_image(uint32 gfd, PCB* proc)
 	}
 
 	return dos_header;
+}
+
+error_t pe_parse_import_functions(IMAGE_DOS_HEADER* image, IMAGE_DOS_HEADER* dependency_image)
+{
+	virtual_addr image_base = pe_get_image_base(image);
+	IMAGE_DATA_DIRECTORY* data_dir = &pe_get_data_directory(image)[PE_IMPORT_DIRECTORY];
+	IMAGE_IMPORT_DESCRIPTOR* import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(data_dir->VirtualAddress + image_base);
+	IMAGE_THUNK_DATA* thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
+
+	virtual_addr dep_image_base = pe_get_image_base(dependency_image);
+	IMAGE_DATA_DIRECTORY* dep_data_dir = &pe_get_data_directory(dependency_image)[PE_EXPORT_DIRECTORY];
+	IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);
+
+	for (uint32 index = 0; thunk->Function != 0; thunk++, index++)
+	{
+		char* func_name = (char*)(image_base + thunk->AddressOfData->Name);
+		uint32* addr = (uint32*)(image_base + import_descriptor->FirstThunk) + index;
+
+		virtual_addr address = pe_get_export_function_addr(dep_export_dir, dep_image_base, func_name);
+		serial_printf("found address for function: %s: %h\n", func_name, address);
+
+		*addr = address;	// bind the function
+	}
+
+	return ERROR_OK;
 }
 
 bool validate_PE_image(void* image)

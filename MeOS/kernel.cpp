@@ -169,7 +169,6 @@ TCB* thread_test_time;
 TCB* create_test_process(uint32 fd);
 
 extern char* ___buffer;
-//char __temp[4096] = {'a', 'b', 'c', 'd', 0};
 
 void keyboard_fancy_function()
 {
@@ -214,57 +213,7 @@ void keyboard_fancy_function()
 			}
 			else if (c == KEYCODE::KEY_L)
 			{
-				clear_screen();
-				uint32 test_proc;
-				page_cache_print();
-
-				/*for (int i = 0; i < 256; i++)
-					printf("%c", i);
-				printfln("");*/
-
-				if (open_file("sdc_mount/TEXT.TXT", &test_proc, O_CACHE_ONLY) != VFS_OK)
-					PANIC("could not open text.exe");
-
-				if(vfs_mmap(0x800000, lft_get(&process_get_current()->lft, test_proc)->gfd, 0, 4096, PROT_READ | PROT_WRITE, MMAP_SHARED) == MAP_FAILED)
-					PANIC("Could not map file");
-
-				
-				//printfln("page for text: %h", page_cache_get_buffer(lft_get(&process_get_current()->lft, test_proc)->gfd, 0));
-
-
-				char* x = (char*)0x800000;
-
-				for (int i = 0; i < 10; i++)
-					printf("%c", x[i]);
-				printfln("");
-
-				for (int i = 0; i < 5; i++)
-					x[i] = 'a';
-
-				/*if (open_file("sdc_mount/TEST.EXE", &test_proc, 0) != VFS_OK)
-					PANIC("could not open text.exe");
-
-				TCB* thread = create_test_process(test_proc);
-
-
-				INT_OFF;
-				thread_insert(thread);
-				INT_ON;*/
-
-				/*;
-
-				if (read_file(test_proc, 0, 4096, (virtual_addr)__temp) != 4096)
-				{
-					serial_printf("error %u", get_last_error());
-					PANIC("could not read text.txt");
-				}*/
-
-				page_cache_print();
-
-				/*for (int i = 0; i < 50; i++)
-					printf("%c", __temp[i]);
-				printfln(".End");*/
-
+				scheduler_print_queues();
 			}
 			else if (c == KEYCODE::KEY_S)
 			{
@@ -407,15 +356,13 @@ struct kernel_info
 	idt_entry_t* idt_base;
 };
 
-_declspec(naked)
 void enter_user_mode(uint32 stack, uint32 entry)
 {
 	uint32 kernel_esp;
 	_asm mov [kernel_esp], esp
 
-	//set_tss(0x10, kernel_esp);
-	serial_printf("entering user mode %h, kernel stack: %h %h\n", entry, kernel_esp, stack);
-	_asm ret
+	set_tss(0x10, kernel_esp);
+	serial_printf("entering user mode %h, kernel esp - user stack: %h %h\n", entry, kernel_esp, stack);
 
 	_asm {
 		cli
@@ -439,43 +386,10 @@ void enter_user_mode(uint32 stack, uint32 entry)
 }
 
 // sets up a process and initializes the first thread and its stacks (kernel + user)
-void kernel_setup_process(uint32 stack, uint32 entry)
+void kernel_setup_process(IMAGE_DOS_HEADER* dos_header)
 {
-	/*if (vfs_mmap(1 GB - 28 KB, 0, 0, 32 KB, PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER) == MAP_FAILED)
+	if (vfs_mmap(1 GB - 32 KB, 0, 0, 32 KB, PROT_READ | PROT_WRITE, MMAP_GROWS_DOWN | MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_USER) == MAP_FAILED)
 		PANIC("Cannot map stack");
-
-	vmmngr_alloc_page_f(1 GB - 8 KB, DEFAULT_FLAGS | I86_PTE_USER);
-	vmmngr_alloc_page_f(1 GB - 12 KB, DEFAULT_FLAGS | I86_PTE_USER);*/
-
-	// fix the stack	NOT NEEDED AS THE RETURN VALUE IS PLACED IN THE STACK
-	//_asm sub ebp, 4				// compiler offsets arguments by 8 (due to ebp push and return value on the stack?). we have not the return value so fake it
-
-	serial_printf("executing process: %u\n\n", process_get_current()->id);
-
-	serial_printf("executed testdll with stack: %u at address: %h\n", stack, entry);
-
-	typedef void(*fptr)();
-	((fptr)entry)();
-
-	//_asm call enter_user_mode
-
-	serial_printf("end of execution\n");
-
-	//enter_user_mode(1 GB - 8 KB, (uint32)entry);
-	for (;;);
-}
-
-TCB* create_test_process(uint32 fd)
-{
-	PCB* proc = process_get_current(); //process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
-
-	IMAGE_DOS_HEADER* dos_header = pe_load_image(gft_get_by_fd(fd), proc);
-
-	if (dos_header == 0)
-	{
-		serial_printf("error occured while reading image: %e\n");
-		PANIC("");
-	}
 
 	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(dos_header->e_lfanew + (uint32)dos_header);
 	IMAGE_DATA_DIRECTORY* import_table_directory = &nt_header->OptionalHeader.DataDirectory[PE_IMPORT_DIRECTORY];
@@ -491,54 +405,48 @@ TCB* create_test_process(uint32 fd)
 		serial_printf("import module %s\n", module_name);
 		serial_printf("time stamp: %u\n", import_descriptor->TimeDateStamp);
 
+		// get the dependency gfd (other methods than simply expecting the dependency to be opened must be added here)
 		uint32 dep_gfd = gft_get_by_name(module_name);
 
 		if (dep_gfd == INVALID_FD)
 			PANIC("Cannot find dependency\n");
 
-		serial_printf("loading dependency module\n");
-
 		// dependencies
-		/*IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, proc);
-		virtual_addr dep_image_base = pe_get_image_base(dep_dos_header);
-		IMAGE_DATA_DIRECTORY* dep_data_dir = pe_get_data_directory(dep_dos_header);
-		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);*/
-
-		IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, proc);
-		//IMAGE_NT_HEADERS* dep_nt_header = pe_get_nt_headers(dep_dos_header);(IMAGE_NT_HEADERS*)(dep_dos_header->e_lfanew + (uint32)dep_dos_header);
-		virtual_addr dep_image_base = pe_get_image_base(dep_dos_header);
-		IMAGE_DATA_DIRECTORY* dep_data_dir = &pe_get_data_directory(dep_dos_header)[PE_EXPORT_DIRECTORY];
-		IMAGE_EXPORT_DIRECTORY* dep_export_dir = (IMAGE_EXPORT_DIRECTORY*)(dep_data_dir->VirtualAddress + dep_image_base);
-
-		// -----------------------------------------------
-
-		IMAGE_THUNK_DATA* thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
-
-		// first thunk contains the addresses
-		// original first thunk contains the names of the functions.
-
-		for(uint32 index = 0; thunk->Function != 0; thunk++, index++)
-		{
-			char* func_name = (char*)(image_base + thunk->AddressOfData->Name);
-			uint32* addr = (uint32*)(image_base + import_descriptor->FirstThunk) + index;
-
-			virtual_addr address = pe_get_export_function_addr(dep_export_dir, dep_image_base, func_name);
-			serial_printf("found address for function: %s: %h\n", func_name, address);
-
-			*addr = address;	// bind the function
-		}
+		IMAGE_DOS_HEADER* dep_dos_header = pe_load_image(dep_gfd, process_get_current());
+		pe_parse_import_functions(dos_header, dep_dos_header);
 	}
 
 	serial_printf("executable loaded.\n\n");
 
 	uint32 entry = nt_header->OptionalHeader.AddressOfEntryPoint + image_base;
+	serial_printf("entry point: %h\n", entry);
+	//typedef void(*fptr)();
+	//((fptr)entry)();
+	//((void(*)(void))entry)();
+
+	enter_user_mode(1 GB, entry);
+	for (;;);
+}
+
+TCB* create_test_process(uint32 fd)
+{
+	PCB* proc = process_create(process_get_current(), 0, 3 MB, 0xFFFFE000);
+
+	IMAGE_DOS_HEADER* dos_header = pe_load_image(gft_get_by_fd(fd), proc);
+
+	if (dos_header == 0)
+	{
+		serial_printf("error occured while reading image: %e\n");
+		PANIC("");
+	}
+
 	virtual_addr krnl_stack = kernel_stack_reserve();
 	TCB* thread = 0;
 
 	if (krnl_stack == 0)
 		serial_printf("process creation failed: cannot allocate stack: %e\n", krnl_stack);
 	else
-		thread = thread_create(proc, (uint32)kernel_setup_process, krnl_stack, 4 KB, 3, 2, entry, 4096);
+		thread = thread_create(proc, (uint32)kernel_setup_process, krnl_stack, 4 KB, 3, 1, dos_header);
 
 	return thread;
 }
@@ -551,7 +459,11 @@ void proc_init_thread()
 	serial_printf("executing %s", __FUNCTION__);
 
 	// start setting up heaps, drivers and everything needed.
-	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 12 MB, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS) == MAP_FAILED)
+	if (vfs_mmap(2 GB, INVALID_FD, 0, 1 GB + 10 MB, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS) == MAP_FAILED)
+		PANIC("Could not map kernel land");
+
+	// map the kernel heap as alloc immediate (otherwise, if a page fault occurs in a vfs_mmap the memory_contract spinlock will not be available and the kernel hangs)
+	if (vfs_mmap(3 GB + 11 MB, INVALID_FD, 0, 16 KB, PROT_NONE | PROT_READ | PROT_WRITE, MMAP_PRIVATE | MMAP_ANONYMOUS | MMAP_ALLOC_IMMEDIATE) == MAP_FAILED)
 		PANIC("Could not map kernel land");
 
 	// memory map MMIO
@@ -823,45 +735,6 @@ void proc_init_thread()
 		vfs_node* hierarchy = fat_fs_mount("sdc_mount", dev);
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
-
-	//virtual_addr buffer = page_cache_reserve_anonymous();
-
-	//*(uint32*)(buffer) = 0;
-
-	//uint32 fd;
-	//if (open_file("sdc_mount/TEXT.TXT", &fd, VFS_CAP_READ | VFS_CAP_WRITE | VFS_CAP_CACHE) == ERROR_OCCUR)
-	//{
-	//	serial_printf("error: %e\n", get_last_error());
-	//	PANIC("Could not open text");
-	//}
-
-	//if (read_file(fd, 0, 4096, buffer) == INVALID_IO)
-	//{
-	//	serial_printf("error occur: %e\n", get_last_error());
-	//	PANIC("Could not read");
-	//}
-
-	//char* buf = (char*)buffer;
-	//for (int i = 0; i < 10; i++)
-	//	if (isprint(buf[i]))
-	//	{
-	//		serial_printf("%c", buf[i]);
-	//		buf[i] = 'c';
-	//	}
-
-	//if (write_file(fd, 0, 4096, buffer) != 4096)
-	//{
-	//	serial_printf("error occur: %e\n", get_last_error());
-	//	PANIC("Could not write");
-	//}
-
-	//serial_printf("\n\n");
-	//page_cache_print();
-	//serial_printf("\n\n");
-
-	//serial_printf("end of read\n");
-
-	//PANIC("");
 	
 	uint32 __fd;
 	if (open_file("sdc_mount/TESTEXPT.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)

@@ -61,32 +61,6 @@ size_t ahci_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtu
 
 	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), true) != ERROR_OK)
 		return INVALID_IO;
-		 
-	//ahci_message message;
-	//message.issuer = thread_get_current();
-	//message.port = port;
-	//message.low_lba = start;
-	//message.high_lba = high_lba;
-	//message.count = count;
-	//message.address = vmmngr_get_phys_addr(address);
-	//message.read = true;
-
-	//while (true)
-	//	if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
-	//		break;
-
-	//// TODO: Combine these into one function
-	//INT_OFF;
-	//thread_notify(ahci_daemon);
-	//thread_block(thread_get_current_node());
-	//INT_ON;
-
-	//// message result is filled by the daemon
-	//if (message.result != ERROR_OK)
-	//{
-	//	PANIC("error");
-	//	return INVALID_IO;
-	//}
 
 	return count;
 }
@@ -109,31 +83,6 @@ size_t ahci_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 
 	if (ahci_data_transfer(port, start, high_lba, count, vmmngr_get_phys_addr(address), false) != ERROR_OK)
 		return INVALID_IO;
-
-	//ahci_message message;
-	//message.issuer = thread_get_current();
-	//message.port = port;
-	//message.low_lba = start;
-	//message.high_lba = high_lba;
-	//message.count = count;
-	//message.address = vmmngr_get_phys_addr(address);
-	//message.read = false;
-
-	//while (true)
-	//	if (queue_mpmc_insert(&NODE_INFO(file)->messages, &message))
-	//		break;
-
-	//// TODO: Combine these into one function
-	//INT_OFF;
-	//thread_notify(ahci_daemon);
-	//thread_block(thread_get_current_node());
-	//INT_ON;
-
-	//if (message.result != ERROR_OK)
-	//{
-	//	set_raw_error(message.result);
-	//	return INVALID_IO;
-	//}
 
 	return count;
 }
@@ -248,8 +197,6 @@ error_t ahci_data_transfer(HBA_PORT_t* port, DWORD startl, DWORD starth, DWORD c
 	// signal that the request has been completed
 	semaphore_signal(&ahci_request_sem);
 
-	//thread_block(thread_get_current_node());
-
 	return ERROR_OK;
 }
 
@@ -309,7 +256,6 @@ void ahci_callback(registers_t* regs)
 		if (ahci_is_interrupt_pending(i))
 		{
 			HBA_PORT_t* port = &abar->ports[i];
-			//thread_notify(ahci_daemon);
 
 			port->is = -1;				// clear port interrupts
 			ahci_clear_interrupt(i);	// clear master port interrupt at ahci
@@ -318,35 +264,6 @@ void ahci_callback(registers_t* regs)
 		}
 	}
 }
-
-//void ahci_daemon_callback()
-//{
-//	while (true)
-//	{
-//		//while (request_semaphore.lock > 0)
-//		{
-//			for (uint8 i = 0; i < ahci_get_no_ports(); i++)
-//			{
-//				ahci_storage_info* info = NODE_INFO(ahci_port_nodes[i]);
-//				while (queue_mpmc_is_empty(&info->messages) == false)
-//				{
-//					ahci_message* message = queue_mpmc_peek(&info->messages);
-//					queue_mpmc_remove(&info->messages);
-//
-//					error_t error = ahci_data_transfer(message->port, message->low_lba, message->high_lba, message->count, message->address, message->read);
-//					if (error != ERROR_OK)
-//						message->result = get_last_error();
-//					else
-//						message->result = ERROR_OK;
-//
-//					////////thread_notify(message->issuer);
-//					//semaphore_wait(&request_semaphore);
-//				}
-//			}
-//		}
-//		thread_block(thread_get_current_node());
-//	}
-//}
 
 #pragma endregion
 
@@ -380,13 +297,6 @@ error_t init_ahci(HBA_MEM_t* _abar, uint32 base)
 	semaphore_init(&ahci_callback_sem, 0);
 	// there is one ahci-wide available request for the client to consume
 	semaphore_init(&ahci_request_sem, 1);
-	/*virtual_addr stack = kernel_stack_reserve();
-	if (stack == 0)
-		PANIC("ahci stack allocation failed");*/
-
-	/*auto temp = thread_create(process_get_current(), (virtual_addr)ahci_daemon_callback, stack, 4096, 1, 0);
-	ahci_daemon = thread_insert(temp);
-	thread_block(ahci_daemon);*/
 
 	register_interrupt_handler(43, ahci_callback);
 	ahci_enable_interrupts(true);
@@ -419,9 +329,6 @@ error_t ahci_setup_vfs_port(uint8 port_num)
 	dev_dmd->volume_port = port_num;
 
 	ahci_port_nodes[port_num] = node;
-
-	// allow maximum 10 requests
-	queue_mpmc_init(&dev_dmd->messages, 10);
 
 	return ERROR_OK;
 }
