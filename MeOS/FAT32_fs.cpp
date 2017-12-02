@@ -165,11 +165,11 @@ bool fat_fs_validate_83_name(char* name, uint32 length)
 
 size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	//if (!file->tag->tag)
-	//{
-	//	set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
-	//	return 0;		// read 0 bytes
-	//}
+	if (NODE_DATA(file)->layout_loaded == false)
+	{
+		set_last_error(EPERM, FAT_NODE_NOT_OPEN, EO_MASS_STORAGE_FS);
+		return INVALID_IO;
+	}
 
 	if (start % FAT_FORMAT_PAGE_SIZE != 0 || count % FAT_FORMAT_PAGE_SIZE != 0)
 	{
@@ -194,11 +194,11 @@ size_t fat_fs_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virtua
 
 size_t fat_fs_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
-	//if (!file->tag->tag)
-	//{
-	//	set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
-	//	return 0;	// written zero bytes
-	//}
+	if (NODE_DATA(file)->layout_loaded == false)
+	{
+		set_last_error(EPERM, FAT_NODE_NOT_OPEN, EO_MASS_STORAGE_FS);
+		return INVALID_IO;
+	}
 
 	if (start % FAT_FORMAT_PAGE_SIZE != 0 || count % FAT_FORMAT_PAGE_SIZE != 0)
 	{
@@ -225,7 +225,6 @@ error_t fat_fs_open(vfs_node* node, uint32 capabilities)
 	if (!node->tag->tag)
 		return set_last_error(EINVAL, FAT_BAD_NODE_STRUCTURE, EO_MASS_STORAGE_FS);
 
-	// TODO: filesystem open permission
 	vfs_node* mount_point = node->tag;
 
 	// load the file layout only if the layout has not been loaded. else it is cached so return success.
@@ -551,8 +550,6 @@ list<vfs_node*> fat_fs_read_directory(vfs_node* mount_point, uint32 current_clus
 			return list<vfs_node*>();
 		}
 
-		//vector_insert_back(&MOUNT_DATA(mount_point)->layout, (uint32)offset);	//TODO: What is that??
-
 		// read all directory entries of this cluster. There are 128 entries as each is 32 bytes long
 		for (uint8 i = 0; i < 128; i++)
 		{
@@ -642,12 +639,6 @@ vfs_node* fat_fs_mount(char* mount_name, vfs_node* dev_node)
 	fat_mount_data* mount_data = (fat_mount_data*)mount_point->deep_md;
 	if (vector_init(&mount_data->layout, 1) != ERROR_OK)
 		return 0;
-
-	// create the mount point file (root directory)
-
-	//MOUNT_DATA(mount_point)->fd = gft_insert_s(create_gfe(mount_point));
-	/*if (page_cache_register_file(MOUNT_DATA(mount_point)->fd) != ERROR_OK)
-		return 0;*/
 
 	// load the data at the mount point
 	mount_data->cluster_lba = cluster_lba;

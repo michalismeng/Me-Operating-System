@@ -187,6 +187,7 @@ call format-light.bat"</Command>
     <ClInclude Include="MeOS\Debugger.h" />
     <ClInclude Include="MeOS\descriptor_tables.h" />
     <ClInclude Include="MeOS\dl_list.h" />
+    <ClInclude Include="MeOS\elf.h" />
     <ClInclude Include="MeOS\error.h" />
     <ClInclude Include="MeOS\ethernet.h" />
     <ClInclude Include="MeOS\FAT32_fs.h" />
@@ -259,6 +260,7 @@ call format-light.bat"</Command>
     <ClCompile Include="MeOS\cstring.c" />
     <ClCompile Include="MeOS\Debugger.cpp" />
     <ClCompile Include="MeOS\descriptor_tables.c" />
+    <ClCompile Include="MeOS\elf.cpp" />
     <ClCompile Include="MeOS\error.cpp" />
     <ClCompile Include="MeOS\ethernet.cpp" />
     <ClCompile Include="MeOS\FAT32_fs.cpp" />

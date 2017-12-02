@@ -26,6 +26,7 @@ size_t test_dev_read(uint32 fd, vfs_node* file, uint32 start, size_t count, virt
 size_t test_dev_write(uint32 fd, vfs_node* file, uint32 start, size_t count, virtual_addr address)
 {
 	serial_printf("-----test dev writing-----\n");
+	serial_printf("start: %u\n", start);
 	memcpy(buffer + start, (void*)address, count);
 	return count;
 }

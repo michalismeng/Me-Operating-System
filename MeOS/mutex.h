@@ -5,14 +5,11 @@
 
 #include "system.h"
 #include "types.h"
-#include "utility.h"
-#include "queue.h"
-#include "thread_sched.h"
+#include "semaphore.h"
 
 struct mutex
 {
-	uint32 lock;
-	queue<TCB*> waiting_threads;
+	semaphore binary_sem;
 };
 
 void mutex_init(mutex* m);

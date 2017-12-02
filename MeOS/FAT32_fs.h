@@ -137,7 +137,8 @@ enum FAT_ERROR
 	FAT_BAD_LAYOUT,
 	FAT_INVALID_83_NAME,
 	FAT_NO_CLUSTERS,
-	FAT_BAD_ALIGN
+	FAT_BAD_ALIGN,
+	FAT_NODE_NOT_OPEN
 };
 
 typedef vector<uint32> fat_file_layout;

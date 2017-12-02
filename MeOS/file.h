@@ -44,6 +44,8 @@ enum FILE_ERROR
 	// writes to the file, given its global file descriptor, from the given buffer
 	size_t write_file(uint32 fd, uint32 start, size_t count, virtual_addr buffer);
 
+	size_t write_file_global(uint32 gfd, uint32 start, size_t count, virtual_addr buffer, uint32 capabilities);
+
 	// syncs the file, given its global file descriptor
 	error_t sync_file(uint32 fd, uint32 start_page, uint32 end_page);
 

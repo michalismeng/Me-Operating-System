@@ -11,5 +11,6 @@ bool test_read_file();
 bool test_read_file_cached();
 bool test_write_file_cached();
 bool test_sync_file();
+bool test_write_with_dirty();
 
 #endif

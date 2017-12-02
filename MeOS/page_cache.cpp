@@ -63,8 +63,35 @@ _page_cache_file_info page_cache_file_info_create(uint32 page, uint32 buffer_ind
 	_page_cache_file_info finfo;
 	finfo.page = page;
 	finfo.buffer_index = buffer_index;
+	finfo.dirty = false;
 
 	return finfo;
+}
+
+list_node<_page_cache_file_info>* page_cache_get_finfo(uint32 gfd, uint32 page)
+{
+	if (gfd >= gft_get_table()->count)
+	{
+		set_last_error(EBADF, PAGE_CACHE_OUT_OF_BOUNDS, EO_PAGE_CACHE);
+		return 0;
+	}
+
+	if (gft_get_table()->data[gfd].file_node == 0)
+	{
+		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
+		return 0;
+	}
+
+	auto temp = gft_get_table()->data[gfd].pages.head;
+	while (temp != 0)
+	{
+		if (temp->data.page == page)
+			return temp;
+		temp = temp->next;
+	}
+
+	set_last_error(EINVAL, PAGE_CACHE_FINFO_NOT_FOUND, EO_PAGE_CACHE);
+	return 0;
 }
 
 // public functions
@@ -91,31 +118,13 @@ error_t page_cache_init(virtual_addr start, uint32 no_buffers)
 
 virtual_addr page_cache_get_buffer(uint32 gfd, uint32 page)
 {
-	if (gfd >= gft_get_table()->count)
-	{
-		set_last_error(EBADF, PAGE_CACHE_OUT_OF_BOUNDS, EO_PAGE_CACHE);
-		return 0;
-	}
-
-	if (gft_get_table()->data[gfd].file_node == 0)
-	{
-		set_last_error(EBADF, PAGE_CACHE_INVALID, EO_PAGE_CACHE);
-		return 0;
-	}
-
-	auto temp = gft_get_table()->data[gfd].pages.head;
-	while (temp != 0)
-	{
-		if (temp->data.page == page)
-			break;
-		temp = temp->next;
-	}
+	auto finfo = page_cache_get_finfo(gfd, page);
 
 	// page not found. No buffer is allocated. Return failure.
-	if (temp == 0)
+	if (finfo == 0)
 		return 0;
 
-	return (virtual_addr)(page_cache.cache + temp->data.buffer_index);
+	return (virtual_addr)(page_cache.cache + finfo->data.buffer_index);
 }
 
 virtual_addr page_cache_reserve_anonymous()
@@ -248,6 +257,25 @@ error_t page_cache_release_buffer(uint32 gfd, uint32 page)
 	page_cache_release_anonymous(page_cache_addr_by_index(index));
 
 	return ERROR_OK;
+}
+
+error_t page_cache_make_dirty(uint32 gfd, uint32 page, bool dirty)
+{
+	auto finfo = page_cache_get_finfo(gfd, page);
+	if (finfo == 0)
+		return ERROR_OCCUR;
+
+	finfo->data.dirty = dirty;
+	return ERROR_OK;
+}
+
+bool page_cache_is_page_dirty(uint32 gfd, uint32 page)
+{
+	auto finfo = page_cache_get_finfo(gfd, page);
+	if (finfo == 0)
+		return false;
+
+	return finfo->data.dirty;
 }
 
 void page_cache_print()

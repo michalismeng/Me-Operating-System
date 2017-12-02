@@ -198,6 +198,31 @@ bool test_write_file_cached()
 	RET_SUCCESS;
 }
 
+bool test_write_with_dirty()
+{
+	uint32 fd;
+	if (open_file("dev/test_dev", &fd, VFS_CAP_WRITE | VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
+		FAIL("Could not open test device: %e\n");
+
+	for (int i = 0; i < 512; i++)
+		test_buffer_write[i] = 255 - i;
+
+	serial_printf("writing 512 bytes at first 'page'\n");
+
+	if (write_file(fd, 0, 512, (virtual_addr)test_buffer_write) != 512)
+		FAIL("Could not write test dev: %e\n");
+
+	if (read_file(fd, 4096, 512, (virtual_addr)test_buffer_read) != 512)
+		FAIL("Could not read test dev: %e\n");
+
+	// on sync expect to see only ONE test dev write (although there are two pages read)
+
+	// uncomment and expect to see no test dev write
+	// page_cache_make_dirty(gft_get_by_fd(fd), 0, false);
+
+	RET_SUCCESS;
+}
+
 bool test_sync_file()
 {
 	uint32 fd;

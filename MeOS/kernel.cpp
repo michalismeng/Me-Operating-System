@@ -374,7 +374,7 @@ void enter_user_mode(uint32 stack, uint32 entry)
 
 		push 0x23					// SS, notice it uses same selector as above
 		push dword ptr[stack]
-		pushfd						// push flags, move them to eax and OR with ths IF flags to enable interrupts
+		pushfd						// push flags, move them to eax and OR with the IF flag to enable interrupts
 		pop eax
 		or eax, 0x200
 		push eax
@@ -453,6 +453,10 @@ TCB* create_test_process(uint32 fd)
 
 multiboot_info* boot_info;
 
+//#define TEST_ENV
+
+#include "elf.h"
+
 void proc_init_thread()
 {
 	INT_OFF;
@@ -481,7 +485,7 @@ void proc_init_thread()
 	// re-init this processe's local file table against the new heap
 	init_local_file_table(&process_get_current()->lft, 10);
 
-	___buffer = (char*)(3 GB + 10 MB + 12 KB);
+	___buffer = (char*)(3 GB + 9 MB);
 
 	// TODO: standardize this!
 	vbe_mode_info_block* vbe = (vbe_mode_info_block*)(0x2000);
@@ -608,7 +612,8 @@ void proc_init_thread()
 	uint32 error;
 	vfs_node* n;
 	INT_OFF;
-	//init_keyboard();	
+	init_keyboard();	
+
 
 #ifdef TEST_ENV
 	if (test_open_file_table_open() == false)
@@ -649,16 +654,22 @@ void proc_init_thread()
 
 	init_test_dev();
 
-	// do not run the two tests below simulatneously as they require pages not be cached
+	// do not run the three tests below simulatneously as they require pages not be cached
 	/*if (test_read_file_cached() == false)
 	{
 		serial_printf("read cached file failed");
 		PANIC("");
 	}*/
 
-	if (test_write_file_cached() == false)
+	/*if (test_write_file_cached() == false)
 	{
 		serial_printf("write cached file failed");
+		PANIC("");
+	}*/
+
+	if (test_write_with_dirty() == false)
+	{
+		serial_printf("write cached with firty failed");
 		PANIC("");
 	}
 
@@ -667,6 +678,8 @@ void proc_init_thread()
 		serial_printf("sync cached file failed");
 		PANIC("");
 	}
+
+	PANIC("Tests ended");
 
 #endif
 
@@ -719,11 +732,6 @@ void proc_init_thread()
 	scheduler_print_queues();
 	INT_ON;
 
-	/*if (test_ahci_read() == false)
-		PANIC("AHCI read test failed");
-
-	PANIC("Tests completed");*/
-
 	vfs_node* dev;
 	if (vfs_root_lookup("dev/sdc", &dev) != ERROR_OK)
 		PANIC("Error opening");
@@ -735,8 +743,26 @@ void proc_init_thread()
 		vfs_node* hierarchy = fat_fs_mount("sdc_mount", dev);
 		vfs_add_child(vfs_get_root(), hierarchy);
 	}
-	
+
 	uint32 __fd;
+	if (open_file("sdc_mount/TEST.OUT", &__fd, VFS_CAP_READ) != ERROR_OK)
+	{
+		serial_printf("open file error: %e", get_last_error());
+		PANIC("");
+	}
+
+	___buffer[0] = 1;
+	if (read_file(__fd, 0, 4096, (virtual_addr)___buffer) != 4096)
+	{
+		serial_printf("read file error: %e", get_last_error());
+		PANIC("");
+	}
+
+	elf32_ehdr* hdr = (elf32_ehdr*)___buffer;
+
+	serial_printf("program start: %h\n\n", hdr->e_entry);
+	
+	/*uint32 __fd;
 	if (open_file("sdc_mount/TESTEXPT.EXE", &__fd, VFS_CAP_READ | VFS_CAP_CACHE) != ERROR_OK)
 	{
 		printfln("open file error: %e", get_last_error());
@@ -751,17 +777,13 @@ void proc_init_thread()
 
 	TCB* proc = create_test_process(__fd);
 
-	//scheduler_print_queues();
-
 	INT_OFF;
 	serial_printf("executing TESTDLL.EXE\n");
 	thread_insert(proc);
-	INT_ON;
+	INT_ON;*/
 
 	load_default_font();
 	serial_printf("here printng\n");
-
-	//while (true);
 
 	clear_screen();
 	draw_rectangle({ 400 - 100, 300 - 100 }, { 100, 100 }, 0xFFFFFFFF);

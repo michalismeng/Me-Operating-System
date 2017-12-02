@@ -88,7 +88,7 @@ bool test_page_cache_find_buffer()
 	uint32 fd, gfd;
 
 	if(open_file("dev", &fd, VFS_CAP_READ) != ERROR_OK)
-		FAIL("Could not open keyboard file: %e\n");
+		FAIL("Could not open dev file: %e\n");
 
 	gfd = gft_get_by_fd(fd);
 
